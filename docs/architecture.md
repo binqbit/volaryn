@@ -91,6 +91,20 @@ volaryn/
 
 The program owns settlement validation independently of backend checks. Frontend features cover positions, offers, protection, and writer commitments; shared components contain presentation rather than financial rules. Generated files are never hand-edited. The workspace build regenerates them and checks for drift.
 
+### Business changes and extension boundaries
+
+Keep the product adaptable through cohesive modules and a few explicit boundaries. Introduce an interface where an external dependency must be replaceable or isolated for tests; keep ordinary business logic in concrete functions and types. Extract a strategy only when a real second behavior needs independent selection. No plugin framework, generic workflow engine, interface per entity, or environment switch per feature is required.
+
+| Change | Owning boundary and preserved contract |
+| --- | --- |
+| Replace a data or RPC provider | Adapters normalize identity, units, freshness, and errors into application types. Provider payloads do not become domain or UI contracts. |
+| Change discovery, offer presentation, or suggested terms | Application use cases and frontend feature modules evolve together. Suggestions remain separate from executable, writer-funded offers. |
+| Change asset admission or commercial rules | Admission policy governs new commitments. Any new fee or economic rule is explicitly disclosed and enforced in the agreement version that supports it; active terms remain unchanged. |
+| Change storage or indexing | Read-model query and checkpoint operations belong to the persistence boundary. SQL and database transactions stay inside the adapter. |
+| Extend financial rights | Versioned program instructions own authorization and settlement; generated clients expose those operations to application features. A backend configuration change cannot create an on-chain right. |
+
+Wire concrete adapters at application startup using the committed deployment configuration. Add only the operations a use case needs; avoid a generic repository or universal settlement interface. Frontend features consume typed application models and generated transaction clients through shared helpers, so changing a provider does not require rewriting screens. Expose actions supported by the configured program and agreement version; unknown versions must not be presented as executable.
+
 ## 3. Sources of truth and integrations
 
 | Information | Authority |
@@ -152,11 +166,19 @@ Reuse also requires inspectable program behavior, deployment and upgrade control
 | --- | --- |
 | `ProtocolConfig` | Deployment identity, exact USDC mint/program, and policy authority. Settlement identity is immutable for a deployment. |
 | `AssetPolicy` | Admit a specific underlying and constrain new agreements. |
-| `Agreement` PDA | Writer, unique nonce, optional designated holder, activated holder, exact mints/programs, raw underlying quantity, payout and premium in USDC base units, acceptance deadline, expiry, policy version, timestamps, and state. |
+| `Agreement` PDA | Agreement version, writer, unique nonce, optional designated holder, activated holder, exact mints/programs, raw underlying quantity, payout and premium in USDC base units, acceptance deadline, expiry, policy version, timestamps, and state. |
 | Reserve token account | Holds at least the promised USDC payout; the agreement PDA controls spending. |
 | Underlying settlement token account | Receives the exercised underlying; controlled by the PDA until atomic handoff to the writer. |
 
 Agreement addresses derive from a fixed seed, writer address, and unique nonce. Retain terminal agreement records to prevent reuse and permit account-based reconstruction. Validate account ownership, PDA seeds, signers, mint identities, token programs, and authorities using [Anchor constraints](https://www.anchor-lang.com/docs/references/account-constraints).
+
+### Agreement evolution
+
+Record an explicit agreement version from creation, binding its account layout and financial rules independently of the asset-policy version. Keep economic terms, participant authorization, and lifecycle transitions separate in program code. The base agreement binds exercise authority to the activated holder and provides no transfer instruction. Do not allocate speculative transfer fields or build a second financial model in advance.
+
+Compatible changes retain decoding and behavior for existing accounts. A materially different right uses a new agreement version or a separate deployment, with updated clients and explicit rules for servicing earlier agreements. Identify records by network, program, and agreement address. Existing rights do not migrate merely because the application is redeployed; incompatible changes require a defined migration or continued service by the original program. Versioning does not remove the trust placed in a [program upgrade authority](https://solana.com/docs/programs/deploying#program-management).
+
+For example, a transferable-right variant would add an explicit on-chain change of exercise authority, define sender authorization and recipient consent and eligibility rules, and route exercise and payout to the authorized holder. The recipient must still satisfy the asset-delivery requirement. Its tests must resolve transfer/exercise races, reject transfers after exercise or expiry, reject the previous holder after transfer, and preserve the reserve, writer identity and obligation, premium, quantity, payout, and expiry. Existing holder-bound agreements retain their original rules. This is a future product decision, not an implicit capability of the base agreement; it does not require introducing an option token or marketplace into this design.
 
 ### State machine
 
@@ -232,6 +254,12 @@ On startup and periodically, enumerate retained agreement accounts and reconcile
 
 Stale market data disables derived pricing and new market-based suggestions; reviewed fixed offers remain governed by their on-chain terms. Stale chain reads must be labelled and refreshed before presenting an offer as executable. External-data failures never disable the contract's exercise path. If the API is unavailable, a published IDL/client and the agreement address are sufficient to exercise through another compatible RPC.
 
+### Scaling the application
+
+The reference deployment uses one application instance with local SQLite and one reconciliation worker. Measure request latency, reconciliation lag, RPC usage, and database contention before changing that topology. Improve bounded queries, indexes, batching, and cache reuse within the existing modules first.
+
+If measured load requires multiple application instances or independently scheduled indexing, replace the persistence adapter with a suitable shared transactional store and explicitly assign reconciliation ownership with idempotent checkpoint writes. Validate migrations, concurrent updates, and recovery before enabling replicas. Do not share a SQLite file between hosts; its [network-filesystem limitations](https://sqlite.org/useovernet.html) make that unsuitable as a scaling shortcut. These changes can preserve the product and settlement contracts, but still require operational work and compatibility tests. A separate worker or service is introduced only when independent capacity, failure isolation, or deployment is needed.
+
 ## 6. Packaging and configuration
 
 The local deployment contract provides one entry point:
@@ -273,7 +301,7 @@ Policy authority controls new admission only. Program upgrade authority is a sep
 | Program | Funding, exact USDC premium payment on activation, writer-offline full exercise, partial-exercise rejection, full payout, net receipt, ownership handoff, expiry/refund with premium retained, double exercise, wrong mint/program/holder, cancellation race, and atomic rollback. |
 | Token behavior | Active transfer fees and changes, scaled display changes, required extensions, custom-account sizing, no immutable owner, unset delegate/close authority, issuer freeze/pause, hook rejection, and withheld-fee cleanup. |
 | Invariants | No early reserve withdrawal, donated surplus cannot block exercise, exact expiry boundary, overflow rejection, and policy updates cannot rewrite active rights. |
-| Backend/client contracts | Captured official response parsing, missing fields, price-unit mismatch, stale sources, reconciliation after restart, and generated-client compatibility. |
+| Backend/client contracts | Captured official response parsing, missing fields, price-unit mismatch, stale sources, reconciliation after restart, generated-client compatibility, and explicit rejection of unsupported agreement versions. |
 | Complete application | Clean Compose startup, idempotent restart, exact-quantity offer matching, distinct empty/error states, holder/writer flows with real local transactions, explicit exercise and expiry presentation, backend-independent exercise through a second client, and local/live separation. |
 
 Run formatting, linting, focused Rust/TypeScript tests, generated-artifact checks, a container build, and complete-flow tests in CI. Production RPC calls are read-only integration checks; tests never spend live assets. Log request IDs, agreement addresses, public signatures, source failures, and reconciliation lag without logging keys or credential-bearing RPC URLs.

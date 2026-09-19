@@ -30,7 +30,7 @@ Stages are cumulative. Preparation for later work may proceed independently, but
 
 **Scope**
 
-- Establish program boundaries, account identities, agreement states, and a machine-readable contract interface suitable for generating application clients.
+- Establish program boundaries, account identities, explicit agreement versioning, and agreement states, with a machine-readable interface suitable for generating application clients. Separate economic terms from authorization checks without implementing unused financial variants.
 - Implement the full financial lifecycle: isolated payout funding, separate USDC premium payment, holder authorization, full exercise, cancellation before activation, expiry recovery, and terminal cleanup.
 - Enforce asset admission and lifecycle limits for new commitments while preserving active terms. Start with a deliberately small supported fixture set.
 - Include representative issuer behavior from the beginning: gross token delivery, transfer fees, scaled display amounts, transfer restrictions, and the settlement account's handoff to the writer. Test fee and display-scaling changes after activation against the fixed obligation.
@@ -48,7 +48,7 @@ Run both successful paths and rejected actions: insufficient backing or delivery
 
 **Scope**
 
-- Connect a minimal backend and frontend through stable application interfaces. Generate the program client from the contract interface and keep HTTP types aligned with the backend contract.
+- Connect a minimal backend and frontend through stable application interfaces and the architecture's [extension boundaries](architecture.md#business-changes-and-extension-boundaries). Generate the program client from the contract interface and keep HTTP types aligned with the backend contract; introduce replaceable interfaces at external boundaries rather than around every module.
 - Add the local ledger and an idempotent initialization job that deploys the program, initializes policy, and prepares test participants and funded offers through real program instructions.
 - Expose network identity, one supported fixture position, funded offers, agreement terms, and transaction outcomes. Store a minimal rebuildable projection of chain state and reconcile it from authoritative accounts on startup and after transactions.
 - Support wallet signing, transaction submission, and confirmation in the browser; the backend never signs financial actions. Clearly distinguish pending, provisional, finalized, and failed outcomes. Reconcile uncertain submissions before offering a retry.
@@ -149,5 +149,7 @@ Container packaging begins with the first runnable contract checks and evolves i
 ## Extending the pipeline
 
 An additional capability enters through its owning boundary, brings a demonstrable user outcome, and adds tests for its new failure modes. A new asset repeats the admission and compatibility gate; a contract change repeats financial verification and client compatibility; a storage change repeats update and recovery checks. Preserve active agreement semantics across every increment.
+
+Classify a business change before extending the system: presentation or provider changes stay within application boundaries; new economic or authorization rules follow [agreement evolution](architecture.md#agreement-evolution); additional runtime capacity follows measured bottlenecks. Require cross-version decoding and behavior tests when supporting more than one agreement version, and define migration or continued service for earlier agreements. A capability such as transferring a right enters as its own bounded product increment, with authorization and settlement tests, rather than as a configuration switch or speculative module.
 
 Optional context, including Pyth, follows the official-data integration boundary only when its access, units, and product value are established. It must work as an isolated addition whose absence does not block core journeys, local startup, or settlement. Changes to the financial model or deployed service boundaries require an explicit product and architecture update before entering this pipeline.
