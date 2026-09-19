@@ -13,14 +13,14 @@ This document defines the sequence for building Volaryn as working, verifiable i
 
 ## Stage sequence
 
-| Stage | Working result | Prerequisite |
-| --- | --- | --- |
-| 1. Contract foundation | Repeatable financial scenarios executed against the settlement program. | Product terms and settlement rules from the architecture. |
-| 2. Minimal local application | A holder can activate and exercise a funded test offer through the browser. | Contract foundation passes its acceptance gate. |
-| 3. Complete local product | Holders and writers complete all core journeys through the interface. | Browser-to-contract flow and local startup work reliably. |
-| 4. Official asset integration | Asset discovery and context use verified sources and network-specific eligibility rules. | Complete local journeys and stable application boundaries. |
-| 5. Recovery and release reliability | The application preserves financial correctness through restarts, stale data, and interrupted transactions. | Complete journeys and external adapters are testable. |
-| 6. Deployment and operation | Reproducible local and hosted deployments with verified configuration and recovery procedures. | Integrated behavior and failure recovery pass their gates. |
+| Stage                               | Working result                                                                                              | Prerequisite                                               |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| 1. Contract foundation              | Repeatable financial scenarios executed against the settlement program.                                     | Product terms and settlement rules from the architecture.  |
+| 2. Minimal local application        | A holder can activate and exercise a funded test offer through the browser.                                 | Contract foundation passes its acceptance gate.            |
+| 3. Complete local product           | Holders and writers complete all core journeys through the interface.                                       | Browser-to-contract flow and local startup work reliably.  |
+| 4. Official asset integration       | Asset discovery and context use verified sources and network-specific eligibility rules.                    | Complete local journeys and stable application boundaries. |
+| 5. Recovery and release reliability | The application preserves financial correctness through restarts, stale data, and interrupted transactions. | Complete journeys and external adapters are testable.      |
+| 6. Deployment and operation         | Reproducible local and hosted deployments with verified configuration and recovery procedures.              | Integrated behavior and failure recovery pass their gates. |
 
 Stages are cumulative. Preparation for later work may proceed independently, but integration depends on the stated prerequisite. Optional market context is outside the core sequence.
 
@@ -145,16 +145,16 @@ Build host and program artifacts with their respective pinned compilers and unch
 
 ## Runtime and delivery evolution
 
-| Stage | Runtime and Compose evolution | Automated checks added |
-| --- | --- | --- |
-| 1 | Reproducible contract build and scenario runner; no persistent application services required. | Contract lifecycle, invariants, supported token behavior, and reproducible fixtures. |
-| 2 | Compose adds the local ledger, one-shot initialization, and one application service containing the backend, frontend, and embedded storage. Volumes, startup ordering, and readiness are part of this first application environment. | Generated-interface compatibility, clean startup, ordinary restart, and the browser settlement flow. |
-| 3 | The same services gain complete product modules. No separate frontend server or matching service is needed. | Complete holder/writer journeys and meaningful interface failure states. |
-| 4 | Source adapters run inside the application. Network-specific configuration is added; the local default remains independent of external providers. | Provider parsing, identity, policy, unit mapping, and expanded token compatibility. |
-| 5 | The same runtime gains full reconciliation, diagnostics, and recovery checks. Background work remains inside the application. | Interrupted transactions, dependency failures, reconstruction, and compatible updates. |
-| 6 | Local Compose retains its services. Live Compose runs only the application against external chain infrastructure; hosting provides HTTPS. | Release-artifact validation, live-build isolation, deployment smoke checks, and rollback rehearsal. |
+| Stage | Runtime and Compose evolution                                                                                                                                                                                                        | Automated checks added                                                                               |
+| ----- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| 1     | Reproducible contract build and scenario runner; no persistent application services required.                                                                                                                                        | Contract lifecycle, invariants, supported token behavior, and reproducible fixtures.                 |
+| 2     | Compose adds the local ledger, one-shot initialization, and one application service containing the backend, frontend, and embedded storage. Volumes, startup ordering, and readiness are part of this first application environment. | Generated-interface compatibility, clean startup, ordinary restart, and the browser settlement flow. |
+| 3     | The same services gain complete product modules. No separate frontend server or matching service is needed.                                                                                                                          | Complete holder/writer journeys and meaningful interface failure states.                             |
+| 4     | Source adapters run inside the application. Network-specific configuration is added; the local default remains independent of external providers.                                                                                    | Provider parsing, identity, policy, unit mapping, and expanded token compatibility.                  |
+| 5     | The same runtime gains full reconciliation, diagnostics, and recovery checks. Background work remains inside the application.                                                                                                        | Interrupted transactions, dependency failures, reconstruction, and compatible updates.               |
+| 6     | Local Compose retains its services. Live Compose runs only the application against external chain infrastructure; hosting provides HTTPS.                                                                                            | Release-artifact validation, live-build isolation, deployment smoke checks, and rollback rehearsal.  |
 
-Container packaging begins with the first runnable contract checks and evolves into the application environment. Deployment preparation is continuous; the final stage adds operational release capability. Every new runtime dependency must have a clear responsibility that the existing architecture cannot already satisfy. Configuration keeps committed defaults and the minimal operator settings defined in the architecture.
+Contract checks run natively in LiteSVM; optional container packaging supplies reproducible build tools for CI. The validator container joins the complete localnet application environment in Stage 2. Deployment preparation is continuous; the final stage adds operational release capability. Every new runtime dependency must have a clear responsibility that the existing architecture cannot already satisfy. Configuration keeps committed defaults and the minimal operator settings defined in the architecture.
 
 ## Extending the pipeline
 

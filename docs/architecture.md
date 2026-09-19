@@ -6,14 +6,14 @@ This document defines the system's responsibilities, financial rules, integratio
 
 Volaryn connects a PreStocks holder seeking temporary downside protection with a writer willing to acquire that position under agreed terms. The holder keeps the underlying until exercise; the writer commits the entire USDC payout before activation.
 
-| Requirement | Architectural consequence |
-| --- | --- |
-| A concrete holder problem | Position discovery and protection are the primary workflow. |
-| A complete, demonstrable outcome | Funding, activation, independent exercise, and unused-expiry recovery use the actual Solana program. |
-| A reason to use Solana | Program-controlled collateral and atomic settlement enforce the agreement. |
-| Execution quality | Exact asset identity, visible funding, explicit transaction status, and failure-safe transfers are core behavior. |
+| Requirement                      | Architectural consequence                                                                                                                            |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| A concrete holder problem        | Position discovery and protection are the primary workflow.                                                                                          |
+| A complete, demonstrable outcome | Funding, activation, independent exercise, and unused-expiry recovery use the actual Solana program.                                                 |
+| A reason to use Solana           | Program-controlled collateral and atomic settlement enforce the agreement.                                                                           |
+| Execution quality                | Exact asset identity, visible funding, explicit transaction status, and failure-safe transfers are core behavior.                                    |
 | Meaningful PreStocks integration | Official mints, market context, token mechanics, and asset lifecycle determine eligibility and presentation. Competing pre-IPO issuers are excluded. |
-| Simple operation | One Rust application process, a bundled React frontend, SQLite, and a reproducible Compose entry point. |
+| Simple operation                 | One Rust application process, a bundled React frontend, SQLite, and a reproducible Compose entry point.                                              |
 
 The first five requirements reflect the [Stocklana brief and sponsor criteria](https://hackathons.solana.com/hackathons/stocklana). Submission schedules and prize administration belong outside this architecture.
 
@@ -38,17 +38,17 @@ flowchart LR
 
 The browser's normal RPC transport is a restricted same-origin backend proxy. The diagram separates transaction authorship from transport: the wallet signs, the backend forwards, and the program decides. An independently hosted client can submit the same instructions through another RPC.
 
-| Area | Selected dependencies | Purpose |
-| --- | --- | --- |
-| Backend | Rust, Tokio, Axum, Tower, `tower-http` | Async HTTP, static frontend delivery, request limits, and tracing middleware. |
-| External access | `reqwest` with Rustls; nonblocking `solana-rpc-client` and compatible types | PreStocks HTTP and typed chain access without a separate integration service. |
-| Persistence | SQLite through SQLx with embedded migrations | Durable caches and query projections; no database container or ORM layer. |
-| Data and errors | Serde, `serde_json`, `thiserror`, `tracing`, `tracing-subscriber`, `rust_decimal` | Typed boundaries, stable errors, structured logs, and exact off-chain numeric handling. |
-| Program | Rust, Anchor, `anchor-spl`, Token-2022 interfaces | Account constraints, PDA authority, and extension-aware token operations. |
-| Frontend | React, TypeScript, Vite, React Router, CSS Modules | A static application with feature modules; no server-side rendering service. |
-| Wallet and transactions | Solana Kit HTTP RPC, Wallet Standard plugin, React bindings, generated program client | Wallet discovery, account decoding, signing, and HTTP-based submission and confirmation. |
-| Generated contracts | Anchor IDL and Codama; Utoipa, `openapi-typescript`, `openapi-fetch` | Generate matching program and HTTP clients; only generated code and client helpers enter the frontend runtime. |
-| Verification | Rust tests, LiteSVM, Vitest, React Testing Library, Playwright | Financial invariants, adapter behavior, component interactions, and complete browser flows. |
+| Area                    | Selected dependencies                                                                 | Purpose                                                                                                        |
+| ----------------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Backend                 | Rust, Tokio, Axum, Tower, `tower-http`                                                | Async HTTP, static frontend delivery, request limits, and tracing middleware.                                  |
+| External access         | `reqwest` with Rustls; nonblocking `solana-rpc-client` and compatible types           | PreStocks HTTP and typed chain access without a separate integration service.                                  |
+| Persistence             | SQLite through SQLx with embedded migrations                                          | Durable caches and query projections; no database container or ORM layer.                                      |
+| Data and errors         | Serde, `serde_json`, `thiserror`, `tracing`, `tracing-subscriber`, `rust_decimal`     | Typed boundaries, stable errors, structured logs, and exact off-chain numeric handling.                        |
+| Program                 | Rust, Anchor, `anchor-spl`, Token-2022 interfaces                                     | Account constraints, PDA authority, and extension-aware token operations.                                      |
+| Frontend                | React, TypeScript, Vite, React Router, CSS Modules                                    | A static application with feature modules; no server-side rendering service.                                   |
+| Wallet and transactions | Solana Kit HTTP RPC, Wallet Standard plugin, React bindings, generated program client | Wallet discovery, account decoding, signing, and HTTP-based submission and confirmation.                       |
+| Generated contracts     | Anchor IDL and Codama; Utoipa, `openapi-typescript`, `openapi-fetch`                  | Generate matching program and HTTP clients; only generated code and client helpers enter the frontend runtime. |
+| Verification            | Rust tests, LiteSVM, Vitest, React Testing Library, Playwright                        | Financial invariants, adapter behavior, component interactions, and complete browser flows.                    |
 
 The [technology stack](tech-stack.md) is the reference for package selection, alternatives, and toolchain compatibility. Keep native React state and typed HTTP helpers; generate the Kit-compatible program client from the IDL. Build-time generation and test tooling do not add runtime services. Dependency changes must pass the stack's compatibility gates.
 
@@ -71,7 +71,7 @@ volaryn/
 ├── config/                    # Network manifests and reviewed asset policies
 ├── tools/
 │   ├── localnet/              # Validator bootstrap and disposable fixtures
-│   └── test                  # Containerized fast/full test entry point
+│   └── test                  # Native fast checks and containerized test modes
 ├── tests/                     # Program scenarios and browser flows
 ├── package.json               # npm workspace and build scripts
 ├── package-lock.json
@@ -95,26 +95,26 @@ The program owns settlement validation independently of backend checks. Frontend
 
 Keep the product adaptable through cohesive modules and a few explicit boundaries. Introduce an interface where an external dependency must be replaceable or isolated for tests; keep ordinary business logic in concrete functions and types. Extract a strategy only when a real second behavior needs independent selection. No plugin framework, generic workflow engine, interface per entity, or environment switch per feature is required.
 
-| Change | Owning boundary and preserved contract |
-| --- | --- |
-| Replace a data or RPC provider | Adapters normalize identity, units, freshness, and errors into application types. Provider payloads do not become domain or UI contracts. |
-| Change discovery, offer presentation, or suggested terms | Application use cases and frontend feature modules evolve together. Suggestions remain separate from executable, writer-funded offers. |
-| Change asset admission or commercial rules | Admission policy governs new commitments. Any new fee or economic rule is explicitly disclosed and enforced in the agreement version that supports it; active terms remain unchanged. |
-| Change storage or indexing | Read-model query and checkpoint operations belong to the persistence boundary. SQL and database transactions stay inside the adapter. |
-| Extend financial rights | Versioned program instructions own authorization and settlement; generated clients expose those operations to application features. A backend configuration change cannot create an on-chain right. |
+| Change                                                   | Owning boundary and preserved contract                                                                                                                                                              |
+| -------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Replace a data or RPC provider                           | Adapters normalize identity, units, freshness, and errors into application types. Provider payloads do not become domain or UI contracts.                                                           |
+| Change discovery, offer presentation, or suggested terms | Application use cases and frontend feature modules evolve together. Suggestions remain separate from executable, writer-funded offers.                                                              |
+| Change asset admission or commercial rules               | Admission policy governs new commitments. Any new fee or economic rule is explicitly disclosed and enforced in the agreement version that supports it; active terms remain unchanged.               |
+| Change storage or indexing                               | Read-model query and checkpoint operations belong to the persistence boundary. SQL and database transactions stay inside the adapter.                                                               |
+| Extend financial rights                                  | Versioned program instructions own authorization and settlement; generated clients expose those operations to application features. A backend configuration change cannot create an on-chain right. |
 
 Wire concrete adapters at application startup using the committed deployment configuration. Add only the operations a use case needs; avoid a generic repository or universal settlement interface. Frontend features consume typed application models and generated transaction clients through shared helpers, so changing a provider does not require rewriting screens. Expose actions supported by the configured program and agreement version; unknown versions must not be presented as executable.
 
 ## 3. Sources of truth and integrations
 
-| Information | Authority |
-| --- | --- |
-| Agreement terms, holder, status, reserve, settlement | Solana program and token accounts |
-| Wallet inventory and transfer capabilities | Token accounts, mint state, and their owning token programs |
-| PreStocks identity and market context | Official PreStocks data, checked against reviewed mint admission |
-| Supported assets and permitted new expiries | Versioned asset policy, with critical limits enforced on chain |
-| Search results and dashboards | Rebuildable SQLite projections |
-| Pending transaction feedback | Browser transaction state, reconciled against chain confirmation |
+| Information                                          | Authority                                                        |
+| ---------------------------------------------------- | ---------------------------------------------------------------- |
+| Agreement terms, holder, status, reserve, settlement | Solana program and token accounts                                |
+| Wallet inventory and transfer capabilities           | Token accounts, mint state, and their owning token programs      |
+| PreStocks identity and market context                | Official PreStocks data, checked against reviewed mint admission |
+| Supported assets and permitted new expiries          | Versioned asset policy, with critical limits enforced on chain   |
+| Search results and dashboards                        | Rebuildable SQLite projections                                   |
+| Pending transaction feedback                         | Browser transaction state, reconciled against chain confirmation |
 
 ### PreStocks
 
@@ -162,13 +162,13 @@ Reuse also requires inspectable program behavior, deployment and upgrade control
 
 ### Accounts
 
-| Account | Responsibility |
-| --- | --- |
-| `ProtocolConfig` | Deployment identity, exact USDC mint/program, and policy authority. Settlement identity is immutable for a deployment. |
-| `AssetPolicy` | Admit a specific underlying and constrain new agreements. |
-| `Agreement` PDA | Agreement version, writer, unique nonce, optional designated holder, activated holder, exact mints/programs, raw underlying quantity, payout and premium in USDC base units, acceptance deadline, expiry, policy version, timestamps, and state. |
-| Reserve token account | Holds at least the promised USDC payout; the agreement PDA controls spending. |
-| Underlying settlement token account | Receives the exercised underlying; controlled by the PDA until atomic handoff to the writer. |
+| Account                             | Responsibility                                                                                                                                                                                                                                   |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `ProtocolConfig`                    | Deployment identity, exact USDC mint/program, and policy authority. Settlement identity is immutable for a deployment.                                                                                                                           |
+| `AssetPolicy`                       | Admit a specific underlying and constrain new agreements.                                                                                                                                                                                        |
+| `Agreement` PDA                     | Agreement version, writer, unique nonce, optional designated holder, activated holder, exact mints/programs, raw underlying quantity, payout and premium in USDC base units, acceptance deadline, expiry, policy version, timestamps, and state. |
+| Reserve token account               | Holds at least the promised USDC payout; the agreement PDA controls spending.                                                                                                                                                                    |
+| Underlying settlement token account | Receives the exercised underlying; controlled by the PDA until atomic handoff to the writer.                                                                                                                                                     |
 
 Agreement addresses derive from a fixed seed, writer address, and unique nonce. Retain terminal agreement records to prevent reuse and permit account-based reconstruction. Validate account ownership, PDA seeds, signers, mint identities, token programs, and authorities using [Anchor constraints](https://www.anchor-lang.com/docs/references/account-constraints).
 
@@ -224,15 +224,15 @@ Use `reserve >= payout`, not strict equality: unsolicited transfers must not bre
 
 The backend serves a same-origin REST API, static frontend files, and bounded background polling. It holds no live holder, writer, policy, or deployment private keys. Public account data needs no login; all financially meaningful mutations require on-chain signatures. There are no email accounts, JWT sessions, custodial wallets, or server-side transaction signing.
 
-| Surface | Responsibility |
-| --- | --- |
-| `GET /api/config` | Public network identity, program ID, USDC mint, protocol/client version, and demo status; never provider secrets. |
-| `GET /api/assets` | Admitted assets, normalized source context, policy, and freshness. |
-| `GET /api/positions?owner=...` | Verified supported balances, source token accounts, and transfer restrictions. |
-| `GET /api/offers?mint=...` | Funded, still-acceptable offers with exact terms, any designated holder, observed chain slot, and funding status. |
-| `GET /api/agreements?owner=...` and `GET /api/agreements/{address}` | Holder/writer views, exact terms, reserve, and effective expiry state. |
-| `POST /rpc` | Bounded allowlist of required account-read, simulation, blockhash, status, and signed-transaction submission methods. |
-| `GET /health/live`, `GET /health/ready` | Process liveness and initialization readiness. |
+| Surface                                                             | Responsibility                                                                                                        |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/config`                                                   | Public network identity, program ID, USDC mint, protocol/client version, and demo status; never provider secrets.     |
+| `GET /api/assets`                                                   | Admitted assets, normalized source context, policy, and freshness.                                                    |
+| `GET /api/positions?owner=...`                                      | Verified supported balances, source token accounts, and transfer restrictions.                                        |
+| `GET /api/offers?mint=...`                                          | Funded, still-acceptable offers with exact terms, any designated holder, observed chain slot, and funding status.     |
+| `GET /api/agreements?owner=...` and `GET /api/agreements/{address}` | Holder/writer views, exact terms, reserve, and effective expiry state.                                                |
+| `POST /rpc`                                                         | Bounded allowlist of required account-read, simulation, blockhash, status, and signed-transaction submission methods. |
+| `GET /health/live`, `GET /health/ready`                             | Process liveness and initialization readiness.                                                                        |
 
 There is no REST endpoint that makes a protection active in SQLite. Clients construct instructions from the generated program client, reread relevant chain accounts, simulate, ask the wallet to sign, submit, and observe confirmation. A response or signature alone is not financial success.
 
@@ -274,11 +274,11 @@ docker compose up --build
 
 It serves the application at `http://localhost:8080` and requires **no environment variables, cloud account, API key, installed Rust toolchain, or installed Node runtime on the host**. Docker and Compose are the host prerequisites; the first image build needs network access.
 
-| Compose service | Role |
-| --- | --- |
-| `validator` | Local Solana ledger with the required token programs, persisted in a named volume. |
-| `bootstrap` | One-shot deployment of the built program, policy initialization, and test-asset/account seeding. |
-| `app` | Rust executable serving API and compiled React assets, with SQLite on a named volume. |
+| Compose service | Role                                                                                             |
+| --------------- | ------------------------------------------------------------------------------------------------ |
+| `validator`     | Local Solana ledger with the required token programs, persisted in a named volume.               |
+| `bootstrap`     | One-shot deployment of the built program, policy initialization, and test-asset/account seeding. |
+| `app`           | Rust executable serving API and compiled React assets, with SQLite on a named volume.            |
 
 Startup waits for validator health, successful bootstrap, and database migrations before readiness. Use Compose's documented [`service_healthy` and `service_completed_successfully` conditions](https://docs.docker.com/compose/how-tos/startup-order/). Bootstrap is idempotent: reuse matching ledger/deployment state, and fail clearly on incompatible state without resetting balances. Local reset is an explicit operation, never an automatic startup repair.
 
@@ -300,13 +300,13 @@ Issuer powers remain outside Volaryn's control. PreStocks authorities may freeze
 
 Policy authority controls new admission only. Program upgrade authority is a separate trust assumption: an upgradeable deployment must disclose who controls it and cannot claim immutable guarantees. Live deployment requires an explicit upgrade policy and separate eligibility/legal review; no application checkbox establishes legal permission. These constraints do not add hosted services to the hackathon runtime.
 
-| Verification boundary | Required evidence |
-| --- | --- |
-| Program | Funding, exact USDC premium payment on activation, writer-offline full exercise, partial-exercise rejection, full payout, net receipt, ownership handoff, expiry/refund with premium retained, double exercise, wrong mint/program/holder, cancellation race, and atomic rollback. |
-| Token behavior | Active transfer fees and changes, scaled display changes, required extensions, custom-account sizing, no immutable owner, unset delegate/close authority, issuer freeze/pause, hook rejection, and withheld-fee cleanup. |
-| Invariants | No early reserve withdrawal, donated surplus cannot block exercise, exact expiry boundary, overflow rejection, and policy updates cannot rewrite active rights. |
-| Backend/client contracts | Captured official response parsing, missing fields, price-unit mismatch, stale sources, reconciliation after restart, generated-client compatibility, and explicit rejection of unsupported agreement versions. |
-| Complete application | Clean Compose startup, idempotent restart, exact-quantity offer matching, distinct empty/error states, holder/writer flows with real local transactions, explicit exercise and expiry presentation, backend-independent exercise through a second client, and local/live separation. |
+| Verification boundary    | Required evidence                                                                                                                                                                                                                                                                    |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Program                  | Funding, exact USDC premium payment on activation, writer-offline full exercise, partial-exercise rejection, full payout, net receipt, ownership handoff, expiry/refund with premium retained, double exercise, wrong mint/program/holder, cancellation race, and atomic rollback.   |
+| Token behavior           | Active transfer fees and changes, scaled display changes, required extensions, custom-account sizing, no immutable owner, unset delegate/close authority, issuer freeze/pause, hook rejection, and withheld-fee cleanup.                                                             |
+| Invariants               | No early reserve withdrawal, donated surplus cannot block exercise, exact expiry boundary, overflow rejection, and policy updates cannot rewrite active rights.                                                                                                                      |
+| Backend/client contracts | Captured official response parsing, missing fields, price-unit mismatch, stale sources, reconciliation after restart, generated-client compatibility, and explicit rejection of unsupported agreement versions.                                                                      |
+| Complete application     | Clean Compose startup, idempotent restart, exact-quantity offer matching, distinct empty/error states, holder/writer flows with real local transactions, explicit exercise and expiry presentation, backend-independent exercise through a second client, and local/live separation. |
 
 Run formatting, linting, focused Rust/TypeScript tests, generated-artifact checks, a container build, and complete-flow tests in CI. Production RPC calls are read-only integration checks; tests never spend live assets. Log request IDs, agreement addresses, public signatures, source failures, and reconciliation lag without logging keys or credential-bearing RPC URLs.
 
@@ -314,25 +314,26 @@ Run formatting, linting, focused Rust/TypeScript tests, generated-artifact check
 
 Testing uses the same domain rules, generated clients, migrations, and compiled settlement program as the application. External adapters are replaceable at composition boundaries; test controls never add financial bypasses to the deployed program or live API.
 
-| Layer | Execution environment |
-| --- | --- |
-| Domain and interface behavior | In-process tests with controlled inputs, application time, and external responses. |
-| Contract and token behavior | LiteSVM loads the compiled program and the pinned token programs used by the local validator. Signature checks remain enabled for financial scenarios. |
-| Backend and persistence | Real temporary SQLite files with production migrations and WAL settings; deterministic market and RPC adapters for mapping, timeout, and recovery cases. |
-| Complete user journeys | The local validator, bootstrap, application, and browser execute real transactions. A test wallet signs with disposable keys through the wallet interface; it can also reject or disconnect without replacing transaction results. |
+| Layer                         | Execution environment                                                                                                                                                                                                              |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Domain and interface behavior | In-process tests with controlled inputs, application time, and external responses.                                                                                                                                                 |
+| Contract and token behavior   | LiteSVM loads the compiled program and the pinned token programs used by the local validator. Signature checks remain enabled for financial scenarios.                                                                             |
+| Backend and persistence       | Real temporary SQLite files with production migrations and WAL settings; deterministic market and RPC adapters for mapping, timeout, and recovery cases.                                                                           |
+| Complete user journeys        | The local validator, bootstrap, application, and browser execute real transactions. A test wallet signs with disposable keys through the wallet interface; it can also reject or disconnect without replacing transaction results. |
 
 Versioned fixture recipes define participants, balances, token extensions, asset policies, and source responses for both contract and browser scenarios. Establish ordinary agreement states through program instructions. Each test owns its accounts and data; tests do not depend on another test's execution order. Fixture factories can express funded, active, expired, and issuer-restricted scenarios without hand-editing application balances.
 
 The contract harness controls chain time and epochs to test expiry boundaries and fee changes immediately. [LiteSVM supports changing the Clock sysvar and advancing slots](https://github.com/LiteSVM/litesvm#capabilities). Application-clock substitution is limited to off-chain freshness and retry logic. Validator/browser tests use short test expiries and bounded polling of chain state; changing browser time cannot prove contract expiry. Readiness and confirmation checks replace fixed sleeps.
 
-The repository exposes two containerized test entry points:
+The test entry points separate in-process checks from the complete localnet environment:
 
-| Command contract | Responsibility |
-| --- | --- |
-| `./tools/test fast` | Formatting, type/build checks, generated-contract drift, and focused domain, contract, adapter, persistence, and component tests. No persistent validator or browser stack is required. |
-| `./tools/test full` | Runs the fast checks, then starts an isolated Compose environment and executes complete browser and recovery scenarios. |
+| Command contract      | Responsibility                                                                                                                                                                                                         |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `./tools/test fast`   | Native lint/type/build checks, generated-contract drift, and focused domain, contract, adapter, persistence, and component tests. No container, validator process, browser stack, or standalone formatter is required. |
+| `./tools/test docker` | Repository formatting and the fast checks with pinned containerized tools, for CI and build reproducibility. No validator or application services are started.                                                         |
+| `./tools/test full`   | Runs the fast checks, then starts an isolated Compose environment and executes complete browser and recovery scenarios.                                                                                                |
 
-Both entry points run unchanged locally and in CI, accept a scenario selector for focused reruns, and require no operator credentials or host language toolchains. Building images and dependencies requires network access; the default test scenarios use local resources and fixtures. Read-only checks against official providers run separately and report external availability distinctly from deterministic test results.
+These entry points accept a scenario selector for focused reruns and require no operator credentials. Native checks use the pinned host development tools; containerized modes supply their own toolchains. The validator container belongs to the complete localnet environment, including full application tests. Building images and dependencies requires network access; the default test scenarios use local resources and fixtures. Read-only checks against official providers run separately and report external availability distinctly from deterministic test results.
 
 `compose.test.yaml` reuses the application topology and adds a one-shot test runner. Each full run receives its own Compose project, ledger, SQLite volume, browser state, and fixture identities, with no published host ports; verify the merged configuration removes inherited port bindings. Browser tests use the [stack's secure loopback origin](tech-stack.md#8-repository-containers-and-deployment) so disposable wallet signing can use Web Crypto while the application can be independently recreated. The environment never mounts persistent demo or live data. Independent runs are isolated; scenarios within a shared ledger run serially unless they have separate state. The runner waits for readiness, returns a failing exit code on failed checks, exports diagnostics, and removes only its own resources. Restart/recovery scenarios retain their state within that run. Resetting the persistent manual demo remains a separate explicit action.
 
@@ -340,11 +341,11 @@ Scripted adapters reproduce stale data, malformed responses, unavailable RPC, an
 
 ### Integration requirements and failure behavior
 
-| Integration requirement | Boundary and default behavior |
-| --- | --- |
-| Valid PreStocks data and verified price units | Adapter validates responses and freshness; missing or incompatible data disables dependent calculations, without blocking exercise. |
-| Official asset identity on the selected network | Verify issuer provenance and mint accounts for that network; fixtures remain labelled simulations and unsupported mints are ineligible. |
+| Integration requirement                                 | Boundary and default behavior                                                                                                                                                        |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Valid PreStocks data and verified price units           | Adapter validates responses and freshness; missing or incompatible data disables dependent calculations, without blocking exercise.                                                  |
+| Official asset identity on the selected network         | Verify issuer provenance and mint accounts for that network; fixtures remain labelled simulations and unsupported mints are ineligible.                                              |
 | Compatible issuer extensions and valid lifecycle policy | Require reviewed admission policy and explicit transfer compatibility; invalid policy blocks new agreements while active rights retain their terms, subject to asset deliverability. |
-| Authorized Pyth Indices access and comparable units | Enable the optional adapter only with verified access and unit mapping; missing prerequisites disable that context alone. |
+| Authorized Pyth Indices access and comparable units     | Enable the optional adapter only with verified access and unit mapping; missing prerequisites disable that context alone.                                                            |
 
 These requirements are enforced at their owning boundaries. The fixed agreement requires no price oracle, privileged backend signer, or more complex collateral model.

@@ -6,19 +6,19 @@ The selection favors a small operational footprint, precise financial behavior, 
 
 ## 1. Selected stack
 
-| Concern | Selection | Responsibility |
-| --- | --- | --- |
-| Application server | Rust, Tokio, Axum, Tower, `tower-http` | HTTP API, static frontend, bounded background work. |
-| External access | `reqwest` with Rustls; asynchronous `solana-rpc-client` | Market-source HTTP and typed chain reads. |
-| Local persistence | SQLite, SQLx, embedded SQL migrations | Rebuildable projections, source observations, reconciliation checkpoints. |
-| Data and diagnostics | Serde, `serde_json`, `thiserror`, `tracing`, `tracing-subscriber` | Validated boundaries, stable errors, structured logs. |
-| Exact market arithmetic | `rust_decimal` | Off-chain prices and derived estimates; settlement uses integer base units. |
-| Settlement program | Rust, Anchor, `anchor-spl`, Token-2022 interfaces | Agreement authorization, reserves, atomic settlement. |
-| Frontend | React, TypeScript, Vite, React Router, CSS Modules | Static wallet application with navigable feature screens. |
-| Wallet and transactions | Solana Kit HTTP RPC, Wallet Standard plugin, React bindings | Wallet discovery, signing, chain decoding, transaction submission and status polling. |
-| Generated contracts | Anchor IDL and Codama; Utoipa, `openapi-typescript`, `openapi-fetch` | Typed program and HTTP clients from authoritative definitions. |
-| Verification | Rust tests, LiteSVM, Vitest, React Testing Library, Playwright | Domain, program, adapter, component, and complete-flow evidence. |
-| Build and delivery | Cargo and npm workspaces, Docker BuildKit, Docker Compose | One repository, pinned builds, isolated tests, simple deployment. |
+| Concern                 | Selection                                                            | Responsibility                                                                        |
+| ----------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Application server      | Rust, Tokio, Axum, Tower, `tower-http`                               | HTTP API, static frontend, bounded background work.                                   |
+| External access         | `reqwest` with Rustls; asynchronous `solana-rpc-client`              | Market-source HTTP and typed chain reads.                                             |
+| Local persistence       | SQLite, SQLx, embedded SQL migrations                                | Rebuildable projections, source observations, reconciliation checkpoints.             |
+| Data and diagnostics    | Serde, `serde_json`, `thiserror`, `tracing`, `tracing-subscriber`    | Validated boundaries, stable errors, structured logs.                                 |
+| Exact market arithmetic | `rust_decimal`                                                       | Off-chain prices and derived estimates; settlement uses integer base units.           |
+| Settlement program      | Rust, Anchor, `anchor-spl`, Token-2022 interfaces                    | Agreement authorization, reserves, atomic settlement.                                 |
+| Frontend                | React, TypeScript, Vite, React Router, CSS Modules                   | Static wallet application with navigable feature screens.                             |
+| Wallet and transactions | Solana Kit HTTP RPC, Wallet Standard plugin, React bindings          | Wallet discovery, signing, chain decoding, transaction submission and status polling. |
+| Generated contracts     | Anchor IDL and Codama; Utoipa, `openapi-typescript`, `openapi-fetch` | Typed program and HTTP clients from authoritative definitions.                        |
+| Verification            | Rust tests, LiteSVM, Vitest, React Testing Library, Playwright       | Domain, program, adapter, component, and complete-flow evidence.                      |
+| Build and delivery      | Cargo and npm workspaces, Docker BuildKit, Docker Compose            | One repository, pinned builds, isolated tests, simple deployment.                     |
 
 Node and the frontend build tools are build/test dependencies. SQLite is embedded in the application. Neither requires an additional production service.
 
@@ -58,13 +58,13 @@ Use `query`/`query_as` with `FromRow` and real migrated-database tests. These qu
 
 ### Exact values across boundaries
 
-| Value | Representation and rule |
-| --- | --- |
-| Settlement quantity, payout, premium | Checked integer base units in Rust and the program; wider intermediates for arithmetic. |
-| Browser token amounts | Input strings until validated, then `bigint`; never JavaScript floating-point financial arithmetic. |
-| Volaryn REST financial values | Validated decimal strings with explicit units. |
-| SQLite financial values | Canonical decimal strings in `TEXT`, parsed at the persistence boundary. |
-| Market prices and derived estimates | Bounded `rust_decimal` values off chain, with checked arithmetic and explicit precision and rounding rules for derived estimates and display. |
+| Value                                | Representation and rule                                                                                                                       |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Settlement quantity, payout, premium | Checked integer base units in Rust and the program; wider intermediates for arithmetic.                                                       |
+| Browser token amounts                | Input strings until validated, then `bigint`; never JavaScript floating-point financial arithmetic.                                           |
+| Volaryn REST financial values        | Validated decimal strings with explicit units.                                                                                                |
+| SQLite financial values              | Canonical decimal strings in `TEXT`, parsed at the persistence boundary.                                                                      |
+| Market prices and derived estimates  | Bounded `rust_decimal` values off chain, with checked arithmetic and explicit precision and rounding rules for derived estimates and display. |
 
 SQLite integers are signed 64-bit, so they cannot represent the entire token `u64` range. `REAL` and numeric coercions also cannot preserve arbitrary exact decimal values. Do not use numeric casts, SQL `SUM`, or ordinary lexical ordering of the text fields as financial arithmetic. [SQLx SQLite numeric limits](https://docs.rs/sqlx/latest/sqlx/sqlite/types/index.html).
 
@@ -130,25 +130,25 @@ Generated TypeScript types are compile-time contracts, not runtime validators. B
 
 Treat three kinds of change separately:
 
-| Contract | Evolution mechanism |
-| --- | --- |
-| Application database | Ordered SQL migrations and supported upgrade tests. |
-| HTTP and generated clients | Compatible schema changes, regeneration, type checks, and response tests. |
-| On-chain agreement | Explicit agreement version, decoding and behavior checks, and defined migration or continued servicing of earlier rights. |
+| Contract                   | Evolution mechanism                                                                                                       |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Application database       | Ordered SQL migrations and supported upgrade tests.                                                                       |
+| HTTP and generated clients | Compatible schema changes, regeneration, type checks, and response tests.                                                 |
+| On-chain agreement         | Explicit agreement version, decoding and behavior checks, and defined migration or continued servicing of earlier rights. |
 
 Regenerate artifacts in CI and fail on uncommitted drift. Verify actual account and instruction bytes, numeric boundaries, PDA derivation, and error decoding; a successful generator run alone does not establish compatibility.
 
 ## 7. Testing and development tools
 
-| Tool | Purpose and boundary |
-| --- | --- |
-| Rust test framework, Tokio test utilities | Domain rules, asynchronous adapters, and migrated temporary SQLite files with production WAL settings. |
-| Tower service utilities; local Axum fixture servers | Exercise routing and actual HTTP-client parsing/failures without public providers or another mock-server dependency. |
-| LiteSVM | Load the built settlement program and pinned token programs; test signatures, controlled chain time, and financial invariants. |
-| `solana-test-validator` | Real local RPC and validator execution for application and browser scenarios. |
-| Vitest | Numeric conversion, reducers, HTTP boundary behavior, and focused frontend logic. |
-| React Testing Library, `user-event`, `jsdom` | Component behavior through labelled controls; DOM simulation is limited to component tests. |
-| Playwright | Actual browser, disposable wallet signatures, and local-chain user journeys. |
+| Tool                                                | Purpose and boundary                                                                                                           |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Rust test framework, Tokio test utilities           | Domain rules, asynchronous adapters, and migrated temporary SQLite files with production WAL settings.                         |
+| Tower service utilities; local Axum fixture servers | Exercise routing and actual HTTP-client parsing/failures without public providers or another mock-server dependency.           |
+| LiteSVM                                             | Load the built settlement program and pinned token programs; test signatures, controlled chain time, and financial invariants. |
+| `solana-test-validator`                             | Real local RPC and validator execution for application and browser scenarios.                                                  |
+| Vitest                                              | Numeric conversion, reducers, HTTP boundary behavior, and focused frontend logic.                                              |
+| React Testing Library, `user-event`, `jsdom`        | Component behavior through labelled controls; DOM simulation is limited to component tests.                                    |
+| Playwright                                          | Actual browser, disposable wallet signatures, and local-chain user journeys.                                                   |
 
 LiteSVM and the local validator cover different boundaries. Pin token-program artifacts and relevant runtime features instead of treating bundled defaults as proof of parity. Compose launches `solana-test-validator` explicitly; do not inherit a different local runtime from an Anchor command's default. [LiteSVM](https://docs.rs/litesvm/latest/litesvm/), [Anchor local-runtime selection](https://www.anchor-lang.com/docs/updates/release-notes/1-0-0).
 
@@ -156,7 +156,7 @@ Use a unique database file for each persistence/recovery test and explicitly clo
 
 Use Vitest's Node environment for non-DOM tests and `jsdom` only where needed. Browser tests remain responsible for navigation, focus, layout, wallet behavior, and actual transaction outcomes. [Vitest](https://vitest.dev/guide/), [React Testing Library](https://testing-library.com/docs/react-testing-library/intro/), [user interactions](https://testing-library.com/docs/user-event/setup/).
 
-Use `rustfmt` and Clippy for Rust; ESLint with `typescript-eslint` type-aware rules and `eslint-plugin-react-hooks` for application code; Prettier for frontend, configuration, and documentation formatting. Keep formatting separate from semantic linting, using `eslint-config-prettier` to avoid conflicting rules. Pay particular attention to unhandled asynchronous failures around wallet and submission operations. [Typed linting](https://typescript-eslint.io/getting-started/typed-linting/), [React Hooks linting](https://react.dev/reference/eslint-plugin-react-hooks), [formatter integration](https://prettier.io/docs/integrating-with-linters).
+Use `rustfmt` and Clippy for Rust; ESLint with `typescript-eslint` type-aware rules and `eslint-plugin-react-hooks` for application code; Prettier for frontend source formatting. Use dprint with versioned plugins for repository Python, Markdown, JSON, TOML, YAML, and Dockerfiles, and shfmt for shell scripts. Give each file type one formatter and run the shared formatting check in CI; generated artifacts retain their generator output. These tools keep repository checks independent of the frontend runtime. [dprint configuration](https://dprint.dev/config/), [shfmt](https://github.com/mvdan/sh). Keep formatting separate from semantic linting, using `eslint-config-prettier` to avoid conflicting rules. Pay particular attention to unhandled asynchronous failures around wallet and submission operations. [Typed linting](https://typescript-eslint.io/getting-started/typed-linting/), [React Hooks linting](https://react.dev/reference/eslint-plugin-react-hooks), [formatter integration](https://prettier.io/docs/integrating-with-linters).
 
 The shared test wrappers, isolation, fixtures, failure artifacts, and fast/full execution contracts are defined in the [architecture](architecture.md#test-environment-and-entry-points). These tools are development dependencies; they do not add permanent application services.
 
@@ -182,13 +182,13 @@ The full-test wrapper starts dependencies, waits for readiness, runs the test co
 
 ## 9. Compatibility and dependency policy
 
-| Dependency group | Evidence required before accepting a change |
-| --- | --- |
-| Anchor CLI/crates, SBF build tools, Solana types | Host and SBF builds use the same lockfile; account validation, serialization, token CPI, and transaction-resource limits pass. |
-| Kit, wallet plugin, React bindings, Codama renderer | Strict peer resolution and declaration checks pass; IDL spec/account resolution agree; wallets sign and generated transactions execute using HTTP only. |
-| Axum, Utoipa integration, SQLx, Reqwest | Route/schema generation, resolved features, patched native SQLite, migrations, TLS, byte limits, and whole-operation deadlines pass in the application image. |
+| Dependency group                                                       | Evidence required before accepting a change                                                                                                                            |
+| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Anchor CLI/crates, SBF build tools, Solana types                       | Host and SBF builds use the same lockfile; account validation, serialization, token CPI, and transaction-resource limits pass.                                         |
+| Kit, wallet plugin, React bindings, Codama renderer                    | Strict peer resolution and declaration checks pass; IDL spec/account resolution agree; wallets sign and generated transactions execute using HTTP only.                |
+| Axum, Utoipa integration, SQLx, Reqwest                                | Route/schema generation, resolved features, patched native SQLite, migrations, TLS, byte limits, and whole-operation deadlines pass in the application image.          |
 | React, Vite, TypeScript, OpenAPI generator, ESLint, Vitest/jsdom, Node | Peer and engine checks, supported compiler/parser versions, type checking, production build, deep links, Strict Mode, request races, and pending-action recovery pass. |
-| Compose, Playwright package and browsers | Rendered configurations are isolated; secure-context signing, application replacement, and complete local-chain flows pass in the CI container. |
+| Compose, Playwright package and browsers                               | Rendered configurations are isolated; secure-context signing, application replacement, and complete local-chain flows pass in the CI container.                        |
 
 Record the resolved combination in manifests and lockfiles, with exact toolchain and image pins. Verify clean builds with locked dependencies, regenerated artifacts, and the relevant behavioral suites. Package documentation establishes capabilities; only this combined execution gate establishes compatibility for the project.
 
