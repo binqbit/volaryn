@@ -24,6 +24,8 @@ The architecture combines a Rust backend, a React and TypeScript frontend, and a
 
 Read [the product brief](docs/product.md) for the holder's problem, concrete outcomes, related products, and product boundaries. Read [the architecture](docs/architecture.md) for component boundaries, settlement rules, integrations, dependencies, and the deployment model.
 
+The [implementation pipeline](docs/pipeline.md) defines the development stages, working outcomes, dependencies, and acceptance checks.
+
 ## Product boundaries
 
 Protection requires delivery of the specified asset before expiry. It does not insure against issuer restrictions, unavailable transfers, wallet compromise, or network failure. The payout is denominated in USDC, and the premium and network costs remain separate expenses. Local test assets are explicitly distinguished from genuine PreStocks holdings.

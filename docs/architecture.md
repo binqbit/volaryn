@@ -80,7 +80,8 @@ volaryn/
 ├── README.md
 └── docs/
     ├── architecture.md
-    └── product.md
+    ├── product.md
+    └── pipeline.md
 ```
 
 `http` validates transport input and calls `application`; application services coordinate domain rules and adapter interfaces. `domain` has no HTTP, database, or SDK dependency. Adapters implement chain reads, asset context, and persistence. Jobs call the same services as request handlers. Define interfaces at those external boundaries, not one interface per class or table.
