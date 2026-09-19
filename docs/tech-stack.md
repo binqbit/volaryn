@@ -1,0 +1,197 @@
+# Volaryn Technology Stack
+
+This document defines technology choices, their rationale, and the boundaries within which they apply. The [architecture](architecture.md) defines system behavior; the [product brief](product.md) defines the user outcome; the [implementation pipeline](pipeline.md) defines delivery order and acceptance gates.
+
+The selection favors a small operational footprint, precise financial behavior, reproducible tests, and replaceable external dependencies. Exact versions belong in manifests, toolchain files, lockfiles, and container pins. A release uses a tested combination of those versions rather than independently selecting the newest package in each ecosystem.
+
+## 1. Selected stack
+
+| Concern | Selection | Responsibility |
+| --- | --- | --- |
+| Application server | Rust, Tokio, Axum, Tower, `tower-http` | HTTP API, static frontend, bounded background work. |
+| External access | `reqwest` with Rustls; asynchronous `solana-rpc-client` | Market-source HTTP and typed chain reads. |
+| Local persistence | SQLite, SQLx, embedded SQL migrations | Rebuildable projections, source observations, reconciliation checkpoints. |
+| Data and diagnostics | Serde, `serde_json`, `thiserror`, `tracing`, `tracing-subscriber` | Validated boundaries, stable errors, structured logs. |
+| Exact market arithmetic | `rust_decimal` | Off-chain prices and derived estimates; settlement uses integer base units. |
+| Settlement program | Rust, Anchor, `anchor-spl`, Token-2022 interfaces | Agreement authorization, reserves, atomic settlement. |
+| Frontend | React, TypeScript, Vite, React Router, CSS Modules | Static wallet application with navigable feature screens. |
+| Wallet and transactions | Solana Kit HTTP RPC, Wallet Standard plugin, React bindings | Wallet discovery, signing, chain decoding, transaction submission and status polling. |
+| Generated contracts | Anchor IDL and Codama; Utoipa, `openapi-typescript`, `openapi-fetch` | Typed program and HTTP clients from authoritative definitions. |
+| Verification | Rust tests, LiteSVM, Vitest, React Testing Library, Playwright | Domain, program, adapter, component, and complete-flow evidence. |
+| Build and delivery | Cargo and npm workspaces, Docker BuildKit, Docker Compose | One repository, pinned builds, isolated tests, simple deployment. |
+
+Node and the frontend build tools are build/test dependencies. SQLite is embedded in the application. Neither requires an additional production service.
+
+## 2. Backend and external access
+
+### Axum, Tokio, and Tower
+
+**Choose Axum** for the application server. Its Tower integration provides one middleware model for request limits, timeouts, request IDs, tracing, and testing the router as a service. Tokio also runs asynchronous source requests and bounded reconciliation jobs, keeping those responsibilities in one process. `tower-http` supplies static-file serving and HTTP middleware. [Axum](https://docs.rs/axum/latest/axum/), [middleware model](https://docs.rs/axum/latest/axum/middleware/), [static serving](https://docs.rs/tower-http/latest/tower_http/services/struct.ServeDir.html).
+
+Actix Web is a valid alternative and also uses Tokio. Axum is selected because its direct Tower composition fits the chosen boundaries; the product has no requirement that justifies a second middleware model or a framework switch. This is a maintainability decision, not a claim of universal performance superiority. [Actix Web](https://actix.rs/docs/whatis/).
+
+Keep HTTP extraction and response mapping in `http`, orchestration in `application`, and business types in `domain`. Background jobs use the same application services with bounded concurrency and explicit cancellation. A message broker, scheduler service, and dependency-injection framework are unnecessary for the defined polling workload.
+
+Map middleware failures into the REST error contract: a generic timeout layer does not automatically produce the application's JSON error. Apply body limits to streamed requests, including `/rpc`, as well as JSON extractors; bound response consumption and the whole upstream operation. Test chunked bodies and slow upstreams. [Axum error handling](https://docs.rs/axum/latest/axum/error_handling/), [extractor-limit boundary](https://docs.rs/axum/latest/axum/extract/struct.DefaultBodyLimit.html).
+
+### HTTP, chain reads, errors, and logs
+
+Use a reusable asynchronous `reqwest` client with Rustls, explicit timeouts, response-size bounds, and controlled redirects. Limit retries to appropriate idempotent reads. An ambiguous signed-transaction submission requires signature reconciliation, not automatically constructing a replacement financial action. Enable only the JSON and TLS capabilities required by the pinned release; inspect transitive features as well as direct ones. Rustls removes an application-level OpenSSL choice but can still require native tooling in the build image. [Reqwest](https://docs.rs/reqwest/latest/reqwest/), [TLS configuration](https://docs.rs/reqwest/latest/reqwest/tls/).
+
+Use `solana-rpc-client`'s nonblocking client and the compatible Solana types needed for account reads. Align the direct `reqwest` dependency with the RPC client's compatible family and disable unnecessary default features such as the RPC progress spinner. Different Reqwest major/minor families can duplicate HTTP/TLS dependencies and expose incompatible client types. Keep SDK types inside the chain adapter; the backend does not need an Anchor signing client or private-key custody. [Asynchronous RPC client](https://docs.rs/solana-rpc-client/latest/solana_rpc_client/nonblocking/rpc_client/struct.RpcClient.html), [RPC dependencies](https://docs.rs/crate/solana-rpc-client/4.3.0).
+
+Use one bounded transport policy through a narrow `RpcSender` implementation backed by the shared HTTP client. The SDK's default sender has internal rate-limit retries and unbounded JSON response consumption; a configured client timeout alone does not enforce a whole-operation deadline or response-size cap. Keep retries in one layer, bound decoded response bytes, and test oversized responses and long `Retry-After` delays. [RPC sender implementation](https://docs.rs/solana-rpc-client/4.3.0/src/solana_rpc_client/http_sender.rs.html).
+
+Serde and `serde_json` decode source-specific DTOs, followed by explicit validation into domain types. `thiserror` defines typed failures; HTTP handlers map them to stable public error codes. `tracing` and `tracing-subscriber` write structured stdout with request, agreement, and transaction context. Logging defaults are committed configuration; no hosted telemetry platform or mandatory logging environment variable is required. [Typed errors](https://docs.rs/thiserror/latest/thiserror/), [structured log output](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/fmt/).
+
+## 3. Persistence, numeric precision, and migrations
+
+### SQLite through SQLx
+
+**Choose SQLite** because persistence contains local projections and observations, while financial rights remain on chain. It gives the application durable storage without a database service. **Choose SQLx** for explicit parameterized SQL, asynchronous integration, and migrations. An ORM adds little value to the bounded projection queries and would not remove database-specific migration work. [SQLx](https://docs.rs/sqlx/latest/sqlx/).
+
+Enable only the required Tokio runtime, bundled SQLite, migration, and macro capabilities. Bundled SQLite makes the library version part of the build rather than an operator prerequisite. Use a small connection pool, foreign-key enforcement, WAL mode, a bounded busy timeout, short transactions, and one projection writer. WAL permits readers alongside a writer; it does not make SQLite a multi-host database. [SQLx features](https://docs.rs/crate/sqlx/latest/features), [connection options](https://docs.rs/sqlx/latest/sqlx/sqlite/struct.SqliteConnectOptions.html), [SQLite WAL](https://sqlite.org/wal.html).
+
+Bundle an engine containing the upstream WAL-reset fix, such as SQLite 3.51.3 or a later fixed release; verify `SELECT sqlite_version()` in the built-image tests. Pinning SQLx alone does not fix the native engine version. Fetch bounded result pages and release readers before slow network delivery so they do not indefinitely delay WAL checkpoints. [WAL-reset fix](https://sqlite.org/wal.html#walresetbug), [native dependency range](https://docs.rs/crate/sqlx-sqlite/0.9.0).
+
+Use `query`/`query_as` with `FromRow` and real migrated-database tests. These queries are checked when executed, not verified as SQL at compile time. This avoids a build-time database or mandatory `DATABASE_URL`. If compile-time `query!` checking is introduced, commit and verify its offline metadata as part of generation. [Typed row mapping](https://docs.rs/sqlx/latest/sqlx/fn.query_as.html), [offline query checking](https://docs.rs/sqlx/latest/sqlx/macro.query.html).
+
+### Exact values across boundaries
+
+| Value | Representation and rule |
+| --- | --- |
+| Settlement quantity, payout, premium | Checked integer base units in Rust and the program; wider intermediates for arithmetic. |
+| Browser token amounts | Input strings until validated, then `bigint`; never JavaScript floating-point financial arithmetic. |
+| Volaryn REST financial values | Validated decimal strings with explicit units. |
+| SQLite financial values | Canonical decimal strings in `TEXT`, parsed at the persistence boundary. |
+| Market prices and derived estimates | Bounded `rust_decimal` values off chain, with checked arithmetic and explicit precision and rounding rules for derived estimates and display. |
+
+SQLite integers are signed 64-bit, so they cannot represent the entire token `u64` range. `REAL` and numeric coercions also cannot preserve arbitrary exact decimal values. Do not use numeric casts, SQL `SUM`, or ordinary lexical ordering of the text fields as financial arithmetic. [SQLx SQLite numeric limits](https://docs.rs/sqlx/latest/sqlx/sqlite/types/index.html).
+
+Preserve external JSON number text, using `serde_json::RawValue` where necessary, and parse it directly into `rust_decimal`; converting through `f64` first loses the intended precision. Reject values outside the supported range or scale. This decimal dependency belongs to market context, not the on-chain settlement program. [Raw JSON values](https://docs.rs/serde_json/latest/serde_json/value/struct.RawValue.html), [Decimal representation](https://docs.rs/rust_decimal/latest/rust_decimal/struct.Decimal.html).
+
+Solana JSON-RPC retains its own numeric wire format. Use Kit's Solana-aware serializer/parser; do not route RPC through the REST client or ordinary browser JSON parsing. The bounded `/rpc` proxy validates the envelope and method allowlist while preserving payload numbers and JSON-RPC result/error envelopes. Test values above `Number.MAX_SAFE_INTEGER` through the entire proxy path. [Kit HTTP transport](https://github.com/anza-xyz/kit/tree/main/packages/rpc-transport-http).
+
+### Migration contract
+
+Store ordered, immutable SQL files in `backend/migrations/`. Embed them with `sqlx::migrate!()` and run them before readiness and reconciliation. A small `backend/build.rs` tracks the migrations directory so newly added files trigger a rebuild; use consistent LF line endings. Validate the applied history against the embedded migrations and fail clearly on incompatible history or checksum mismatch. Never reset data as a startup repair. [Embedded migrations](https://docs.rs/sqlx/latest/sqlx/macro.migrate.html), [migration validation](https://docs.rs/sqlx/latest/sqlx/migrate/struct.Migrator.html).
+
+One application startup owns migrations. Stop the previous application and writer before opening the same volume for an upgrade; do not overlap replicas during deployment. SQLx's SQLite migration lock methods are no-ops, so generic migrator locking is not a cross-process coordination mechanism. [SQLite migration implementation](https://github.com/transact-rs/sqlx/blob/v0.9.0/sqlx-sqlite/src/migrate.rs).
+
+Prefer additive schema changes, explicit backfills, and forward fixes. Test empty installation, upgrades from supported schemas, repeated startup, and interrupted migration recovery. Application rollback requires a compatible schema; an automatic down-migration is not the recovery strategy. Use SQLite's backup facilities or a clean stopped-volume copy: copying only the main file while WAL is active is insufficient. [SQLite backup facilities](https://sqlite.org/backup.html).
+
+Rebuilding chain projections and migrating stored observations are distinct operations. Reconstruction cannot recover discarded market history. A future shared database remains behind the persistence boundary, but its SQL, concurrency behavior, and data conversion require their own tests.
+
+## 4. Settlement program and Solana clients
+
+### Anchor and token interfaces
+
+**Choose Rust with Anchor** for account validation, PDA constraints, instruction organization, and IDL generation. These facilities reduce repetitive account-handling code and provide a common source for clients. They do not establish the financial invariants or guarantee program correctness; the contract suite verifies those rules. Program dependencies remain separate from backend HTTP, database, and market-arithmetic code. [Anchor account constraints](https://www.anchor-lang.com/docs/references/account-constraints).
+
+Use `anchor-spl` token interfaces for shared token operations and narrowly scoped Token-2022 interface helpers for extension decoding, account sizing, and instructions. Anchor does not wrap every extension instruction; keep any direct CPI implementation in the program's token module. Test the exact mint-extension combination, custom settlement account, and authority handoff specified by the architecture. Do not substitute a generic associated-account helper where it changes those requirements. [Anchor token integration](https://www.anchor-lang.com/docs/tokens), [extension support](https://www.anchor-lang.com/docs/tokens/extensions), [Token-2022 interfaces](https://docs.rs/spl-token-2022-interface/latest/spl_token_2022_interface/extension/index.html).
+
+Choose direct token-interface crates from the family used by the pinned `anchor-spl`, preferably using its re-exports where available. Host RPC and LiteSVM may resolve different Solana type families; exchange account bytes and explicit boundary conversions instead of passing SDK-specific objects between them. A matching crate name does not make different major versions interchangeable. [Anchor SPL dependencies](https://docs.rs/crate/anchor-spl/1.2.0).
+
+### Kit and generated program clients
+
+Use `@solana/kit`, `@solana/kit-plugin-wallet`, and `@solana/react`; wallet hooks come from `@solana/kit-plugin-wallet/react`. Wallet Standard discovery avoids maintaining a separate integration package for each wallet. Compose one stable client per validated deployment using Kit's `createSolanaRpc` and a small application helper for single-transaction submission and HTTP status polling. Do not select the RPC convenience plugin's default executor: it requires WebSocket subscriptions, which the same-origin transport contract does not provide. There is no implicit external RPC fallback. [Solana React integration](https://solana.com/docs/frontend/react-hooks), [RPC plugin executor](https://github.com/anza-xyz/kit-plugins/blob/main/packages/kit-plugin-rpc/src/transaction-plan-executor.ts).
+
+Generate the program client through **Anchor IDL → Codama's Anchor importer → JavaScript renderer → `packages/protocol`**. The build dependencies are `codama`, `@codama/nodes-from-anchor`, and `@codama/renderers-js`; the generated codecs and instruction builders are browser runtime code. This avoids handwritten layouts and encoders. [Codama](https://github.com/codama-idl/codama), [Anchor importer](https://github.com/codama-idl/codama/blob/main/packages/nodes-from-anchor/README.md), [JavaScript renderer](https://github.com/codama-idl/renderers-js).
+
+Validate the IDL specification version before generation; fail on unsupported input instead of falling through to a legacy parser. Generated clients do not reproduce every Anchor account-resolution rule. Resolve unsupported nested seeds and account relationships explicitly in a thin helper, and compare addresses and instruction bytes with the actual program. [Importer dispatch](https://github.com/codama-idl/codama/blob/main/packages/nodes-from-anchor/src/index.ts), [account seed handling](https://github.com/codama-idl/codama/blob/main/packages/nodes-from-anchor/src/v01/InstructionAccountNode.ts).
+
+Do not add Anchor's legacy TypeScript runtime or `@solana/web3.js` v1 to this client path: Anchor documents that runtime against the older SDK. When token operations need a JavaScript client, use the compatible `@solana-program/token` or `@solana-program/token-2022` packages only in the modules that need them. [Anchor TypeScript compatibility](https://www.anchor-lang.com/docs/clients/typescript), [Solana client guidance](https://solana.com/docs/frontend/web3-compat).
+
+Exercise remains one atomic operation in one transaction. A convenience transaction planner must not split delivery, payout, and authority handoff into independently submitted transactions. Select a transaction format supported by both wallet and runtime, and test the largest supported token configuration against transaction-size, compute, memory, and CPI limits. Unknown agreement versions remain non-executable until their decoders and behavior are supported. [Transaction formats](https://solana.com/docs/core/transactions/versioned-transactions), [Anchor memory constraints](https://www.anchor-lang.com/docs/features/zero-copy).
+
+## 5. Frontend application
+
+**Choose React with strict TypeScript and Vite**, using the official React plugin. Use the TypeScript 5.9 family with the selected OpenAPI generator and typed linting tools; upgrade that group together rather than adopting a compiler major independently. Vite builds static assets that the Rust server serves; the product has no requirement for server-side rendering or a separate Node application server. Run `tsc --noEmit` explicitly: Vite transpiles TypeScript but does not type-check it. Use strict checking, unchecked-index protection, and isolated-module-compatible code. [Vite TypeScript behavior](https://vite.dev/guide/features#typescript), [OpenAPI generator peer requirement](https://registry.npmjs.org/openapi-typescript/7.13.0), [typed linting support](https://typescript-eslint.io/users/dependency-versions/).
+
+Maintain separate browser and tooling TypeScript configurations. Include the declaration libraries required by the selected Kit release, including disposable types, and development-only Node types where referenced. Type-check the generated client with library checking enabled; these declarations do not authorize Node APIs or polyfills in browser code. Check the wallet plugin's React peer range as well as the React bindings' range. [Kit client types](https://github.com/anza-xyz/kit/blob/main/packages/plugin-core/src/client.ts), [wallet package peer requirements](https://registry.npmjs.org/@solana%2fkit-plugin-wallet/0.20.0).
+
+Use React Router in **Declarative mode** for position, offer, and agreement routes. This supports links and page reloads without adopting a full-stack routing framework. The Rust server returns `index.html` for application navigation routes; API/RPC/health failures and missing assets keep their proper responses. [React Router](https://reactrouter.com/start/declarative/installation).
+
+Use CSS Modules with shared CSS custom properties for color, typography, spacing, and component states. Build small shared components from semantic HTML controls. Native dialogs can serve simple selection and confirmation flows, with labels, focus, cancellation, and focus restoration tested in a browser. A broad component framework, CSS-in-JS runtime, and styling preprocessor are unnecessary for these screens. [Vite CSS Modules](https://vite.dev/guide/features#css-modules), [HTML dialogs](https://html.spec.whatwg.org/multipage/interactive-elements.html#the-dialog-element).
+
+Use local React state for forms, reducers for transaction progress, and narrow context for wallet and configuration. Wrap the selected `@solana/react` request utilities in feature hooks over the typed HTTP client, keeping cancellation and request identity tied to network, program, wallet, and query. Retained data after a failed refresh remains stale. Controlled amount inputs preserve strings until validated conversion. A dedicated query cache or form framework becomes justified only when concrete needs exceed these helpers. [React reducers](https://react.dev/reference/react/useReducer), [Kit request hook](https://github.com/anza-xyz/kit/blob/main/packages/react/src/useRequest.ts).
+
+Keep Strict Mode enabled. Signing and submission start only from explicit user actions, with a synchronous in-flight guard; effects observe results and clean up subscriptions or dialogs. Check wallet signing capability and chain support, then recheck the captured account/network after asynchronous preparation. Track pending actions above route components and persist only public reconciliation identifiers needed after reload. Unmounting, cancellation, or a wallet switch cannot undo a submitted transaction or authorize resubmission. [React Strict Mode](https://react.dev/reference/react/StrictMode), [event-driven requests](https://react.dev/learn/you-might-not-need-an-effect#sending-a-post-request).
+
+Read deployment configuration from `/api/config`. The same live frontend artifact can serve different live deployments; local and test builds separately include disposable wallet tooling. Credentials never belong in browser build variables; Vite exposes its client environment values to the bundle. [Vite environment behavior](https://vite.dev/guide/env-and-mode).
+
+Revalidate `index.html`; apply immutable caching only to hashed assets. Use `no-store` for configuration and transaction-sensitive API/RPC responses. Handle Vite chunk-load failures with a controlled refresh prompt that preserves pending-action reconciliation, rather than an automatic reload during wallet approval. [Vite deployment and load errors](https://vite.dev/guide/build#load-error-handling).
+
+## 6. HTTP contract and runtime validation
+
+Use **Utoipa with `utoipa-axum`** to generate OpenAPI from Rust DTOs and annotated routes. Export the contract during generation without starting the application or connecting to a database. Use **`openapi-typescript`** for types under `frontend/src/lib/api` and **`openapi-fetch`** for a small typed client over native `fetch`. This gives typed paths and responses without Axios, handwritten duplicate DTOs, or a separate API service. No documentation-UI runtime is required. [Utoipa](https://docs.rs/utoipa/latest/utoipa/), [Axum integration](https://docs.rs/utoipa-axum/latest/utoipa_axum/), [OpenAPI types](https://openapi-ts.dev/introduction), [typed fetch](https://openapi-ts.dev/openapi-fetch/).
+
+Generated TypeScript types are compile-time contracts, not runtime validators. Backend adapters validate external payloads. Frontend boundary functions validate critical configuration, version tags, addresses, and decimal strings before use; signing flows also reread and decode chain state. An HTTP projection cannot authorize settlement. Avoid duplicating the entire schema in a second handwritten validation catalog.
+
+Treat three kinds of change separately:
+
+| Contract | Evolution mechanism |
+| --- | --- |
+| Application database | Ordered SQL migrations and supported upgrade tests. |
+| HTTP and generated clients | Compatible schema changes, regeneration, type checks, and response tests. |
+| On-chain agreement | Explicit agreement version, decoding and behavior checks, and defined migration or continued servicing of earlier rights. |
+
+Regenerate artifacts in CI and fail on uncommitted drift. Verify actual account and instruction bytes, numeric boundaries, PDA derivation, and error decoding; a successful generator run alone does not establish compatibility.
+
+## 7. Testing and development tools
+
+| Tool | Purpose and boundary |
+| --- | --- |
+| Rust test framework, Tokio test utilities | Domain rules, asynchronous adapters, and migrated temporary SQLite files with production WAL settings. |
+| Tower service utilities; local Axum fixture servers | Exercise routing and actual HTTP-client parsing/failures without public providers or another mock-server dependency. |
+| LiteSVM | Load the built settlement program and pinned token programs; test signatures, controlled chain time, and financial invariants. |
+| `solana-test-validator` | Real local RPC and validator execution for application and browser scenarios. |
+| Vitest | Numeric conversion, reducers, HTTP boundary behavior, and focused frontend logic. |
+| React Testing Library, `user-event`, `jsdom` | Component behavior through labelled controls; DOM simulation is limited to component tests. |
+| Playwright | Actual browser, disposable wallet signatures, and local-chain user journeys. |
+
+LiteSVM and the local validator cover different boundaries. Pin token-program artifacts and relevant runtime features instead of treating bundled defaults as proof of parity. Compose launches `solana-test-validator` explicitly; do not inherit a different local runtime from an Anchor command's default. [LiteSVM](https://docs.rs/litesvm/latest/litesvm/), [Anchor local-runtime selection](https://www.anchor-lang.com/docs/updates/release-notes/1-0-0).
+
+Use a unique database file for each persistence/recovery test and explicitly close its pool. In-memory databases can disappear when pooled connections close or are dropped during cancellation; they also do not prove file/WAL recovery. [SQLx pool cancellation](https://docs.rs/sqlx/latest/sqlx/struct.Pool.html#method.acquire).
+
+Use Vitest's Node environment for non-DOM tests and `jsdom` only where needed. Browser tests remain responsible for navigation, focus, layout, wallet behavior, and actual transaction outcomes. [Vitest](https://vitest.dev/guide/), [React Testing Library](https://testing-library.com/docs/react-testing-library/intro/), [user interactions](https://testing-library.com/docs/user-event/setup/).
+
+Use `rustfmt` and Clippy for Rust; ESLint with `typescript-eslint` type-aware rules and `eslint-plugin-react-hooks` for application code; Prettier for frontend, configuration, and documentation formatting. Keep formatting separate from semantic linting, using `eslint-config-prettier` to avoid conflicting rules. Pay particular attention to unhandled asynchronous failures around wallet and submission operations. [Typed linting](https://typescript-eslint.io/getting-started/typed-linting/), [React Hooks linting](https://react.dev/reference/eslint-plugin-react-hooks), [formatter integration](https://prettier.io/docs/integrating-with-linters).
+
+The shared test wrappers, isolation, fixtures, failure artifacts, and fast/full execution contracts are defined in the [architecture](architecture.md#test-environment-and-entry-points). These tools are development dependencies; they do not add permanent application services.
+
+## 8. Repository, containers, and deployment
+
+Use one **Cargo workspace** for the backend, program, and local tooling, and one **npm workspace** for the frontend and generated protocol client. Commit both lockfiles. Keep host-only dependencies out of the on-chain target, select build targets explicitly, and use compatible dependency resolution instead of assuming all Solana crates share one major version. A shared repository does not require sharing SDK-specific types across runtime boundaries. [Cargo workspaces](https://doc.rust-lang.org/cargo/reference/workspaces.html), [feature resolution](https://doc.rust-lang.org/cargo/reference/features.html#feature-resolver-version-2), [npm workspaces](https://docs.npmjs.com/cli/v11/using-npm/workspaces/).
+
+Use Node 24 LTS with a patch satisfying every selected package's engine range, including the test tools; the selected jsdom family requires at least 24.15.0 on this LTS line. Pin exact Node/npm versions in build and test images. Install through `npm ci` with strict engine and peer checks, and invoke locked binaries through repository scripts. Do not suppress dependency conflicts with `--force` or `--legacy-peer-deps`. Pin the host Rust toolchain separately from Anchor/Agave and the SBF platform tools used to compile the program. The SBF compiler is not fixed by `rust-toolchain.toml` alone. [Node release policy](https://nodejs.org/en/about/previous-releases), [jsdom engine requirements](https://registry.npmjs.org/jsdom/30.1.0), [npm dependency checks](https://docs.npmjs.com/cli/v11/using-npm/config/), [SBF platform tools](https://github.com/anza-xyz/cargo-build-sbf#platform-tools).
+
+Declare each Rust package's minimum compiler version separately. Build the backend and program in separate invocations with their pinned compilers and the same unchanged lockfile; the SBF Cargo must also parse that workspace and lockfile. Feature isolation does not isolate dependency-version resolution. Split workspaces only if a demonstrated toolchain conflict cannot be resolved within these boundaries. [Cargo version resolution](https://doc.rust-lang.org/cargo/reference/resolver.html), [multiple compiler policies](https://doc.rust-lang.org/cargo/reference/rust-version.html#multiple-policies-in-a-workspace).
+
+Docker BuildKit and multi-stage builds separate generation, compilation, testing, bootstrap tooling, and application runtime. Use compatible glibc-based Linux build/runtime images; keep the runtime small with the Rust binary, static assets, public configuration, and required certificates/libraries. Native compilation tools remain in builders. This avoids requiring a static-musl toolchain merely to obtain a small image. [Docker multi-stage builds](https://docs.docker.com/build/building/multi-stage/).
+
+Docker Compose owns the validator/bootstrap/application topology and its health ordering. Test overrides add only an isolated one-shot runner; live Compose runs the application against the declared external deployment. Hosting supplies HTTPS, while the application uses the same-origin API and RPC proxy. No hosting vendor or container orchestrator is a mandatory runtime dependency. [Compose startup ordering](https://docs.docker.com/compose/how-tos/startup-order/).
+
+Render and validate each Compose configuration before starting it. Test overrides explicitly remove inherited host ports with `ports: !reset []`; an empty list alone does not remove them. Scope names and volumes to the test project. Run `compose.live.yaml` as a standalone configuration, excluding local bootstrap and validator services. Health probes must use a command shipped in the runtime image, such as a probe mode of the Rust executable. [Compose merge rules](https://docs.docker.com/reference/compose-file/merge/).
+
+Build browser-test images from the pinned Node base and install browser dependencies through the locked Playwright package during image construction. If using an official Playwright image instead, its version must match the package; the image does not include the project npm installation. Enable an init process and allocate sufficient container shared memory for Chromium, then validate the limit under the browser suite. [Playwright container requirements](https://playwright.dev/docs/docker).
+
+Browser signing needs a secure origin for Kit's Web Crypto operations. The test runner uses a small in-process forwarder built with Node's HTTP module: browser requests to its loopback origin reach `app:8080` over the Compose network, preserving HTTP status and body bytes. This needs no extra service or host port and allows the application container to be recreated independently. Reconnect through service DNS after replacement. A plain HTTP Compose hostname does not receive the loopback secure-context exemption; hosted origins use HTTPS. [Kit Web Crypto](https://github.com/anza-xyz/kit#web-crypto-api), [secure-context rules](https://www.w3.org/TR/secure-contexts/#is-origin-trustworthy), [Node HTTP](https://nodejs.org/api/http.html), [Compose container replacement](https://docs.docker.com/compose/how-tos/networking/#update-containers-on-the-network).
+
+The full-test wrapper starts dependencies, waits for readiness, runs the test container, captures its status and artifacts, and cleans up its own resources. Do not make the bootstrap container's successful exit terminate the test environment. CI calls these same wrappers; provider-specific workflow configuration stays thin. [Compose exit semantics](https://docs.docker.com/reference/cli/docker/compose/up/).
+
+## 9. Compatibility and dependency policy
+
+| Dependency group | Evidence required before accepting a change |
+| --- | --- |
+| Anchor CLI/crates, SBF build tools, Solana types | Host and SBF builds use the same lockfile; account validation, serialization, token CPI, and transaction-resource limits pass. |
+| Kit, wallet plugin, React bindings, Codama renderer | Strict peer resolution and declaration checks pass; IDL spec/account resolution agree; wallets sign and generated transactions execute using HTTP only. |
+| Axum, Utoipa integration, SQLx, Reqwest | Route/schema generation, resolved features, patched native SQLite, migrations, TLS, byte limits, and whole-operation deadlines pass in the application image. |
+| React, Vite, TypeScript, OpenAPI generator, ESLint, Vitest/jsdom, Node | Peer and engine checks, supported compiler/parser versions, type checking, production build, deep links, Strict Mode, request races, and pending-action recovery pass. |
+| Compose, Playwright package and browsers | Rendered configurations are isolated; secure-context signing, application replacement, and complete local-chain flows pass in the CI container. |
+
+Record the resolved combination in manifests and lockfiles, with exact toolchain and image pins. Verify clean builds with locked dependencies, regenerated artifacts, and the relevant behavioral suites. Package documentation establishes capabilities; only this combined execution gate establishes compatibility for the project.
+
+Add a dependency for a concrete responsibility, not a possible future feature. Use build/dev dependencies for generators and test tooling, limit Cargo features, and exclude local signers and fault controls from live artifacts. Neither optional market context nor a framework's convenience plugin may silently introduce credentials, a new service, or a settlement prerequisite.
+
+PostgreSQL, a separate indexer, a query-cache library, or targeted UI primitives can be introduced when the architecture's change boundaries and measured needs justify them. The baseline does not include Redis, message brokers, a general plugin engine, an ORM, a full-stack frontend server, a secondary option token, or a settlement-price oracle. Adopting a different financial model requires a product decision as well as technology changes.

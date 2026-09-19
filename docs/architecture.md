@@ -1,6 +1,6 @@
 # Volaryn Architecture
 
-This document defines the system's responsibilities, financial rules, integrations, and deployment contract. The [README](../README.md) introduces the product; the [product brief](product.md) explains its user problem, agreement, related products, and boundaries. Paths, APIs, and commands below define the implementation contract.
+This document defines the system's responsibilities, financial rules, integrations, and deployment contract. The [README](../README.md) introduces the product; the [product brief](product.md) explains its user problem, agreement, related products, and boundaries. The [technology stack](tech-stack.md) defines dependency choices, rationale, and compatibility requirements. Paths, APIs, and commands below define the implementation contract.
 
 ## 1. Design constraints
 
@@ -40,19 +40,17 @@ The browser's normal RPC transport is a restricted same-origin backend proxy. Th
 
 | Area | Selected dependencies | Purpose |
 | --- | --- | --- |
-| Backend | Rust, Tokio, Axum, `tower-http` | Async HTTP, static frontend delivery, request limits, and tracing middleware. |
-| External access | `reqwest` with Rustls; compatible Solana Rust client/types | PreStocks HTTP and typed chain access without a separate integration service. |
-| Persistence | SQLite through SQLx, SQLite features only | Durable caches and query projections; no database container or ORM layer. |
-| Data and errors | Serde, `thiserror`, `tracing`; decimal arithmetic for market values | Typed boundaries, stable errors, structured logs, and explicit numeric handling. |
+| Backend | Rust, Tokio, Axum, Tower, `tower-http` | Async HTTP, static frontend delivery, request limits, and tracing middleware. |
+| External access | `reqwest` with Rustls; nonblocking `solana-rpc-client` and compatible types | PreStocks HTTP and typed chain access without a separate integration service. |
+| Persistence | SQLite through SQLx with embedded migrations | Durable caches and query projections; no database container or ORM layer. |
+| Data and errors | Serde, `serde_json`, `thiserror`, `tracing`, `tracing-subscriber`, `rust_decimal` | Typed boundaries, stable errors, structured logs, and exact off-chain numeric handling. |
 | Program | Rust, Anchor, `anchor-spl`, Token-2022 interfaces | Account constraints, PDA authority, and extension-aware token operations. |
-| Frontend | React, TypeScript, Vite, CSS | A static application with feature modules; no server-side rendering service. |
-| Wallet and transactions | Solana Kit, its Wallet Standard plugin, React bindings, generated program client | Wallet discovery, account decoding, signing, and submission. |
-| Build-time contracts | Anchor IDL, Codama; OpenAPI from Rust DTOs and generated TypeScript types | Keep program and HTTP clients aligned with their authoritative definitions. |
-| Verification | Rust tests, LiteSVM, Vitest, Playwright | Financial invariants, adapter behavior, and complete browser flows. |
+| Frontend | React, TypeScript, Vite, React Router, CSS Modules | A static application with feature modules; no server-side rendering service. |
+| Wallet and transactions | Solana Kit HTTP RPC, Wallet Standard plugin, React bindings, generated program client | Wallet discovery, account decoding, signing, and HTTP-based submission and confirmation. |
+| Generated contracts | Anchor IDL and Codama; Utoipa, `openapi-typescript`, `openapi-fetch` | Generate matching program and HTTP clients; only generated code and client helpers enter the frontend runtime. |
+| Verification | Rust tests, LiteSVM, Vitest, React Testing Library, Playwright | Financial invariants, adapter behavior, component interactions, and complete browser flows. |
 
-[Axum](https://docs.rs/axum/latest/axum/), [static file serving](https://docs.rs/tower-http/latest/tower_http/services/struct.ServeDir.html), and [SQLx](https://docs.rs/sqlx/latest/sqlx/) cover the application runtime without extra services. Use native React state and typed HTTP helpers; introduce no global state framework just to mirror server data.
-
-[Solana recommends Kit for new frontends](https://solana.com/docs/frontend). Generate a Kit-compatible client from Anchor's IDL using [Codama](https://github.com/codama-idl/codama) and its [JavaScript renderer](https://github.com/codama-idl/renderers-js). Do not combine that client with Anchor's legacy TypeScript runtime, whose [documented compatibility](https://www.anchor-lang.com/docs/clients/typescript) is with `web3.js` v1. Pin a tested toolchain combination, Cargo/npm lockfiles, and container images; upgrades must pass serialization and transaction compatibility checks.
+The [technology stack](tech-stack.md) is the reference for package selection, alternatives, and toolchain compatibility. Keep native React state and typed HTTP helpers; generate the Kit-compatible program client from the IDL. Build-time generation and test tooling do not add runtime services. Dependency changes must pass the stack's compatibility gates.
 
 ### Repository layout
 
@@ -63,6 +61,7 @@ volaryn/
 ├── rust-toolchain.toml
 ├── Anchor.toml
 ├── backend/
+│   ├── build.rs               # Track embedded migration files
 │   ├── src/{http,application,domain,adapters,jobs}/
 │   └── migrations/
 ├── frontend/
@@ -84,7 +83,8 @@ volaryn/
 └── docs/
     ├── architecture.md
     ├── product.md
-    └── pipeline.md
+    ├── pipeline.md
+    └── tech-stack.md
 ```
 
 `http` validates transport input and calls `application`; application services coordinate domain rules and adapter interfaces. `domain` has no HTTP, database, or SDK dependency. Adapters implement chain reads, asset context, and persistence. Jobs call the same services as request handlers. Define interfaces at those external boundaries, not one interface per class or table.
@@ -238,7 +238,9 @@ There is no REST endpoint that makes a protection active in SQLite. Clients cons
 
 Track `awaiting_signature`, `submitted`, `confirmed`, `finalized`, and `failed` distinctly. Display confirmed results as provisional until finalized. On a timeout, query signature status and account state before offering another attempt; refresh an expired blockhash only after reconciling the earlier attempt. Replays cannot pay twice because program state transitions are single-use.
 
-Use Rust integer base units with checked arithmetic and wider intermediates, TypeScript `bigint`, and decimal strings over JSON. Never send token quantities as JavaScript numbers. Timestamps use UTC; the program's clock decides expiry. Return stable error codes with human-readable messages, including expired offer, wrong network, unavailable asset data, insufficient deliverable balance, and issuer-restricted transfer.
+Pending actions belong to application-level state, keyed by network, program, agreement, action, and signing account. Retain public signature and blockhash-validity information when known so reloads resume observation rather than submission. Missing feedback is an unresolved outcome, not a failure. Navigation and wallet changes cannot cancel a transaction already sent or give another account permission to continue signing it. Signing starts from an explicit user action with duplicate-action protection.
+
+Use Rust integer base units with checked arithmetic and wider intermediates, TypeScript `bigint`, and decimal strings over Volaryn's REST API. Solana JSON-RPC keeps its own numeric encoding through Kit's lossless transport and the proxy; never convert financial values through JavaScript numbers. Timestamps use UTC; the program's clock decides expiry. Return stable REST error codes with human-readable messages, including expired offer, wrong network, unavailable asset data, insufficient deliverable balance, and issuer-restricted transfer; preserve JSON-RPC result/error envelopes on `/rpc`.
 
 **My Positions** starts from verified supported wallet holdings. **Choose Protection** filters actual funded offers by exact mint, selected quantity and acceptable terms, holder restrictions, and valid admission policy. Each offer retains its fixed quantity and terms; the client cannot resize it to fit a position. When no funded offer matches, show that result explicitly. A failed or stale lookup is an availability error, not evidence that no offers exist; neither case produces a synthetic executable quote.
 
@@ -249,6 +251,8 @@ Use Rust integer base units with checked arithmetic and wider intermediates, Typ
 ### Read models and recovery
 
 SQLite stores asset snapshots, normalized market observations, agreement projections, and reconciliation cursors. Financial balances are observations tagged with network, program, slot, and commitment. A single bounded worker writes projections using WAL mode and short transactions; HTTP handlers do not hold database transactions while waiting on upstream calls.
+
+Persist raw financial amounts and exact market decimals as validated strings rather than floating-point or potentially overflowing signed integers. One startup owns embedded SQL migrations before readiness; stop the previous application and writer before an upgrade opens the same SQLite volume. The [stack's persistence and migration contract](tech-stack.md#3-persistence-numeric-precision-and-migrations) defines query validation, schema compatibility, and recovery.
 
 On startup and periodically, enumerate retained agreement accounts and reconcile their token accounts. Use finalized snapshots for durable projections; confirmed browser feedback is separate. Logs can accelerate refresh but are not the sole source of truth. Missed polls, restarts, or a deleted cache cannot change agreements. Rebuilding recovers authoritative terms and states, though previously cached market history can be lost.
 
@@ -282,7 +286,7 @@ Build the frontend, backend, and program in pinned Docker build targets. The app
 
 Under Volaryn's own demonstration policy, the local build supplies clearly labelled disposable holder/writer demo signers, funded test USDC, and Token-2022 fixtures with representative fees and scaling. It executes the real program, including ownership handoff, rather than simulating balances in React. Fixture market context records its provenance and does not require PreStocks uptime. Demo signers and seeding routes are excluded from the live build and additionally require the expected local ledger identity.
 
-The live Compose file starts only the application against an already deployed program. Network manifests contain public program IDs, expected genesis identity, official settlement mint, supported policies, and public RPC defaults. **`SOLANA_RPC_URL` is the only optional operator-supplied runtime environment setting**, for an alternative or authenticated RPC provider. It stays server-side. Ports, storage paths, polling limits, and upstream URLs have committed defaults rather than environment switches.
+The live Compose file runs as a standalone configuration and starts only the application against an already deployed program. Network manifests contain public program IDs, expected genesis identity, official settlement mint, supported policies, and public RPC defaults. **`SOLANA_RPC_URL` is the only optional operator-supplied runtime environment setting**, for an alternative or authenticated RPC provider. It stays server-side. Ports, storage paths, polling limits, and upstream URLs have committed defaults rather than environment switches.
 
 The backend exposes an allowlisted RPC proxy with request limits and no caller-selected upstream URL. Validate the network and deployed program against the manifest at startup and before enabling transactions. Wallet/network mismatch fails visibly. Live deployment keys are supplied to explicit deployment tooling outside the runtime; starting Compose never deploys or upgrades a live program. HTTPS belongs at the hosting platform's ingress.
 
@@ -314,7 +318,7 @@ Testing uses the same domain rules, generated clients, migrations, and compiled 
 | --- | --- |
 | Domain and interface behavior | In-process tests with controlled inputs, application time, and external responses. |
 | Contract and token behavior | LiteSVM loads the compiled program and the pinned token programs used by the local validator. Signature checks remain enabled for financial scenarios. |
-| Backend and persistence | Real temporary SQLite databases with production migrations; deterministic market and RPC adapters for mapping, timeout, and recovery cases. |
+| Backend and persistence | Real temporary SQLite files with production migrations and WAL settings; deterministic market and RPC adapters for mapping, timeout, and recovery cases. |
 | Complete user journeys | The local validator, bootstrap, application, and browser execute real transactions. A test wallet signs with disposable keys through the wallet interface; it can also reject or disconnect without replacing transaction results. |
 
 Versioned fixture recipes define participants, balances, token extensions, asset policies, and source responses for both contract and browser scenarios. Establish ordinary agreement states through program instructions. Each test owns its accounts and data; tests do not depend on another test's execution order. Fixture factories can express funded, active, expired, and issuer-restricted scenarios without hand-editing application balances.
@@ -330,7 +334,7 @@ The repository exposes two containerized test entry points:
 
 Both entry points run unchanged locally and in CI, accept a scenario selector for focused reruns, and require no operator credentials or host language toolchains. Building images and dependencies requires network access; the default test scenarios use local resources and fixtures. Read-only checks against official providers run separately and report external availability distinctly from deterministic test results.
 
-`compose.test.yaml` reuses the application topology and adds a one-shot test runner. Each full run receives its own Compose project, ledger, SQLite volume, browser state, and fixture identities, with no fixed published host ports. It never mounts persistent demo or live data. Independent runs are isolated; scenarios within a shared ledger run serially unless they have separate state. The runner waits for readiness, returns a failing exit code on failed checks, exports diagnostics, and removes only its own resources. Restart/recovery scenarios retain their state within that run. Resetting the persistent manual demo remains a separate explicit action.
+`compose.test.yaml` reuses the application topology and adds a one-shot test runner. Each full run receives its own Compose project, ledger, SQLite volume, browser state, and fixture identities, with no published host ports; verify the merged configuration removes inherited port bindings. Browser tests use the [stack's secure loopback origin](tech-stack.md#8-repository-containers-and-deployment) so disposable wallet signing can use Web Crypto while the application can be independently recreated. The environment never mounts persistent demo or live data. Independent runs are isolated; scenarios within a shared ledger run serially unless they have separate state. The runner waits for readiness, returns a failing exit code on failed checks, exports diagnostics, and removes only its own resources. Restart/recovery scenarios retain their state within that run. Resetting the persistent manual demo remains a separate explicit action.
 
 Scripted adapters reproduce stale data, malformed responses, unavailable RPC, and delayed or lost submission responses. Full settlement scenarios still submit to the real local validator; failure controls affect transport, not contract outcomes. Failed runs preserve a replayable scenario name, fixture version and seed, artifact versions, sanitized logs, transaction evidence, and browser traces under `artifacts/tests/`. Automatic retries must not turn an unexplained first failure into a passing result. Test runners, wallet helpers, and fault controls are excluded from live artifacts.
 

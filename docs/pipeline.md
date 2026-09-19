@@ -1,6 +1,6 @@
 # Volaryn Implementation Pipeline
 
-This document defines the sequence for building Volaryn as working, verifiable increments. The [product brief](product.md) defines the user outcome; the [architecture](architecture.md) defines component boundaries, financial rules, and technology choices. This pipeline describes when capabilities become available and what evidence permits the next increment.
+This document defines the sequence for building Volaryn as working, verifiable increments. The [product brief](product.md) defines the user outcome; the [architecture](architecture.md) defines component boundaries and financial rules; the [technology stack](tech-stack.md) defines dependency choices and compatibility gates. This pipeline describes when capabilities become available and what evidence permits the next increment.
 
 ## Progression rules
 
@@ -40,6 +40,8 @@ Stages are cumulative. Preparation for later work may proceed independently, but
 
 Run both successful paths and rejected actions: insufficient backing or delivery balance, incorrect signer or asset, early reserve withdrawal, repeated or partial exercise, activation/cancellation races, exact expiry boundaries, and arithmetic limits. Verify that policy changes cannot rewrite active rights, fees cannot reduce the promised USDC payout, and a failed transfer rolls back the entire operation. Include donated surplus and cleanup restrictions so account housekeeping cannot block settlement or refunds.
 
+Build with the pinned program toolchain and verify transaction size, compute, memory, and nested-call limits for the largest supported token configuration. Atomic settlement must fit a transaction format supported by the runtime and intended wallets.
+
 **Acceptance gate:** the writer can disconnect after activation and the holder can complete atomic settlement, including control of the delivered tokens passing to the writer. The proof must cover the intended Token-2022 settlement path; a simplified token substitute alone does not pass. Both unused expiry and cancelled-offer recovery preserve the correct balances. Every admitted fixture configuration has an executable compatibility test.
 
 ## 2. Minimal local application
@@ -50,7 +52,7 @@ Run both successful paths and rejected actions: insufficient backing or delivery
 
 - Connect a minimal backend and frontend through stable application interfaces and the architecture's [extension boundaries](architecture.md#business-changes-and-extension-boundaries). Generate the program client from the contract interface and keep HTTP types aligned with the backend contract; introduce replaceable interfaces at external boundaries rather than around every module.
 - Add the local ledger and an idempotent initialization job that deploys the program, initializes policy, and prepares test participants and funded offers through real program instructions.
-- Expose network identity, one supported fixture position, funded offers, agreement terms, and transaction outcomes. Store a minimal rebuildable projection of chain state and reconcile it from authoritative accounts on startup and after transactions.
+- Expose network identity, one supported fixture position, funded offers, agreement terms, and transaction outcomes. Store a minimal rebuildable projection of chain state, applying versioned migrations before readiness, and reconcile it from authoritative accounts on startup and after transactions.
 - Support wallet signing, transaction submission, and confirmation in the browser; the backend never signs financial actions. Clearly distinguish pending, provisional, finalized, and failed outcomes. Reconcile uncertain submissions before offering a retry.
 - Serve the frontend and API together. Local initialization and disposable signers require the expected local ledger identity and remain isolated from live configuration.
 - Add the full test entry point with an isolated ledger, database, and browser environment per run. Use the real compiled program and disposable wallet signatures; share the same fixtures and runner between local development and CI, with failure artifacts and scoped cleanup.
@@ -58,6 +60,8 @@ Run both successful paths and rejected actions: insufficient backing or delivery
 **Verification**
 
 Start from a clean checkout using the documented local entry point without mandatory environment variables. Complete activation and exercise through the browser, then verify balances and agreement state on the ledger. Reject wallet/network mismatch and wallet-signature rejection without showing success. Restart the environment without duplicating deployments, offers, or balances. Check that the generated client executes the same contract interface tested in Stage 1. Repeat the automated run from fresh state and alongside a manual demo to verify isolation, useful failure evidence, and cleanup that leaves the demo untouched.
+
+Verify strict dependency and generated-client checks, supported interface versions, and explicit account resolution. Prove HTTP-only submission/confirmation and lossless financial values through the RPC proxy. Check the rendered test configuration for inherited host ports and live resources, and execute wallet signing from the test browser's secure origin.
 
 **Acceptance gate:** the primitive works end to end without manually editing the database or configuring separate frontend and backend deployments. Cancellation and expiry remain executable through the scenario runner even before their full interface exists. Existing agreements survive an ordinary restart, and readiness reflects successful initialization.
 
@@ -76,6 +80,8 @@ Start from a clean checkout using the documented local entry point without manda
 **Verification**
 
 Run complete holder and writer journeys with separate wallets. Exercise after the writer disconnects; separately allow protection to expire and reclaim the reserve. Verify cancellation races, designated-holder restrictions, no-match behavior, full-quantity requirements, and the inability to withdraw an active reserve. Check that a falling displayed price cannot trigger exercise and that the UI explains costs and deadlines correctly. Validate basic keyboard access and usable layouts for the core journeys.
+
+Repeat clicks, switch wallets during preparation, and exercise component remounts. These must not duplicate submission, reuse another account's request results, or present retained stale data as a fresh observation.
 
 **Acceptance gate:** every core action described in the product is reachable through the interface and has a visible, accurate outcome. The application needs no operational scripts for routine holder or writer actions, and every displayed success is supported by chain state.
 
@@ -113,6 +119,8 @@ Test captured provider responses, missing or changed fields, unit mismatches, ti
 
 Interrupt submission and confirmation, repeat requests, restart the application during activity, and make the RPC or market source temporarily unavailable. Rebuild projections after deleting the local cache and recover the same authoritative financial state; cached market history is a separate concern. Exercise through an independent compatible client while the backend is unavailable. Test both a clean installation and an update with existing data and agreements.
 
+Reload or navigate away with a transaction pending, recreate the application container while the browser remains open, and recover through public transaction identifiers. Test oversized/chunked responses and rate-limit delays against whole-operation bounds. Run migration and interrupted-write scenarios on temporary database files with production settings, using a single migration owner.
+
 **Acceptance gate:** interrupted feedback cannot produce a duplicate payment or false completion, and recovery does not alter rights or balances. Supported upgrades preserve earlier flows; incompatible state produces a diagnosable failure. Operators can distinguish unavailable dependencies, stale observations, and actual transaction failures.
 
 ## 6. Deployment and operation
@@ -130,6 +138,8 @@ Interrupt submission and confirmation, repeat requests, restart the application 
 **Verification**
 
 Rehearse installation and updates using the release artifacts, then verify hosted health, identity, assets, and read paths without spending live funds. Prove that local-only facilities are absent from the live build and that operator credentials stay server-side. Rehearse application rollback against compatible persisted data and the declared program version. Check how new commitments can be disabled while preserving valid exercise of active agreements.
+
+Build host and program artifacts with their respective pinned compilers and unchanged lockfiles. Verify the bundled database engine, runtime health-probe availability, standalone live configuration, and stop-before-migrate replacement. Check browser cache headers and recovery from an outdated frontend asset without losing pending-action tracking.
 
 **Acceptance gate:** the release is reproducible, identifiable, observable, and recoverable within documented limits. A release must not proceed with an identity mismatch, missing readiness, broken existing flows, or no compatible recovery path. Application rollback does not undo chain transactions, program upgrades, or incompatible data migrations; those require a separately reviewed recovery or forward-fix procedure.
 
