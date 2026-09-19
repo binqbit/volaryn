@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$repo_root"
+
+case "${1:---check}" in
+--check | --write) mode="${1:---check}" ;;
+--help | -h)
+  echo "Usage: tools/format [--check|--write]"
+  echo "Format Rust, shell, Python, Markdown, JSON, TOML, YAML, and Dockerfiles."
+  exit 0
+  ;;
+*)
+  echo "Expected --check or --write" >&2
+  exit 2
+  ;;
+esac
+if (($# > 1)); then
+  echo "Expected at most one formatting mode" >&2
+  exit 2
+fi
+
+export PATH="$repo_root/tools/rustup:$PATH"
+
+dprint_version="$(dprint --version)"
+if [[ "$dprint_version" != "dprint 0.57.4" ]]; then
+  printf 'Expected dprint 0.57.4, found "%s"; see docs/development.md\n' "$dprint_version" >&2
+  exit 1
+fi
+
+# Debian reports 3.6.0; the upstream binary reports v3.6.0.
+shfmt_version="$(shfmt --version)"
+if [[ "${shfmt_version#v}" != "3.6.0" ]]; then
+  printf 'Expected shfmt 3.6.0, found "%s"; see docs/development.md\n' "$shfmt_version" >&2
+  exit 1
+fi
+
+if [[ "$mode" == --write ]]; then
+  cargo fmt --all
+  shfmt -w tools
+  dprint fmt
+else
+  cargo fmt --all -- --check
+  shfmt -d tools
+  dprint check
+fi

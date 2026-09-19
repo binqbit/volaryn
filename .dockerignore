@@ -1,0 +1,10 @@
+.git
+target
+**/target
+artifacts
+debug-tools
+.anchor
+.env
+node_modules
+**/node_modules
+**/__pycache__
