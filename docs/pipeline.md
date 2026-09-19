@@ -34,7 +34,7 @@ Stages are cumulative. Preparation for later work may proceed independently, but
 - Implement the full financial lifecycle: isolated payout funding, separate USDC premium payment, holder authorization, full exercise, cancellation before activation, expiry recovery, and terminal cleanup.
 - Enforce asset admission and lifecycle limits for new commitments while preserving active terms. Start with a deliberately small supported fixture set.
 - Include representative issuer behavior from the beginning: gross token delivery, transfer fees, scaled display amounts, transfer restrictions, and the settlement account's handoff to the writer. Test fee and display-scaling changes after activation against the fixed obligation.
-- Provide deterministic fixtures and repeatable build and test execution. Automated contract checks begin here and remain required throughout the pipeline.
+- Provide shared, versioned fixture recipes and the fast test entry point defined in the [test-environment contract](architecture.md#test-environment-and-entry-points). Isolate each scenario and control chain time and epochs for boundary tests. Automated contract checks begin here and remain required throughout the pipeline.
 
 **Verification**
 
@@ -53,10 +53,11 @@ Run both successful paths and rejected actions: insufficient backing or delivery
 - Expose network identity, one supported fixture position, funded offers, agreement terms, and transaction outcomes. Store a minimal rebuildable projection of chain state and reconcile it from authoritative accounts on startup and after transactions.
 - Support wallet signing, transaction submission, and confirmation in the browser; the backend never signs financial actions. Clearly distinguish pending, provisional, finalized, and failed outcomes. Reconcile uncertain submissions before offering a retry.
 - Serve the frontend and API together. Local initialization and disposable signers require the expected local ledger identity and remain isolated from live configuration.
+- Add the full test entry point with an isolated ledger, database, and browser environment per run. Use the real compiled program and disposable wallet signatures; share the same fixtures and runner between local development and CI, with failure artifacts and scoped cleanup.
 
 **Verification**
 
-Start from a clean checkout using the documented local entry point without mandatory environment variables. Complete activation and exercise through the browser, then verify balances and agreement state on the ledger. Reject wallet/network mismatch and wallet-signature rejection without showing success. Restart the environment without duplicating deployments, offers, or balances. Check that the generated client executes the same contract interface tested in Stage 1.
+Start from a clean checkout using the documented local entry point without mandatory environment variables. Complete activation and exercise through the browser, then verify balances and agreement state on the ledger. Reject wallet/network mismatch and wallet-signature rejection without showing success. Restart the environment without duplicating deployments, offers, or balances. Check that the generated client executes the same contract interface tested in Stage 1. Repeat the automated run from fresh state and alongside a manual demo to verify isolation, useful failure evidence, and cleanup that leaves the demo untouched.
 
 **Acceptance gate:** the primitive works end to end without manually editing the database or configuring separate frontend and backend deployments. Cancellation and expiry remain executable through the scenario runner even before their full interface exists. Existing agreements survive an ordinary restart, and readiness reflects successful initialization.
 
@@ -106,7 +107,7 @@ Test captured provider responses, missing or changed fields, unit mismatches, ti
 - Resolve uncertain transaction outcomes before offering a retry. Keep confirmed feedback separate from finalized records and avoid duplicate financial actions.
 - Support compatible schema changes, repeated initialization, and clear failure on incompatible deployment state. Never repair incompatibility by silently resetting balances.
 - Add actionable health and readiness signals, request correlation, dependency failures, and reconciliation lag without exposing secrets.
-- Complete the combined automated checks for contract behavior, interfaces, application flows, startup, and recovery.
+- Extend the shared test harness with scripted dependency failures and interrupted-response scenarios. Complete the combined automated checks for contract behavior, interfaces, application flows, startup, and recovery; keep default scenarios independent of live providers.
 
 **Verification**
 

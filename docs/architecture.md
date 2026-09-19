@@ -70,12 +70,15 @@ volaryn/
 ├── programs/volaryn/src/      # Instructions, accounts, token rules, errors
 ├── packages/protocol/         # Generated IDL and TypeScript program client
 ├── config/                    # Network manifests and reviewed asset policies
-├── tools/localnet/            # Validator bootstrap and disposable fixtures
+├── tools/
+│   ├── localnet/              # Validator bootstrap and disposable fixtures
+│   └── test                  # Containerized fast/full test entry point
 ├── tests/                     # Program scenarios and browser flows
 ├── package.json               # npm workspace and build scripts
 ├── package-lock.json
 ├── Dockerfile                 # Application, local tooling, and build targets
 ├── compose.yaml               # Self-contained local demonstration
+├── compose.test.yaml          # Isolated test overrides and one-shot runner
 ├── compose.live.yaml          # Application connected to an existing deployment
 ├── README.md
 └── docs/
@@ -274,6 +277,34 @@ Policy authority controls new admission only. Program upgrade authority is a sep
 | Complete application | Clean Compose startup, idempotent restart, exact-quantity offer matching, distinct empty/error states, holder/writer flows with real local transactions, explicit exercise and expiry presentation, backend-independent exercise through a second client, and local/live separation. |
 
 Run formatting, linting, focused Rust/TypeScript tests, generated-artifact checks, a container build, and complete-flow tests in CI. Production RPC calls are read-only integration checks; tests never spend live assets. Log request IDs, agreement addresses, public signatures, source failures, and reconciliation lag without logging keys or credential-bearing RPC URLs.
+
+### Test environment and entry points
+
+Testing uses the same domain rules, generated clients, migrations, and compiled settlement program as the application. External adapters are replaceable at composition boundaries; test controls never add financial bypasses to the deployed program or live API.
+
+| Layer | Execution environment |
+| --- | --- |
+| Domain and interface behavior | In-process tests with controlled inputs, application time, and external responses. |
+| Contract and token behavior | LiteSVM loads the compiled program and the pinned token programs used by the local validator. Signature checks remain enabled for financial scenarios. |
+| Backend and persistence | Real temporary SQLite databases with production migrations; deterministic market and RPC adapters for mapping, timeout, and recovery cases. |
+| Complete user journeys | The local validator, bootstrap, application, and browser execute real transactions. A test wallet signs with disposable keys through the wallet interface; it can also reject or disconnect without replacing transaction results. |
+
+Versioned fixture recipes define participants, balances, token extensions, asset policies, and source responses for both contract and browser scenarios. Establish ordinary agreement states through program instructions. Each test owns its accounts and data; tests do not depend on another test's execution order. Fixture factories can express funded, active, expired, and issuer-restricted scenarios without hand-editing application balances.
+
+The contract harness controls chain time and epochs to test expiry boundaries and fee changes immediately. [LiteSVM supports changing the Clock sysvar and advancing slots](https://github.com/LiteSVM/litesvm#capabilities). Application-clock substitution is limited to off-chain freshness and retry logic. Validator/browser tests use short test expiries and bounded polling of chain state; changing browser time cannot prove contract expiry. Readiness and confirmation checks replace fixed sleeps.
+
+The repository exposes two containerized test entry points:
+
+| Command contract | Responsibility |
+| --- | --- |
+| `./tools/test fast` | Formatting, type/build checks, generated-contract drift, and focused domain, contract, adapter, persistence, and component tests. No persistent validator or browser stack is required. |
+| `./tools/test full` | Runs the fast checks, then starts an isolated Compose environment and executes complete browser and recovery scenarios. |
+
+Both entry points run unchanged locally and in CI, accept a scenario selector for focused reruns, and require no operator credentials or host language toolchains. Building images and dependencies requires network access; the default test scenarios use local resources and fixtures. Read-only checks against official providers run separately and report external availability distinctly from deterministic test results.
+
+`compose.test.yaml` reuses the application topology and adds a one-shot test runner. Each full run receives its own Compose project, ledger, SQLite volume, browser state, and fixture identities, with no fixed published host ports. It never mounts persistent demo or live data. Independent runs are isolated; scenarios within a shared ledger run serially unless they have separate state. The runner waits for readiness, returns a failing exit code on failed checks, exports diagnostics, and removes only its own resources. Restart/recovery scenarios retain their state within that run. Resetting the persistent manual demo remains a separate explicit action.
+
+Scripted adapters reproduce stale data, malformed responses, unavailable RPC, and delayed or lost submission responses. Full settlement scenarios still submit to the real local validator; failure controls affect transport, not contract outcomes. Failed runs preserve a replayable scenario name, fixture version and seed, artifact versions, sanitized logs, transaction evidence, and browser traces under `artifacts/tests/`. Automatic retries must not turn an unexplained first failure into a passing result. Test runners, wallet helpers, and fault controls are excluded from live artifacts.
 
 ### Integration requirements and failure behavior
 
