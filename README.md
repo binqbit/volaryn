@@ -22,7 +22,7 @@ The product targets the Stocklana main track and PreStocks sponsor track. Its fo
 
 The architecture combines a Rust backend, a React and TypeScript frontend, and a Rust Solana program. A single application container serves the frontend and API; SQLite provides local storage without a database service. The deployment model uses Docker Compose to start the local application, Solana validator, and automatic initialization together, without required environment variables.
 
-Read [the product brief](docs/product.md) for the holder's problem, concrete outcomes, related products, and the evidence relevant to Stocklana judging. Read [the architecture](docs/architecture.md) for component boundaries, settlement rules, integrations, dependencies, and the deployment model.
+Read [the product brief](docs/product.md) for the holder's problem, concrete outcomes, related products, and product boundaries. Read [the architecture](docs/architecture.md) for component boundaries, settlement rules, integrations, dependencies, and the deployment model.
 
 ## Product boundaries
 

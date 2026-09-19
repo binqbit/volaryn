@@ -1,6 +1,6 @@
 # Volaryn Architecture
 
-This document defines the system's responsibilities, financial rules, integrations, and deployment contract. The [README](../README.md) introduces the product; the [product brief](product.md) explains its user problem, related products, and judging evidence. Paths, APIs, and commands below define the implementation contract.
+This document defines the system's responsibilities, financial rules, integrations, and deployment contract. The [README](../README.md) introduces the product; the [product brief](product.md) explains its user problem, agreement, related products, and boundaries. Paths, APIs, and commands below define the implementation contract.
 
 ## 1. Design constraints
 
@@ -148,7 +148,7 @@ Reuse also requires inspectable program behavior, deployment and upgrade control
 | --- | --- |
 | `ProtocolConfig` | Deployment identity, exact USDC mint/program, and policy authority. Settlement identity is immutable for a deployment. |
 | `AssetPolicy` | Admit a specific underlying and constrain new agreements. |
-| `Agreement` PDA | Writer, unique nonce, optional designated holder, activated holder, exact mints/programs, raw quantity, payout, premium, acceptance deadline, expiry, policy version, timestamps, and state. |
+| `Agreement` PDA | Writer, unique nonce, optional designated holder, activated holder, exact mints/programs, raw underlying quantity, payout and premium in USDC base units, acceptance deadline, expiry, policy version, timestamps, and state. |
 | Reserve token account | Holds at least the promised USDC payout; the agreement PDA controls spending. |
 | Underlying settlement token account | Receives the exercised underlying; controlled by the PDA until atomic handoff to the writer. |
 
@@ -169,13 +169,13 @@ An unaccepted offer becomes unavailable at its acceptance deadline; the writer c
 
 ### Funding and activation
 
-`create_offer` requires the writer's signature, valid policy, positive quantity and payout, and `now < accept_before <= expires_at`. It initializes the agreement and both token accounts, then deposits the entire payout. The writer pays account rent. The offer becomes funded only when all operations succeed.
+`create_offer` requires the writer's signature, valid policy, positive quantity, payout, and premium, and `now < accept_before <= expires_at`. Both payout and premium use the exact USDC mint and token program bound by `ProtocolConfig`. It initializes the agreement and both token accounts, then deposits the entire payout. The writer pays account rent. The offer becomes funded only when all operations succeed.
 
-Offers can be addressed to a holder; an unrestricted offer can be accepted once by any eligible signing holder. `activate` verifies the designated holder when present, current policy, deadline, and reserve. It atomically pays the fixed premium from holder to writer and records `Active`. The underlying remains with the holder. A cancellation and activation racing on the same account cannot both succeed.
+Offers can be addressed to a holder; an unrestricted offer can be accepted once by any eligible signing holder. `activate` verifies the designated holder when present, current policy, deadline, and reserve. It atomically pays the fixed premium from holder to writer and records `Active`. The premium is a separate payment that never reduces the reserve or payout; the writer keeps it whether the right is exercised or expires unused. The underlying remains with the holder. A cancellation and activation racing on the same account cannot both succeed.
 
 ### Independent exercise
 
-`exercise` requires the recorded holder's signature, `Active`, and `Clock.unix_timestamp < expires_at`. In one atomic instruction it:
+`exercise` requires the recorded holder's signature, `Active`, and `Clock.unix_timestamp < expires_at`. It consumes the entire right once; partial exercise is not supported. In one atomic instruction it:
 
 1. Validates the fixed account identities, reserve, and holder's spendable source balance.
 2. Transfers `quantity_raw` to the predefined underlying settlement account using the admitted token behavior, and measures the credited amount.
@@ -203,7 +203,7 @@ The backend serves a same-origin REST API, static frontend files, and bounded ba
 | `GET /api/config` | Public network identity, program ID, USDC mint, protocol/client version, and demo status; never provider secrets. |
 | `GET /api/assets` | Admitted assets, normalized source context, policy, and freshness. |
 | `GET /api/positions?owner=...` | Verified supported balances, source token accounts, and transfer restrictions. |
-| `GET /api/offers?mint=...` | Funded, still-acceptable offers with observed chain slot and funding status. |
+| `GET /api/offers?mint=...` | Funded, still-acceptable offers with exact terms, any designated holder, observed chain slot, and funding status. |
 | `GET /api/agreements?owner=...` and `GET /api/agreements/{address}` | Holder/writer views, exact terms, reserve, and effective expiry state. |
 | `POST /rpc` | Bounded allowlist of required account-read, simulation, blockhash, status, and signed-transaction submission methods. |
 | `GET /health/live`, `GET /health/ready` | Process liveness and initialization readiness. |
@@ -214,7 +214,11 @@ Track `awaiting_signature`, `submitted`, `confirmed`, `finalized`, and `failed` 
 
 Use Rust integer base units with checked arithmetic and wider intermediates, TypeScript `bigint`, and decimal strings over JSON. Never send token quantities as JavaScript numbers. Timestamps use UTC; the program's clock decides expiry. Return stable error codes with human-readable messages, including expired offer, wrong network, unavailable asset data, insufficient deliverable balance, and issuer-restricted transfer.
 
-The main screens are **My Positions**, **Choose Protection**, **Review Offer**, **Active Protection**, and **Writer Commitments**. Show gross quantity, estimated net writer receipt, payout, premium, exact expiry, reserve evidence, required source balance, and chain transaction links. Separate an active right from the holder's ability to deliver: underlying can be moved or sold, and one balance cannot satisfy multiple exercised agreements. Avoid claims that the USDC payout is a net investment return or a guaranteed dollar value.
+**My Positions** starts from verified supported wallet holdings. **Choose Protection** filters actual funded offers by exact mint, selected quantity and acceptable terms, holder restrictions, and valid admission policy. Each offer retains its fixed quantity and terms; the client cannot resize it to fit a position. When no funded offer matches, show that result explicitly. A failed or stale lookup is an availability error, not evidence that no offers exist; neither case produces a synthetic executable quote.
+
+**Review Offer** shows gross quantity, estimated net writer receipt, payout, USDC premium, acceptance deadline, protection expiry, reserve evidence, required source balance, and transaction costs. Present token price, mark price, implied valuation, and mark valuation as separately labelled context, distinct from the contractual payout. Refresh eligibility, funding, and holder balances before signing. **Active Protection** exposes holder-initiated full exercise and its deadline; a price fall never triggers automatic exercise. Separate an active right from the holder's ability to deliver: underlying can be moved or sold, and one balance cannot satisfy multiple exercised agreements. Avoid claims that the USDC payout is a net investment return or a guaranteed dollar value.
+
+**Writer Commitments** supports setting terms and creating a fully funded offer, cancelling unaccepted offers, inspecting active locked reserves, reclaiming expired reserves, and locating delivered tokens after exercise. Review includes the committed capital, estimated net token receipt, premium, duration, and issuer risks. Both roles can inspect agreement accounts and transaction links; all actions use the same wallet-signed program instructions described above.
 
 ### Read models and recovery
 
@@ -262,11 +266,11 @@ Policy authority controls new admission only. Program upgrade authority is a sep
 
 | Verification boundary | Required evidence |
 | --- | --- |
-| Program | Funding, activation, writer-offline exercise, full payout, net receipt, ownership handoff, expiry/refund, double exercise, wrong mint/program/holder, cancellation race, and atomic rollback. |
+| Program | Funding, exact USDC premium payment on activation, writer-offline full exercise, partial-exercise rejection, full payout, net receipt, ownership handoff, expiry/refund with premium retained, double exercise, wrong mint/program/holder, cancellation race, and atomic rollback. |
 | Token behavior | Active transfer fees and changes, scaled display changes, required extensions, custom-account sizing, no immutable owner, unset delegate/close authority, issuer freeze/pause, hook rejection, and withheld-fee cleanup. |
 | Invariants | No early reserve withdrawal, donated surplus cannot block exercise, exact expiry boundary, overflow rejection, and policy updates cannot rewrite active rights. |
 | Backend/client contracts | Captured official response parsing, missing fields, price-unit mismatch, stale sources, reconciliation after restart, and generated-client compatibility. |
-| Complete application | Clean Compose startup, idempotent restart, holder/writer flows with real local transactions, backend-independent exercise through a second client, and local/live separation. |
+| Complete application | Clean Compose startup, idempotent restart, exact-quantity offer matching, distinct empty/error states, holder/writer flows with real local transactions, explicit exercise and expiry presentation, backend-independent exercise through a second client, and local/live separation. |
 
 Run formatting, linting, focused Rust/TypeScript tests, generated-artifact checks, a container build, and complete-flow tests in CI. Production RPC calls are read-only integration checks; tests never spend live assets. Log request IDs, agreement addresses, public signatures, source failures, and reconciliation lag without logging keys or credential-bearing RPC URLs.
 
