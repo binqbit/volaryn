@@ -1,9 +1,6 @@
 # Volaryn Architecture
 
-**Status:** target architecture; application code and deployment files are not implemented.  
-**Evidence reviewed:** 19 September 2026.
-
-This document defines the system's responsibilities, financial rules, integrations, and deployment contract. The [README](../README.md) introduces the product. Paths, APIs, and commands below specify the intended implementation.
+This document defines the system's responsibilities, financial rules, integrations, and deployment contract. The [README](../README.md) introduces the product; the [product brief](product.md) explains its user problem, related products, and judging evidence. Paths, APIs, and commands below define the implementation contract.
 
 ## 1. Design constraints
 
@@ -81,7 +78,9 @@ volaryn/
 ├── compose.yaml               # Self-contained local demonstration
 ├── compose.live.yaml          # Application connected to an existing deployment
 ├── README.md
-└── docs/architecture.md
+└── docs/
+    ├── architecture.md
+    └── product.md
 ```
 
 `http` validates transport input and calls `application`; application services coordinate domain rules and adapter interfaces. `domain` has no HTTP, database, or SDK dependency. Adapters implement chain reads, asset context, and persistence. Jobs call the same services as request handlers. Define interfaces at those external boundaries, not one interface per class or table.
@@ -101,17 +100,17 @@ The program owns settlement validation independently of backend checks. Frontend
 
 ### PreStocks
 
-The backend calls [`GET https://prestocks.com/api/prestocks`](https://prestocks.com/api/prestocks). An unauthenticated request succeeded during research. The observed response includes `contract_address`, `name`, `symbol`, `tokenPrice`, `markPrice`, `impliedValuation`, `markValuation`, and `supply`. No API key is required by the observed interface; no documented authentication or service-level guarantee is assumed.
+The backend reads public asset context from [`GET https://prestocks.com/api/prestocks`](https://prestocks.com/api/prestocks). The adapter maps `contract_address`, `name`, `symbol`, `tokenPrice`, `markPrice`, `impliedValuation`, `markValuation`, and `supply` from the response. Public reads use no API key; API availability and response shape remain external dependencies, not settlement prerequisites.
 
-Normalize this response through a typed adapter with bounded timeouts, retries, schema validation, and caching. Join assets by exact mint and network, never by ticker. API additions do not automatically become tradable. Preserve source provenance and `received_at`; the response does not provide a market observation timestamp, so receipt time must not be labelled price time. Missing values remain unavailable rather than becoming zero.
+Normalize this response through a typed adapter with bounded timeouts, retries, schema validation, and caching. Join assets by exact mint and network, never by ticker. API additions do not automatically become tradable. Preserve source provenance and `received_at`; receipt time must not be labelled price time. A market observation timestamp requires explicit source evidence. Missing values remain unavailable rather than becoming zero.
 
 Wallet discovery uses [`getTokenAccountsByOwner`](https://solana.com/docs/rpc/http/gettokenaccountsbyowner) for Token-2022 holdings and the applicable USDC token program. Read mint state for decimals, extensions, and authorities. Aggregate holdings for display while retaining individual account identities and spendable balances.
 
-**Verified compatibility finding:** a mainnet `getMultipleAccounts` inspection at finalized slot `448268396`, epoch `1037`, found all eight API-listed mints owned by Token-2022, with nine decimals. Their extensions included transfer fees, scaled UI amounts, permanent delegates, pausing, mutable freeze authority, confidential-transfer configuration, and a transfer-hook configuration whose program was unset. The active transfer fee was 50 basis points. These are dated observations, not constants to hardcode. Reproduce them using the official API's mint list and [Solana's account RPC](https://solana.com/docs/rpc/http/getmultipleaccounts).
+**Mint validation:** admission checks each official mint through [Solana's account RPC](https://solana.com/docs/rpc/http/getmultipleaccounts) on the selected network. Verify the owning token program, decimals, authorities, and extension configuration, including transfer fees, scaled UI amounts, permanent delegates, pausing, freeze authority, confidential transfers, and transfer hooks where present. Read the fee schedule applicable to the transaction's epoch; never hardcode an issuer-wide fee, asset count, decimal precision, or extension set. Recheck transfer-relevant configuration during transaction review.
 
 ### Quantity and issuer transfer rules
 
-The agreement fixes **`quantity_raw`: the gross base-unit debit from the holder**, not a display balance or a guaranteed net writer receipt. The writer accepts the issuer's transfer-fee exposure. During exercise the holder transfers exactly this amount and receives the entire agreed USDC payout; issuer fees reduce the underlying credited to the settlement account. The program records the actual spendable credit. No additional holder quantity or writer approval is requested when a fee changes. This follows Token-2022's [transfer-fee semantics](https://solana.com/docs/tokens/extensions/transfer-fees).
+The agreement fixes **`quantity_raw`: the gross base-unit debit from the holder**, not a display balance or a guaranteed net writer receipt. If the supported mint applies an issuer-level transfer fee, the writer accepts that fee exposure. During exercise the holder transfers exactly the agreed quantity and receives the entire agreed USDC payout; any applicable issuer fee reduces the underlying credited to the settlement account. The program records the actual spendable credit. No additional holder quantity or writer approval is requested when a fee changes. This follows Token-2022's [transfer-fee semantics](https://solana.com/docs/tokens/extensions/transfer-fees).
 
 Before signing, both parties see the gross quantity, estimated issuer fee, estimated net receipt, fixed USDC payout, premium, and expiry. A funded offer stores the gross-quantity interpretation explicitly. The platform fee is zero in this design; network fees and account rent are separate and never deducted from the payout.
 
@@ -123,7 +122,7 @@ Support ordinary transparent transfers for reviewed Token-2022 extension combina
 
 A reviewed policy binds network, mint, token program, decimals, supported extension behavior, official source, review date, review-validity deadline, admission status, and maximum expiry. The on-chain `AssetPolicy` enforces enablement, review validity, and expiry limits at offer creation and activation. The richer evidence stays in versioned configuration. Administrative policy transactions are signed outside the application process.
 
-Lifecycle information is absent from the observed API and requires reviewed official notices. For example, the [SPACEX notice](https://prestocks.com/spacex) specifies a conversion deadline of 12 March 2027 at 23:59 UTC, and the [XAI notice](https://prestocks.com/xai) specifies 12 September 2026 at 23:59 UTC. Set maximum protection expiry strictly before any applicable conversion deadline, with an explicit reviewed buffer. Missing or outdated policy blocks new agreements.
+Lifecycle limits come from reviewed official notices, such as the [SPACEX notice](https://prestocks.com/spacex) and [XAI notice](https://prestocks.com/xai); a market-data response alone does not establish eligibility. Store each applicable deadline and its source in the asset policy. Set maximum protection expiry strictly before any applicable conversion deadline, with an explicit reviewed buffer. Missing or outdated policy blocks new agreements.
 
 Recheck policy at activation. Subsequent policy changes can stop new commitments but cannot change an active agreement's mint, quantity, payout, or expiry, or introduce an administrative exercise veto. Display new lifecycle warnings on active protection. There is no automatic migration into a replacement mint.
 
@@ -131,11 +130,19 @@ Recheck policy at activation. Subsequent policy changes can stop new commitments
 
 Pyth is an optional market-context adapter, absent from the core runtime dependency graph. Its data may support a meaningful comparison or writer decision, but never authorizes exercise or determines payout.
 
-The [official pre-IPO announcement](https://www.pyth.network/blog/anthropic-openai-pre-ipo-feeds-on-pyth) identifies OpenAI and Anthropic indicators as **Pyth Indices**, with commercial terms separate from Pyth Pro. Do not assume a public Hermes feed, a Pyth Pro entitlement, or a directly comparable PreStocks token price. API access, units, provenance, and usage rights must be confirmed before implementing that adapter. There is no mandatory Pyth package, credential, or environment variable.
+The [official pre-IPO announcement](https://www.pyth.network/blog/anthropic-openai-pre-ipo-feeds-on-pyth) identifies OpenAI and Anthropic indicators as **Pyth Indices**, with commercial terms separate from Pyth Pro. Do not assume a public Hermes feed, a Pyth Pro entitlement, or a directly comparable PreStocks token price. Enabling this adapter requires verified API access, units, provenance, and usage rights. There is no mandatory Pyth package, credential, or environment variable.
 
 ## 4. On-chain agreement
 
 Use one Anchor program. Each agreement has its own reserve; funds cannot back multiple agreements.
+
+### Settlement engine choice
+
+A dedicated Rust/Anchor program is the reference design specified here. Existing infrastructure such as [Epicentral's Solana Option Standard](https://beta.epicentral.markets/) is a reuse candidate, subject to verification against the same requirements: exact PreStocks Token-2022 behavior, fixed gross delivery, isolated full USDC backing, holder custody until exercise, atomic settlement before expiry without a price oracle or fresh writer approval, and lifecycle restrictions on new agreements. Any protocol fees must preserve the full promised payout and the documented cost model.
+
+Reuse also requires inspectable program behavior, deployment and upgrade controls, suitable licensing, and reproducible local tests. An alternative settlement engine must satisfy the [settlement invariants](#7-trust-boundaries-and-verification), with its dependencies and integration contract defined in this specification.
+
+### Accounts
 
 | Account | Responsibility |
 | --- | --- |
@@ -177,7 +184,7 @@ Offers can be addressed to a holder; an unrestricted offer can be accepted once 
 
 Any failure rolls back every transfer and state change. There is no price threshold, oracle read, fresh writer signature, backend authorization, or mutable admission-policy check in this path.
 
-The settlement account is a **custom token account, not an associated token account**. Allocate it for the actual mint-required extensions and initialize it without `ImmutableOwner` or `CpiGuard`, with no delegate and no separate close authority. This permits the PDA to hand token-account authority to the recorded writer through Token-2022 `SetAuthority`; its runtime owner remains Token-2022. The writer cannot modify the destination before exercise. Handoff gives the writer control of the received balance without a second mandatory token transfer; later consolidation may incur an issuer fee. This design follows the [official authority implementation](https://github.com/solana-program/token-2022/blob/bb07b98567d5519e4cfcfdd05e9a0b283f6c0cae/program/src/processor.rs#L709) and [immutable-owner rules](https://solana.com/docs/tokens/extensions/immutable-owner); compatibility tests against the pinned program are still required.
+The settlement account is a **custom token account, not an associated token account**. Allocate it for the actual mint-required extensions and initialize it without `ImmutableOwner` or `CpiGuard`, with no delegate and no separate close authority. This permits the PDA to hand token-account authority to the recorded writer through Token-2022 `SetAuthority`; its runtime owner remains Token-2022. The writer cannot modify the destination before exercise. Handoff gives the writer control of the received balance without a second mandatory token transfer; later consolidation may incur an issuer fee. This design follows the [official authority implementation](https://github.com/solana-program/token-2022/blob/bb07b98567d5519e4cfcfdd05e9a0b283f6c0cae/program/src/processor.rs#L709) and [immutable-owner rules](https://solana.com/docs/tokens/extensions/immutable-owner). Compatibility tests against the pinned program validate account initialization and authority handoff for each admitted extension combination.
 
 The client must discover this non-associated writer account. Exercise accepts one holder-owned source account containing the required spendable raw quantity. If holdings are split, the UI explains any consolidation and its transfer fees before asking for approval; it never silently changes the contractual quantity.
 
@@ -219,7 +226,7 @@ Stale market data disables derived pricing and new market-based suggestions; rev
 
 ## 6. Packaging and configuration
 
-The intended local entry point is:
+The local deployment contract provides one entry point:
 
 ```sh
 docker compose up --build
@@ -237,13 +244,13 @@ Startup waits for validator health, successful bootstrap, and database migration
 
 Build the frontend, backend, and program in pinned Docker build targets. The application runtime contains the Rust executable, static assets, public manifests, and CA certificates. Node, Rust, Anchor, and Solana CLI tooling remain in build/bootstrap images. Run the application without root privileges and with only its data directory writable. Bind local demo ports to loopback; publish no SQLite or internal service ports.
 
-The local build supplies clearly labelled disposable holder/writer demo signers, funded test USDC, and Token-2022 fixtures with representative fees and scaling. It executes the real program, including ownership handoff, rather than simulating balances in React. Fixture market context records its provenance and does not require PreStocks uptime. Demo signers and seeding routes are excluded from the live build and additionally require the expected local ledger identity.
+Under Volaryn's own demonstration policy, the local build supplies clearly labelled disposable holder/writer demo signers, funded test USDC, and Token-2022 fixtures with representative fees and scaling. It executes the real program, including ownership handoff, rather than simulating balances in React. Fixture market context records its provenance and does not require PreStocks uptime. Demo signers and seeding routes are excluded from the live build and additionally require the expected local ledger identity.
 
 The live Compose file starts only the application against an already deployed program. Network manifests contain public program IDs, expected genesis identity, official settlement mint, supported policies, and public RPC defaults. **`SOLANA_RPC_URL` is the only optional operator-supplied runtime environment setting**, for an alternative or authenticated RPC provider. It stays server-side. Ports, storage paths, polling limits, and upstream URLs have committed defaults rather than environment switches.
 
 The backend exposes an allowlisted RPC proxy with request limits and no caller-selected upstream URL. Validate the network and deployed program against the manifest at startup and before enabling transactions. Wallet/network mismatch fails visibly. Live deployment keys are supplied to explicit deployment tooling outside the runtime; starting Compose never deploys or upgrades a live program. HTTPS belongs at the hosting platform's ingress.
 
-No official PreStocks devnet mints were verified: the eight mainnet API addresses returned no accounts on devnet during research. Local fixtures demonstrate mechanics, not genuine PreStocks ownership or sponsor eligibility. Live integration evidence must use verified official assets; switching a network label cannot turn fixtures into them.
+Each network manifest must bind assets to verified issuer mints on that network; an address on mainnet does not establish a corresponding asset on devnet or a local ledger. Local fixtures demonstrate mechanics and do not establish genuine PreStocks ownership. Under Volaryn's demonstration policy, claims of actual PreStocks integration require evidence tied to verified official assets. This distinction is our transparency standard; sponsor eligibility is governed by the published bounty terms.
 
 ## 7. Trust boundaries and verification
 
@@ -263,13 +270,13 @@ Policy authority controls new admission only. Program upgrade authority is a sep
 
 Run formatting, linting, focused Rust/TypeScript tests, generated-artifact checks, a container build, and complete-flow tests in CI. Production RPC calls are read-only integration checks; tests never spend live assets. Log request IDs, agreement addresses, public signatures, source failures, and reconciliation lag without logging keys or credential-bearing RPC URLs.
 
-### External facts that remain open
+### Integration requirements and failure behavior
 
-| Gap | Boundary and default behavior |
+| Integration requirement | Boundary and default behavior |
 | --- | --- |
-| Formal PreStocks API guarantees and price-unit definition | Adapter validates observations; unit-dependent derived calculations remain disabled until verified. |
-| Official sponsor test assets | Local fixtures remain labelled simulations; no devnet compatibility claim. |
-| Issuer extension/lifecycle changes | Reviewed admission policy and explicit transfer compatibility; active rights retain terms, subject to asset deliverability. |
-| Pyth Indices API access and unit mapping | Optional adapter remains absent until access and a useful comparison are established. |
+| Valid PreStocks data and verified price units | Adapter validates responses and freshness; missing or incompatible data disables dependent calculations, without blocking exercise. |
+| Official asset identity on the selected network | Verify issuer provenance and mint accounts for that network; fixtures remain labelled simulations and unsupported mints are ineligible. |
+| Compatible issuer extensions and valid lifecycle policy | Require reviewed admission policy and explicit transfer compatibility; invalid policy blocks new agreements while active rights retain their terms, subject to asset deliverability. |
+| Authorized Pyth Indices access and comparable units | Enable the optional adapter only with verified access and unit mapping; missing prerequisites disable that context alone. |
 
-These gaps are isolated at their owning boundaries. None requires an oracle, privileged backend signer, or a more complex collateral model to enforce the fixed agreement.
+These requirements are enforced at their owning boundaries. The fixed agreement requires no price oracle, privileged backend signer, or more complex collateral model.
