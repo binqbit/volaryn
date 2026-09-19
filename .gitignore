@@ -1,0 +1,7 @@
+target/
+/artifacts/
+/debug-tools/
+.anchor/
+.env
+node_modules/
+__pycache__/

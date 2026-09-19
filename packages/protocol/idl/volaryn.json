@@ -1,0 +1,1378 @@
+{
+  "address": "Fg6PaFpoGXkYsidMpWxTWqkZcEYKpEjzMTB7zLZJwQYQ",
+  "metadata": {
+    "name": "volaryn",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Fully funded, holder-exercised PreStocks protection agreements"
+  },
+  "instructions": [
+    {
+      "name": "activate",
+      "discriminator": [
+        194,
+        203,
+        35,
+        100,
+        151,
+        55,
+        170,
+        82
+      ],
+      "accounts": [
+        {
+          "name": "holder",
+          "signer": true
+        },
+        {
+          "name": "agreement",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  114,
+                  101,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agreement.writer",
+                "account": "Agreement"
+              },
+              {
+                "kind": "account",
+                "path": "agreement.nonce",
+                "account": "Agreement"
+              }
+            ]
+          }
+        },
+        {
+          "name": "policy",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agreement.underlying_mint",
+                "account": "Agreement"
+              }
+            ]
+          }
+        },
+        {
+          "name": "underlying_mint"
+        },
+        {
+          "name": "usdc_mint"
+        },
+        {
+          "name": "reserve",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  115,
+                  101,
+                  114,
+                  118,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agreement"
+              }
+            ]
+          }
+        },
+        {
+          "name": "holder_usdc",
+          "writable": true
+        },
+        {
+          "name": "writer_usdc",
+          "writable": true
+        },
+        {
+          "name": "usdc_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "cancel_offer",
+      "discriminator": [
+        92,
+        203,
+        223,
+        40,
+        92,
+        89,
+        53,
+        119
+      ],
+      "accounts": [
+        {
+          "name": "writer",
+          "signer": true,
+          "relations": [
+            "agreement"
+          ]
+        },
+        {
+          "name": "agreement",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  114,
+                  101,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "writer"
+              },
+              {
+                "kind": "account",
+                "path": "agreement.nonce",
+                "account": "Agreement"
+              }
+            ]
+          }
+        },
+        {
+          "name": "usdc_mint"
+        },
+        {
+          "name": "reserve",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  115,
+                  101,
+                  114,
+                  118,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agreement"
+              }
+            ]
+          }
+        },
+        {
+          "name": "writer_usdc",
+          "writable": true
+        },
+        {
+          "name": "usdc_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "cleanup_terminal",
+      "discriminator": [
+        17,
+        150,
+        231,
+        142,
+        20,
+        102,
+        245,
+        185
+      ],
+      "accounts": [
+        {
+          "name": "writer",
+          "signer": true,
+          "relations": [
+            "agreement"
+          ]
+        },
+        {
+          "name": "agreement",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  114,
+                  101,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "writer"
+              },
+              {
+                "kind": "account",
+                "path": "agreement.nonce",
+                "account": "Agreement"
+              }
+            ]
+          }
+        },
+        {
+          "name": "usdc_mint"
+        },
+        {
+          "name": "reserve",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  115,
+                  101,
+                  114,
+                  118,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agreement"
+              }
+            ]
+          }
+        },
+        {
+          "name": "writer_usdc",
+          "writable": true
+        },
+        {
+          "name": "settlement",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  101,
+                  116,
+                  116,
+                  108,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agreement"
+              }
+            ]
+          }
+        },
+        {
+          "name": "underlying_program",
+          "address": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+        },
+        {
+          "name": "usdc_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_asset_policy",
+      "discriminator": [
+        151,
+        201,
+        251,
+        176,
+        153,
+        164,
+        64,
+        209
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "policy",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "terms",
+          "type": {
+            "defined": {
+              "name": "PolicyTerms"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "create_offer",
+      "discriminator": [
+        237,
+        233,
+        192,
+        168,
+        248,
+        7,
+        249,
+        241
+      ],
+      "accounts": [
+        {
+          "name": "writer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "policy",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "underlying_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "underlying_mint"
+        },
+        {
+          "name": "usdc_mint"
+        },
+        {
+          "name": "writer_usdc",
+          "writable": true
+        },
+        {
+          "name": "agreement",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  114,
+                  101,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "writer"
+              },
+              {
+                "kind": "arg",
+                "path": "terms.nonce"
+              }
+            ]
+          }
+        },
+        {
+          "name": "reserve",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  115,
+                  101,
+                  114,
+                  118,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agreement"
+              }
+            ]
+          }
+        },
+        {
+          "name": "settlement",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  101,
+                  116,
+                  116,
+                  108,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agreement"
+              }
+            ]
+          }
+        },
+        {
+          "name": "underlying_program",
+          "address": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+        },
+        {
+          "name": "usdc_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "terms",
+          "type": {
+            "defined": {
+              "name": "OfferTerms"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "exercise",
+      "discriminator": [
+        144,
+        79,
+        103,
+        64,
+        241,
+        78,
+        80,
+        174
+      ],
+      "accounts": [
+        {
+          "name": "holder",
+          "signer": true
+        },
+        {
+          "name": "agreement",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  114,
+                  101,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agreement.writer",
+                "account": "Agreement"
+              },
+              {
+                "kind": "account",
+                "path": "agreement.nonce",
+                "account": "Agreement"
+              }
+            ]
+          }
+        },
+        {
+          "name": "underlying_mint"
+        },
+        {
+          "name": "usdc_mint"
+        },
+        {
+          "name": "reserve",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  115,
+                  101,
+                  114,
+                  118,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agreement"
+              }
+            ]
+          }
+        },
+        {
+          "name": "holder_underlying",
+          "writable": true
+        },
+        {
+          "name": "holder_usdc",
+          "writable": true
+        },
+        {
+          "name": "settlement",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  101,
+                  116,
+                  116,
+                  108,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agreement"
+              }
+            ]
+          }
+        },
+        {
+          "name": "underlying_program",
+          "address": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+        },
+        {
+          "name": "usdc_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize",
+      "discriminator": [
+        175,
+        175,
+        109,
+        31,
+        13,
+        152,
+        155,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "program_data",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  218,
+                  7,
+                  92,
+                  178,
+                  255,
+                  94,
+                  198,
+                  129,
+                  118,
+                  19,
+                  222,
+                  83,
+                  12,
+                  8,
+                  94,
+                  25,
+                  22,
+                  134,
+                  227,
+                  121,
+                  161,
+                  216,
+                  16,
+                  31,
+                  131,
+                  29,
+                  193,
+                  236,
+                  138,
+                  214,
+                  219,
+                  25
+                ]
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                2,
+                168,
+                246,
+                145,
+                78,
+                136,
+                161,
+                176,
+                226,
+                16,
+                21,
+                62,
+                247,
+                99,
+                174,
+                43,
+                0,
+                194,
+                185,
+                61,
+                22,
+                193,
+                36,
+                210,
+                192,
+                83,
+                122,
+                16,
+                4,
+                128,
+                0,
+                0
+              ]
+            }
+          }
+        },
+        {
+          "name": "config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "usdc_mint"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "reclaim_expired",
+      "discriminator": [
+        125,
+        185,
+        48,
+        75,
+        0,
+        71,
+        93,
+        98
+      ],
+      "accounts": [
+        {
+          "name": "writer",
+          "signer": true,
+          "relations": [
+            "agreement"
+          ]
+        },
+        {
+          "name": "agreement",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  103,
+                  114,
+                  101,
+                  101,
+                  109,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "writer"
+              },
+              {
+                "kind": "account",
+                "path": "agreement.nonce",
+                "account": "Agreement"
+              }
+            ]
+          }
+        },
+        {
+          "name": "usdc_mint"
+        },
+        {
+          "name": "reserve",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  115,
+                  101,
+                  114,
+                  118,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "agreement"
+              }
+            ]
+          }
+        },
+        {
+          "name": "writer_usdc",
+          "writable": true
+        },
+        {
+          "name": "usdc_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "update_asset_policy",
+      "discriminator": [
+        156,
+        28,
+        90,
+        219,
+        24,
+        173,
+        240,
+        51
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "signer": true,
+          "relations": [
+            "config"
+          ]
+        },
+        {
+          "name": "config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "policy"
+          ]
+        },
+        {
+          "name": "policy",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  111,
+                  108,
+                  105,
+                  99,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "terms",
+          "type": {
+            "defined": {
+              "name": "PolicyTerms"
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Agreement",
+      "discriminator": [
+        83,
+        212,
+        5,
+        110,
+        225,
+        249,
+        197,
+        84
+      ]
+    },
+    {
+      "name": "AssetPolicy",
+      "discriminator": [
+        126,
+        207,
+        10,
+        101,
+        214,
+        78,
+        108,
+        8
+      ]
+    },
+    {
+      "name": "ProtocolConfig",
+      "discriminator": [
+        207,
+        91,
+        250,
+        28,
+        152,
+        179,
+        215,
+        209
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "UnauthorizedInitializer",
+      "msg": "Only the deployment upgrade authority can initialize the protocol"
+    },
+    {
+      "code": 6001,
+      "name": "IneligibleAsset",
+      "msg": "The asset policy is disabled, stale, or does not admit this expiry"
+    },
+    {
+      "code": 6002,
+      "name": "UnsupportedMint",
+      "msg": "The mint has unsupported extensions or is paused"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidTerms",
+      "msg": "Amounts must be positive and deadlines must be ordered"
+    },
+    {
+      "code": 6004,
+      "name": "InvalidState",
+      "msg": "The agreement is in the wrong state"
+    },
+    {
+      "code": 6005,
+      "name": "UnsupportedVersion",
+      "msg": "The agreement version is unsupported"
+    },
+    {
+      "code": 6006,
+      "name": "AcceptanceClosed",
+      "msg": "The acceptance deadline has passed"
+    },
+    {
+      "code": 6007,
+      "name": "WrongHolder",
+      "msg": "The signer is not the authorized holder"
+    },
+    {
+      "code": 6008,
+      "name": "InsufficientReserve",
+      "msg": "The reserve does not cover the fixed payout"
+    },
+    {
+      "code": 6009,
+      "name": "Expired",
+      "msg": "The agreement has expired"
+    },
+    {
+      "code": 6010,
+      "name": "NotExpired",
+      "msg": "The agreement has not expired"
+    },
+    {
+      "code": 6011,
+      "name": "InsufficientDelivery",
+      "msg": "One holder-owned source account must cover the full gross quantity"
+    },
+    {
+      "code": 6012,
+      "name": "InvalidSettlementAccount",
+      "msg": "The settlement account has unsafe authorities or extensions"
+    },
+    {
+      "code": 6013,
+      "name": "ArithmeticOverflow",
+      "msg": "Checked arithmetic failed"
+    },
+    {
+      "code": 6014,
+      "name": "InvalidSettlementCurrency",
+      "msg": "The settlement currency must use the configured six-decimal SPL mint"
+    }
+  ],
+  "types": [
+    {
+      "name": "Agreement",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "writer",
+            "type": "pubkey"
+          },
+          {
+            "name": "nonce",
+            "type": "u64"
+          },
+          {
+            "name": "designated_holder",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "holder",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "underlying_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "underlying_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "underlying_decimals",
+            "type": "u8"
+          },
+          {
+            "name": "usdc_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "usdc_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "quantity_raw",
+            "docs": [
+              "Gross debit from the holder, independent of issuer fees and UI scaling."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "payout",
+            "type": "u64"
+          },
+          {
+            "name": "premium",
+            "type": "u64"
+          },
+          {
+            "name": "accept_before",
+            "type": "i64"
+          },
+          {
+            "name": "expires_at",
+            "type": "i64"
+          },
+          {
+            "name": "policy_version",
+            "type": "u32"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "activated_at",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "settled_at",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "net_received",
+            "type": "u64"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "AgreementStatus"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "AgreementStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Funded"
+          },
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Exercised"
+          },
+          {
+            "name": "Cancelled"
+          },
+          {
+            "name": "Expired"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AssetPolicy",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "decimals",
+            "type": "u8"
+          },
+          {
+            "name": "version",
+            "type": "u32"
+          },
+          {
+            "name": "enabled",
+            "type": "bool"
+          },
+          {
+            "name": "reviewed_until",
+            "type": "i64"
+          },
+          {
+            "name": "max_expiry",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "OfferTerms",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "nonce",
+            "type": "u64"
+          },
+          {
+            "name": "designated_holder",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "quantity_raw",
+            "type": "u64"
+          },
+          {
+            "name": "payout",
+            "type": "u64"
+          },
+          {
+            "name": "premium",
+            "type": "u64"
+          },
+          {
+            "name": "accept_before",
+            "type": "i64"
+          },
+          {
+            "name": "expires_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PolicyTerms",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "enabled",
+            "type": "bool"
+          },
+          {
+            "name": "reviewed_until",
+            "type": "i64"
+          },
+          {
+            "name": "max_expiry",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProtocolConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "usdc_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "usdc_program",
+            "type": "pubkey"
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$repo_root"
+mkdir -p target/idl
+# The locked Anchor CLI injects procmacro2_semver_exempt, which breaks Span
+# conversions on stable Rust. Cargo's encoded flags take precedence over that
+# RUSTFLAGS value; keep only Anchor's warning policy for this IDL build.
+CARGO_ENCODED_RUSTFLAGS="-Awarnings" RUSTUP_TOOLCHAIN=1.98.1 \
+  PATH="$repo_root/tools/rustup:$PATH" \
+  anchor idl build -p volaryn -o target/idl/volaryn.json -- --locked

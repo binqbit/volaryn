@@ -1,0 +1,9 @@
+[toolchain]
+anchor_version = "1.0.2"
+
+[programs.localnet]
+volaryn = "Fg6PaFpoGXkYsidMpWxTWqkZcEYKpEjzMTB7zLZJwQYQ"
+
+[provider]
+cluster = "Localnet"
+wallet = "~/.config/solana/id.json"

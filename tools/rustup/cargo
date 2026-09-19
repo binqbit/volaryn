@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Route repository Cargo calls through rustup even when distro Cargo is not a proxy.
+# Host commands use the pinned compiler; Anchor and build-sbf can select +toolchain.
+set -euo pipefail
+
+toolchain=1.98.1
+if [[ "${1:-}" == +* ]]; then
+  toolchain="${1#+}"
+  shift
+fi
+
+RUSTC="$(rustup which --toolchain "$toolchain" rustc)"
+RUSTDOC="$(rustup which --toolchain "$toolchain" rustdoc)"
+export RUSTC RUSTDOC
+# Cargo subcommands such as Clippy must use the same toolchain as this invocation.
+export PATH="$(dirname "$RUSTC"):$PATH"
+exec rustup run "$toolchain" cargo "$@"
