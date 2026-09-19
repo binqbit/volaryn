@@ -29,3 +29,19 @@ The [technology stack](docs/tech-stack.md) explains the selected frameworks, alt
 ## Product boundaries
 
 Protection requires delivery of the specified asset before expiry. It does not insure against issuer restrictions, unavailable transfers, wallet compromise, or network failure. The payout is denominated in USDC, and the premium and network costs remain separate expenses. Local test assets are explicitly distinguished from genuine PreStocks holdings.
+
+## Contract development
+
+Run the contract checks locally with the [pinned development tools](docs/development.md#run-the-checks):
+
+```sh
+./tools/test fast
+```
+
+Or use Docker to supply the tools and run the CI checks, including formatting:
+
+```sh
+./tools/test docker
+```
+
+Both commands build the Rust/Anchor program, verify its generated interface, and execute the same isolated settlement scenarios in LiteSVM against pinned token programs. The local command needs no container, validator process, wallet, RPC endpoint, or standalone formatters. See [the development guide](docs/development.md) for tool requirements, formatting, modular test structure, fixtures, and interface generation.
