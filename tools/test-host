@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -euo pipefail
+repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$repo_root"
+
+if [[ "${1:-}" == "--help" ]]; then
+  echo "Usage: tools/test-host [scenario-filter]"
+  echo "Run lint, SBF build, IDL drift, and contract scenarios with the pinned host tools."
+  exit 0
+fi
+if (($# > 1)); then
+  echo "Expected at most one scenario filter" >&2
+  exit 2
+fi
+
+for tool in rustup anchor cargo-build-sbf python3; do
+  if ! command -v "$tool" >/dev/null 2>&1; then
+    echo "Missing $tool; see docs/development.md or use tools/test docker" >&2
+    exit 1
+  fi
+done
+
+# Keep cargo +toolchain available for build-sbf, including on distro Rust installs.
+export PATH="$repo_root/tools/rustup:$PATH"
+if [[ "$(anchor --version)" != "anchor-cli 1.0.2" ]]; then
+  echo "Install anchor-cli 1.0.2 or use tools/test docker" >&2
+  exit 1
+fi
+if ! cargo-build-sbf --version | head -n 1 | grep -qx 'cargo-build-sbf 4.0.0'; then
+  echo "Install cargo-build-sbf 4.0.0 or use tools/test docker" >&2
+  exit 1
+fi
+echo "Checking Rust with Clippy"
+cargo clippy --locked --workspace --all-targets -- -D warnings
+echo "Preparing verified token fixtures"
+./tools/prepare-fixtures.py
+# Explicitly share the artifact directory with build-sbf's post-processing step.
+# Launch directly: a parent host Cargo would put its own toolchain first on PATH.
+echo "Building the SBF program"
+CARGO_TARGET_DIR="$repo_root/target" cargo-build-sbf \
+  --manifest-path programs/volaryn/Cargo.toml --tools-version v1.53 --arch v0 -- --locked
+echo "Generating and checking Anchor IDL"
+./tools/build-idl
+cmp packages/protocol/idl/volaryn.json target/idl/volaryn.json
+echo "Running contract scenarios"
+cargo test --locked -p volaryn-contract-tests --test contract "${1:-}" -- --nocapture

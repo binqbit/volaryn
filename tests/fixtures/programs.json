@@ -1,0 +1,8 @@
+{
+  "source_crate": "litesvm",
+  "source_version": "0.16.0",
+  "programs": {
+    "spl_token-3.5.0.so": "7b44674b9704fa7640fbebfac68389f338b500b8c2bc29175c27ed66838b5a3c",
+    "spl_token_2022-11.0.0.so": "495e9d7680dd555cb126a6a8e5464af5be9b01f02f2cd70634352722d22e3cad"
+  }
+}
