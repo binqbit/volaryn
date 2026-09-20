@@ -8,3 +8,6 @@ debug-tools
 node_modules
 **/node_modules
 **/__pycache__
+
+frontend/dist
+frontend/dist-live

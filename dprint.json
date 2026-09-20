@@ -14,7 +14,12 @@
     "artifacts/**",
     "debug-tools/**",
     "packages/protocol/idl/**",
-    "Cargo.lock"
+    "Cargo.lock",
+    "frontend/dist/**",
+    "frontend/dist-live/**",
+    "packages/api/openapi.json",
+    "package-lock.json",
+    "packages/protocol/src/generated/**"
   ],
   "plugins": [
     "https://plugins.dprint.dev/json-0.24.0.wasm",

@@ -1,0 +1,17 @@
+{
+  "name": "@volaryn/frontend",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@solana/kit": "8.3.0",
+    "@solana/kit-plugin-wallet": "0.20.0",
+    "@solana/react": "8.3.0",
+    "@solana/wallet-standard-features": "1.5.0",
+    "@volaryn/protocol": "0.1.0",
+    "@wallet-standard/core": "1.1.2",
+    "openapi-fetch": "0.17.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-router": "8.4.0"
+  }
+}

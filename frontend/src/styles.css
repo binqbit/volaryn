@@ -1,0 +1,148 @@
+:root {
+  color-scheme: dark;
+  /* Solana brand endpoints: https://solana.com/branding */
+  --color-brand-purple: #9945ff;
+  --color-brand-green: #14f195;
+  --color-brand-blue: #55b5ff;
+  --gradient-brand: linear-gradient(
+    110deg,
+    var(--color-brand-purple),
+    var(--color-brand-blue) 52%,
+    var(--color-brand-green)
+  );
+  --color-canvas: #08090d;
+  --color-surface: #12121b;
+  --color-surface-raised: #202031;
+  --color-surface-accent: #151424;
+  --color-border: #303043;
+  --color-border-strong: #68657f;
+  --color-text: #f4f3ff;
+  --color-text-secondary: #cccadd;
+  --color-text-muted: #a8a6bb;
+  --color-accent: var(--color-brand-green);
+  --color-accent-hover: #76ffc5;
+  --color-accent-secondary: #c4a5ff;
+  --color-on-accent: #000000;
+  --color-success-surface: #102c25;
+  --color-success-border: #286950;
+  --color-warning: #f0d28c;
+  --color-warning-surface: #2d2518;
+  --color-error: #ffb4be;
+  --color-error-surface: #321c28;
+  --color-error-border: #a75b70;
+  --shadow-panel: 0 16px 48px #00000040;
+  --shadow-accent: 0 4px 24px #9945ff30;
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    sans-serif;
+  color: var(--color-text);
+  background: var(--color-canvas);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse 65% 650px at 10% 0, #9945ff12, transparent 75%),
+    radial-gradient(ellipse 45% 550px at 100% 180px, #14f1950a, transparent 75%);
+}
+button,
+input {
+  font: inherit;
+}
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+button {
+  cursor: pointer;
+}
+button:disabled {
+  cursor: not-allowed;
+}
+a {
+  color: inherit;
+  text-underline-offset: 4px;
+}
+a:hover {
+  color: var(--color-accent-hover);
+}
+button:focus-visible,
+a:focus-visible,
+summary:focus-visible {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 4px;
+}
+::selection {
+  color: var(--color-on-accent);
+  background: var(--color-accent);
+}
+code {
+  overflow-wrap: anywhere;
+  font-size: 0.73rem;
+}
+.startup {
+  max-width: 640px;
+  margin: 15vh max(20px, calc((100% - 640px) / 2));
+  padding: 32px;
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-panel);
+  line-height: 1.7;
+}
+.startup h1 {
+  font-size: 26px;
+  line-height: 1.3;
+}
+.startup p {
+  color: var(--color-text-secondary);
+}
+.startup[role='alert'] {
+  border-color: var(--color-error-border);
+}
+.startup button {
+  padding: 12px 24px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: var(--gradient-brand);
+  background-size: 120% 100%;
+  color: var(--color-on-accent);
+  font-weight: 600;
+}
+.startup button:hover {
+  background-position: 100% 50%;
+  box-shadow: var(--shadow-accent);
+}
+.updateNotice {
+  margin: 16px;
+  padding: 16px 20px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 8px;
+  background: var(--color-warning-surface);
+  color: var(--color-warning);
+  font-size: 14px;
+  line-height: 1.6;
+}
+@media (prefers-reduced-motion: no-preference) {
+  button,
+  a {
+    transition:
+      color 150ms ease,
+      background-color 150ms ease,
+      border-color 150ms ease,
+      background-position 200ms ease,
+      box-shadow 200ms ease;
+  }
+}
