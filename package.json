@@ -13,11 +13,13 @@
     "build": "vite build --config frontend/vite.config.ts --mode localnet",
     "build:live": "vite build --config frontend/vite.config.ts --mode production",
     "test": "vitest run --config frontend/vite.config.ts",
+    "localnet:bootstrap": "tsx tools/localnet/bootstrap.ts",
+    "dev:localnet": "python3 tools/postgres/with-local-db.py node_modules/.bin/tsx tools/localnet/dev.ts",
     "check:generated": "node tools/check-generated.mjs",
     "check:live": "node tools/check-live.mjs",
-    "lint": "eslint frontend/src packages/protocol/src",
-    "format:check": "prettier --check \"frontend/**/*.{ts,tsx,css,html}\" \"packages/protocol/src/**/*.ts\" \"tools/**/*.{ts,mjs}\" eslint.config.js",
-    "format:write": "prettier --write \"frontend/**/*.{ts,tsx,css,html}\" \"packages/protocol/src/**/*.ts\" \"tools/**/*.{ts,mjs}\" eslint.config.js"
+    "lint": "eslint frontend/src tools/localnet tests/tooling packages/protocol/src",
+    "format:check": "prettier --check \"frontend/**/*.{ts,tsx,css,html}\" \"packages/protocol/src/**/*.ts\" \"tools/**/*.{ts,mjs}\" \"tests/tooling/**/*.ts\" eslint.config.js",
+    "format:write": "prettier --write \"frontend/**/*.{ts,tsx,css,html}\" \"packages/protocol/src/**/*.ts\" \"tools/**/*.{ts,mjs}\" \"tests/tooling/**/*.ts\" eslint.config.js"
   },
   "dependencies": {
     "@solana-program/system": "0.14.1",

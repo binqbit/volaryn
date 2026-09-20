@@ -1,0 +1,129 @@
+services:
+  database:
+    build:
+      context: .
+      target: database
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: volaryn-local-admin
+      POSTGRES_INITDB_ARGS: --data-checksums --auth-host=scram-sha-256
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD, pg_isready, -h, 127.0.0.1, -U, volaryn, -d, volaryn]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    shm_size: 128mb
+    stop_grace_period: 30s
+
+  validator:
+    build:
+      context: .
+      target: validator
+    platform: linux/amd64
+    init: true
+    entrypoint: [solana-test-validator]
+    command: [
+      --ledger,
+      /ledger,
+      --bind-address,
+      validator,
+      --rpc-port,
+      "8899",
+      --upgradeable-program,
+      Fg6PaFpoGXkYsidMpWxTWqkZcEYKpEjzMTB7zLZJwQYQ,
+      /fixtures/volaryn.so,
+      AKnL4NNf3DGWZJS6cPknBuEGnVsV4A4m5tgebLHaRSZ9,
+      --bpf-program,
+      TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA,
+      /fixtures/spl_token-3.5.0.so,
+      --bpf-program,
+      TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb,
+      /fixtures/spl_token_2022-11.0.0.so,
+      --log,
+    ]
+    # Agave requires io_uring, which Docker's default seccomp profile denies.
+    security_opt:
+      - seccomp=./tools/localnet/seccomp/validator.json
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "3"
+    volumes:
+      - ledger:/ledger
+    healthcheck:
+      test: [CMD, solana, --url, http://127.0.0.1:8899, cluster-version]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+      start_period: 10s
+    stop_grace_period: 30s
+
+  bootstrap:
+    build:
+      context: .
+      target: bootstrap
+    platform: linux/amd64
+    init: true
+    depends_on:
+      validator:
+        condition: service_healthy
+    volumes:
+      - deployment:/deployment
+    command: [
+      node_modules/.bin/tsx,
+      tools/localnet/bootstrap.ts,
+      --rpc-url,
+      "http://validator:8899",
+      --manifest,
+      /deployment/deployment.json,
+      --program,
+      /fixtures/volaryn.so,
+    ]
+
+  app:
+    read_only: true
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://volaryn:volaryn-local@database:5432/volaryn
+    build:
+      context: .
+      target: app
+    platform: linux/amd64
+    init: true
+    depends_on:
+      database:
+        condition: service_healthy
+      validator:
+        condition: service_healthy
+      bootstrap:
+        condition: service_completed_successfully
+    command: [
+      --manifest,
+      /deployment/deployment.json,
+      --frontend,
+      /app/frontend,
+      --rpc-url,
+      "http://validator:8899",
+      --bind,
+      "0.0.0.0:8080",
+    ]
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - deployment:/deployment:ro
+    healthcheck:
+      test: [CMD, volaryn, --healthcheck, --bind, "127.0.0.1:8080"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    stop_grace_period: 15s
+
+volumes:
+  ledger:
+  deployment:
+  postgres:
