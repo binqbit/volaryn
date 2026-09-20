@@ -1,19 +1,19 @@
-name: Contract checks
+name: Application checks
 on:
   push:
   pull_request:
 permissions:
   contents: read
 jobs:
-  contracts:
+  localnet:
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
-      - run: ./tools/test docker
+      - run: ./tools/test full
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         if: always()
         with:
-          name: contract-test-logs
+          name: localnet-test-evidence
           path: artifacts/tests/
           retention-days: 7

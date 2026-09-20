@@ -22,6 +22,9 @@ RUN ./tools/rustup/cargo test --locked -p volaryn-backend --features localnet --
     && target/release/export-openapi > /tmp/openapi.json \
     && cmp packages/api/openapi.json /tmp/openapi.json
 
+FROM application-rust AS backend-tests
+ENTRYPOINT ["./tools/rustup/cargo", "test", "--locked", "-p", "volaryn-backend", "--features", "localnet"]
+
 FROM postgres:17.11-bookworm@sha256:639ab7ceb90e13123085b741fb31ef493fba25463002f6da665352e7b534b652 AS database
 COPY tools/postgres/init.sql /docker-entrypoint-initdb.d/10-volaryn.sql
 
@@ -39,6 +42,10 @@ FROM application-js AS bootstrap
 RUN mkdir /deployment && chown node:node /deployment
 COPY --from=application-rust /workspace/target/deploy/volaryn.so /fixtures/volaryn.so
 USER node
+
+FROM application-js AS browser-tests
+RUN npx playwright install --with-deps chromium
+CMD ["node_modules/.bin/tsx", "tools/localnet/browser-container.ts"]
 
 FROM ubuntu:24.04@sha256:008173c23f95b170204355c12626cb5a965d779a7e1283b09e9cffbb1bf33ca3 AS validator
 RUN apt-get update && apt-get install -y --no-install-recommends \

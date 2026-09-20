@@ -1,0 +1,26 @@
+services:
+  backend-tests:
+    build:
+      context: .
+      target: backend-tests
+    platform: linux/amd64
+    init: true
+    environment:
+      VOLARYN_TEST_DATABASE_URL: postgresql://postgres:volaryn-local-admin@database:5432/postgres
+    depends_on:
+      database:
+        condition: service_healthy
+  app:
+    ports: !reset []
+  browser-tests:
+    build:
+      context: .
+      target: browser-tests
+    platform: linux/amd64
+    init: true
+    depends_on:
+      app:
+        condition: service_healthy
+    volumes:
+      - ${VOLARYN_TEST_ARTIFACTS:?Set by tools/test-full}:/workspace/artifacts
+    shm_size: 1gb

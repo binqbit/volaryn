@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+set -euo pipefail
+repo_root="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$repo_root"
+mkdir -p artifacts/tests
+export VOLARYN_TEST_ARTIFACTS
+VOLARYN_TEST_ARTIFACTS="$(mktemp -d "$repo_root/artifacts/tests/localnet.XXXXXX")"
+project="volaryn-test-$(basename "$VOLARYN_TEST_ARTIFACTS" | tr '[:upper:].' '[:lower:]-')"
+compose=(docker compose -p "$project" -f compose.yaml -f compose.test.yaml)
+cleanup() {
+  result=$?
+  trap - EXIT
+  "${compose[@]}" logs --no-color >"$VOLARYN_TEST_ARTIFACTS/services.log" 2>&1 || true
+  "${compose[@]}" down --volumes --remove-orphans >>"$VOLARYN_TEST_ARTIFACTS/cleanup.log" 2>&1 || true
+  exit "$result"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+echo "Full test artifacts: $VOLARYN_TEST_ARTIFACTS"
+"${compose[@]}" config --format json >"$VOLARYN_TEST_ARTIFACTS/compose.json"
+"${compose[@]}" build 2>&1 | tee "$VOLARYN_TEST_ARTIFACTS/build.log"
+"${compose[@]}" run --rm --no-deps browser-tests node tools/check-test-config.mjs
+"${compose[@]}" up -d --wait --wait-timeout 120 database
+"${compose[@]}" run --rm --no-deps backend-tests 2>&1 | tee "$VOLARYN_TEST_ARTIFACTS/backend.log"
+"${compose[@]}" up -d --wait --wait-timeout 300 app 2>&1 | tee "$VOLARYN_TEST_ARTIFACTS/startup.log"
+"${compose[@]}" run --rm browser-tests 2>&1 | tee "$VOLARYN_TEST_ARTIFACTS/browser.log"
+"${compose[@]}" run --rm --no-deps browser-tests node_modules/.bin/tsx tools/localnet/check-recovery.ts snapshot
+"${compose[@]}" stop app
+"${compose[@]}" restart validator database
+"${compose[@]}" up -d --wait --wait-timeout 120 validator database
+"${compose[@]}" run --rm --no-deps bootstrap
+"${compose[@]}" up -d --wait --wait-timeout 120 app
+"${compose[@]}" run --rm --no-deps browser-tests node_modules/.bin/tsx tools/localnet/check-recovery.ts verify
+"${compose[@]}" stop app
+# This database belongs exclusively to the unique test project, never the demo.
+"${compose[@]}" exec -T database psql -U postgres -d volaryn -v ON_ERROR_STOP=1 -c 'TRUNCATE agreements, reconciliation;'
+"${compose[@]}" up -d --wait --wait-timeout 120 app
+"${compose[@]}" run --rm --no-deps browser-tests node_modules/.bin/tsx tools/localnet/check-recovery.ts verify

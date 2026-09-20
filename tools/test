@@ -3,11 +3,27 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$repo_root"
 case "${1:---help}" in
+app)
+  if (($# != 1)); then
+    echo "Usage: tools/test app" >&2
+    exit 2
+  fi
+  exec "$repo_root/tools/test-app"
+  ;;
+full)
+  if (($# != 1)); then
+    echo "Usage: tools/test full" >&2
+    exit 2
+  fi
+  exec "$repo_root/tools/test-full"
+  ;;
 --help | -h)
-  echo "Usage: tools/test {fast|docker} [scenario-filter]"
+  echo "Usage: tools/test {fast|docker|app|full} [scenario-filter]"
   echo "fast: run contract checks locally with the pinned development tools."
   echo "docker: check formatting and run contract checks with containerized tools."
-  echo "Neither mode starts a validator or application services."
+  echo "app: check the backend and frontend locally without a validator."
+  echo "full: build/check everything and run an isolated browser settlement on Compose."
+  echo "Only full starts a validator and application services."
   exit 0
   ;;
 fast | docker)
@@ -15,7 +31,7 @@ fast | docker)
   shift
   ;;
 *)
-  echo "Unknown suite. Use: tools/test {fast|docker} [scenario-filter]" >&2
+  echo "Unknown suite. Use: tools/test {fast|docker|app|full} [scenario-filter]" >&2
   exit 2
   ;;
 esac
