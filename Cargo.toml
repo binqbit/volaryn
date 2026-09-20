@@ -1,5 +1,5 @@
 [workspace]
-members = ["programs/volaryn", "tests/contract"]
+members = ["backend", "programs/volaryn", "tests/contract"]
 resolver = "2"
 
 [workspace.dependencies]

@@ -1,0 +1,533 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Volaryn API",
+    "description": "",
+    "license": {
+      "name": ""
+    },
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/agreements": {
+      "get": {
+        "operationId": "agreements",
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "description": "Last address from the previous page (exclusive).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, from 1 to 200. Defaults to 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "holder",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "writer",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "mint",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "headers": {
+              "X-Next-Cursor": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Exclusive address cursor for the next page; absent on the last page"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AgreementView"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/agreements/{address}": {
+      "get": {
+        "operationId": "agreement",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgreementView"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/assets": {
+      "get": {
+        "operationId": "assets",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AssetView"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/config": {
+      "get": {
+        "operationId": "config",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deployment"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/offers": {
+      "get": {
+        "operationId": "offers",
+        "parameters": [
+          {
+            "name": "after",
+            "in": "query",
+            "description": "Last address from the previous page (exclusive).",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Page size, from 1 to 200. Defaults to 50.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "holder",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "writer",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "mint",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "headers": {
+              "X-Next-Cursor": {
+                "schema": {
+                  "type": "string"
+                },
+                "description": "Exclusive address cursor for the next page; absent on the last page"
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AgreementView"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/positions": {
+      "get": {
+        "operationId": "positions",
+        "parameters": [
+          {
+            "name": "owner",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PositionView"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AgreementView": {
+        "type": "object",
+        "required": [
+          "address",
+          "version",
+          "writer",
+          "underlyingMint",
+          "underlyingProgram",
+          "usdcMint",
+          "quantityRaw",
+          "payout",
+          "premium",
+          "acceptBefore",
+          "expiresAt",
+          "status",
+          "policyVersion",
+          "reserve",
+          "reserveAmount",
+          "settlement",
+          "netReceived",
+          "finalizedSlot",
+          "observedAt"
+        ],
+        "properties": {
+          "acceptBefore": {
+            "type": "string"
+          },
+          "address": {
+            "type": "string"
+          },
+          "designatedHolder": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expiresAt": {
+            "type": "string"
+          },
+          "finalizedSlot": {
+            "type": "string"
+          },
+          "holder": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "netReceived": {
+            "type": "string"
+          },
+          "observedAt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "payout": {
+            "type": "string"
+          },
+          "policyVersion": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "premium": {
+            "type": "string"
+          },
+          "quantityRaw": {
+            "type": "string"
+          },
+          "reserve": {
+            "type": "string"
+          },
+          "reserveAmount": {
+            "type": "string"
+          },
+          "settlement": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "underlyingMint": {
+            "type": "string"
+          },
+          "underlyingProgram": {
+            "type": "string"
+          },
+          "usdcMint": {
+            "type": "string"
+          },
+          "version": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "writer": {
+            "type": "string"
+          }
+        }
+      },
+      "AssetView": {
+        "type": "object",
+        "required": [
+          "mint",
+          "symbol",
+          "name",
+          "decimals",
+          "provenance"
+        ],
+        "properties": {
+          "decimals": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "mint": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "provenance": {
+            "type": "string"
+          },
+          "symbol": {
+            "type": "string"
+          }
+        }
+      },
+      "Deployment": {
+        "type": "object",
+        "required": [
+          "schemaVersion",
+          "fixtureVersion",
+          "mode",
+          "genesisHash",
+          "programId",
+          "programSha256",
+          "programLength",
+          "authority",
+          "holder",
+          "writer",
+          "usdcMint",
+          "underlyingMint",
+          "writerUsdc",
+          "holderUsdc",
+          "holderUnderlying"
+        ],
+        "properties": {
+          "authority": {
+            "type": "string"
+          },
+          "fixtureVersion": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "genesisHash": {
+            "type": "string"
+          },
+          "holder": {
+            "type": "string"
+          },
+          "holderUnderlying": {
+            "type": "string"
+          },
+          "holderUsdc": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "programId": {
+            "type": "string"
+          },
+          "programLength": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "programSha256": {
+            "type": "string"
+          },
+          "schemaVersion": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "underlyingMint": {
+            "type": "string"
+          },
+          "usdcMint": {
+            "type": "string"
+          },
+          "writer": {
+            "type": "string"
+          },
+          "writerUsdc": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "ErrorBody": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "PositionView": {
+        "type": "object",
+        "required": [
+          "owner",
+          "mint",
+          "tokenAccount",
+          "amountRaw",
+          "usdcTokenAccount",
+          "usdcAmountRaw",
+          "decimals",
+          "finalizedSlot"
+        ],
+        "properties": {
+          "amountRaw": {
+            "type": "string"
+          },
+          "decimals": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "finalizedSlot": {
+            "type": "string"
+          },
+          "mint": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "tokenAccount": {
+            "type": "string"
+          },
+          "usdcAmountRaw": {
+            "type": "string"
+          },
+          "usdcTokenAccount": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
