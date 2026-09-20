@@ -4467,6 +4467,7 @@ dependencies = [
  "anchor-spl",
  "bincode",
  "litesvm",
+ "serde_json",
  "solana-account",
  "solana-address 2.6.1",
  "solana-clock",

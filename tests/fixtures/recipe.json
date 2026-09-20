@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "decimals": 6,
+  "quantityRaw": "1000000",
+  "payout": "20000000",
+  "premium": "500000",
+  "writerBalance": "100000000",
+  "holderUsdc": "1000000",
+  "holderUnderlying": "2000000",
+  "seeds": {
+    "authority": 1,
+    "writer": 2,
+    "holder": 3,
+    "usdc": 5,
+    "underlying": 6,
+    "writerUsdc": 7,
+    "holderUsdc": 8,
+    "holderUnderlying": 9
+  },
+  "transferFeeBasisPoints": 75,
+  "maximumFee": "1000000",
+  "displayMultiplier": 2,
+  "acceptanceSeconds": 3600,
+  "protectionSeconds": 7200
+}

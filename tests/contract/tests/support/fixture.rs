@@ -43,6 +43,7 @@ impl Fixture {
     }
 
     fn build(kind: AssetFixture, initialized: bool) -> Self {
+        super::recipe::verify();
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
         let mut svm = LiteSVM::new()
             .with_sigverify(true)

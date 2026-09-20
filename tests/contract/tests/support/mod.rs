@@ -4,6 +4,7 @@ mod addresses;
 mod fixture;
 mod instructions;
 mod ledger;
+mod recipe;
 mod tokens;
 mod transactions;
 
