@@ -20,7 +20,7 @@ The product targets the Stocklana main track and PreStocks sponsor track. Its fo
 
 ## Architecture
 
-The architecture combines a Rust backend, a React and TypeScript frontend, and a Rust Solana program. A single application container serves the frontend and API; SQLite provides local storage without a database service. The deployment model uses Docker Compose to start the local application, Solana validator, and automatic initialization together, without required environment variables.
+The architecture combines a Rust backend, a React and TypeScript frontend, and a Rust Solana program. A single application container serves the frontend and API; PostgreSQL stores query projections and observations in a separate persistent service. The deployment model uses Docker Compose to start the local application, PostgreSQL, Solana validator, and automatic initialization together, without required environment variables.
 
 Read [the product brief](docs/product.md) for the holder's problem, concrete outcomes, related products, and product boundaries. Read [the architecture](docs/architecture.md) for component boundaries, settlement rules, integrations, dependencies, and the deployment model.
 
@@ -29,6 +29,16 @@ The [technology stack](docs/tech-stack.md) explains the selected frameworks, alt
 ## Product boundaries
 
 Protection requires delivery of the specified asset before expiry. It does not insure against issuer restrictions, unavailable transfers, wallet compromise, or network failure. The payout is denominated in USDC, and the premium and network costs remain separate expenses. Local test assets are explicitly distinguished from genuine PreStocks holdings.
+
+## Run locally
+
+```sh
+docker compose up --build
+```
+
+Open `http://localhost:8080`, connect **Local test wallet**, activate the seeded offer, and exercise it. The local environment uses disposable Token-2022 assets with issuer fees and real on-chain settlement. No environment file or external account is required. Restarting preserves the ledger, database, and balances. Native development can use `npm run dev:localnet`; its pinned prerequisites and build commands are in the development guide.
+
+Run `./tools/test app` for native backend/frontend checks, or `./tools/test full` for the isolated Compose browser and recovery suite. See the [development guide](docs/development.md#run-the-local-application) for setup, reset, native localnet testing, and generated interfaces.
 
 ## Contract development
 

@@ -1,4 +1,4 @@
-# Contract Development
+# Development
 
 The contract checks exercise the settlement rules in the [architecture](architecture.md#4-on-chain-agreement). They load the compiled SBF program into LiteSVM, verify real signatures, and execute the token programs. No wallet configuration, RPC provider, API key, or funded account is required.
 
@@ -100,3 +100,139 @@ The scenarios verify full funding, separate premium payment, holder-only exercis
 Every scenario transaction is checked against the legacy transaction size limit. The full exercise scenarios also enforce a 200,000 compute-unit budget; normal SBF execution enforces stack, heap, and nested-call limits. Financial checks keep signature and blockhash verification enabled. No fixture bypasses agreement authorization or edits financial state directly.
 
 Terminal agreements remain allocated to prevent address reuse. Cleanup sweeps reserve surplus and hands over any remaining PDA-controlled underlying account. It does not automatically close token accounts or withdraw issuer-owned withheld fees; the writer can use ordinary token instructions after handoff. Freezing or dust in the underlying account cannot become a prerequisite for a reserve refund.
+
+## Run the local application
+
+```sh
+docker compose up --build
+```
+
+Open `http://localhost:8080` and connect **Local test wallet**. Review the funded offer, activate protection, and exercise it. The wallet prompts for each signature. The writer has already funded the complete payout through the same generated instruction client used by the browser. All identities, assets, and balances are disposable fixtures, including the six-decimal test settlement currency labelled USDC.
+
+The page opens disconnected, including after a reload. Public agreements are readable without a wallet; they are not personal holdings. **Your wallet** loads balances only after an explicit connection and shows the connected address and the origin of the provided demo balances. Disconnecting hides those balances. Only an agreement held by the connected address is labelled as its active protection. After reopening a page with a pending transaction, connect the same wallet to resume confirmation tracking; reconnecting does not sign or send another transaction.
+
+The interface uses a dark palette with [Solana's official purple and green](https://solana.com/branding) (`#9945FF` and `#14F195`) and a blue transition in decorative gradients. Shared color tokens live in `frontend/src/styles.css`; component styling lives in `frontend/src/App.module.css`. Body text, financial values, warning/error states, and disabled controls use solid colors for readability.
+
+No `.env` file is required. Compose runs PostgreSQL, the validator, an initialization job, and one non-root application process serving React and the HTTP API. PostgreSQL uses a persistent named volume and creates a separate `volaryn` application role without superuser, role-creation, or database-creation privileges. Local credentials are public disposable fixtures, not hosted-deployment credentials. Only the application port is published, on loopback. The pinned validator archive targets Linux amd64; other host architectures require Docker's amd64 emulation. The first build downloads pinned tools, dependencies, and browser binaries for the test target.
+
+Compose invokes `solana-test-validator` directly with visible arguments. Its `--bind-address validator` resolves the service's current container IP through Compose DNS; Agave 4.0.3 rejects the unspecified address `0.0.0.0` when constructing gossip contact information. RPC still listens on all container interfaces, so both the loopback health check and other services can reach it. No validator ports are published to the host.
+
+The validator uses a [committed seccomp profile](../tools/localnet/seccomp/README.md) that adds the three io_uring calls required by Agave to Moby's default policy. It remains non-root and does not need privileged mode. The Docker host must support io_uring. The container streams validator logs through `docker compose logs validator`; the local logging driver rotates them at 10 MB with three files retained.
+
+If the validator exits before readiness, read `docker compose logs --no-color --tail=150 validator`. Older containers using the `--quiet` wrapper put errors in the ledger volume instead: `docker compose run --rm --no-deps --entrypoint tail validator -n 120 /ledger/validator.log`. An `io_uring_supported()` panic requires checking kernel support, syscall permissions, and locked-memory limits; `UnspecifiedIpAddr(0.0.0.0)` means the validator received an invalid bind address. Compose supplies the executable, arguments and seccomp profile, including for already-built images: apply changes with `docker compose up -d --no-build --wait --wait-timeout 300`. Keep existing volumes when diagnosing startup failures.
+
+The validator loads the compiled upgradeable program and pinned token programs into a new genesis. Bootstrap verifies the program hash, records the genesis and fixture identity in a public manifest, then creates mints, policy, accounts, balances, and the funded offer through transactions. An existing ledger is resumed; bootstrap reuses compatible accounts and never replaces an exercised or expired offer. A partially completed bootstrap resumes through its pending manifest. Incompatible identity fails explicitly.
+
+On a fresh ledger, bootstrap submits eleven transactions sequentially and waits for each to reach finalization, so initialization can take several minutes after the validator becomes healthy. Compose waits for this job to exit successfully before starting the application. Follow `docker compose logs -f bootstrap` for the current operation, a waiting message every ten seconds during transactions, and completion times. Reusing an initialized ledger skips the creation transactions. Bootstrap source changes require rebuilding its image; `--no-build` continues to use the previously packaged code.
+
+```sh
+docker compose down       # stop services; retain ledger and application data
+docker compose up         # resume the same agreements and balances
+```
+
+To deliberately discard the disposable demonstration and obtain a fresh offer, use `docker compose down --volumes`, followed by `docker compose up`. This reset deletes the local ledger, manifest, and projection; it is never performed by application startup.
+
+Backend CLI arguments select the manifest, upstream RPC, static files, and listening address. PostgreSQL uses `DATABASE_URL` (or `--database-url`); prefer the environment to keep credentials out of command arguments. Compose and the native launcher supply the local connection automatically. The application accepts fixture manifests only when built with the `localnet` feature, verifies genesis and program bytes, and applies embedded migrations before listening. The index discovers account addresses every thirty seconds and refreshes funded/active agreements every two seconds, with up to four concurrent batches of fifty agreement/reserve pairs. Each pair uses one finalized RPC context; stale slots cannot replace newer rows.
+
+`/health/live` reports process liveness. `/health/ready` verifies chain identity independently of PostgreSQL, with a shared five-second identity cache. `/health/index` additionally requires reconciliation within thirty seconds and a database query within two seconds. An index outage disables list queries; verified `/rpc`, configuration, balances, and direct agreement reads remain usable. A direct read allows the database up to 500 ms before falling back to Solana. The pool reconnects and the worker restores index readiness when dependencies recover. Initial startup still requires the database for migrations. The runtime image's `volaryn --healthcheck` probes transport readiness; full environment launchers wait for index readiness.
+
+The browser uses the same-origin `/rpc` route for wallet submission and HTTP polling. The proxy restricts RPC methods, preserves upstream number text and error envelopes, bounds request/response sizes, and sets a whole-request deadline. It has no airdrop or administrative route. Signature, owner, agreement, operation, and block-height lifetime persist in local storage across tab closure, keyed by genesis, program, and wallet. Existing session records migrate when the matching wallet connects. Web Locks prevent concurrent signing in another tab; storage/locking failures fail closed. Private keys and signed transaction bytes are not retained. Confirmed results remain provisional; finalized signature status or a version-specific finalized agreement effect resolves an expired action. Missing signature history alone cannot establish failure. Clearing browser storage removes the recovery record. No replacement is signed automatically.
+
+## Native local application
+
+With the pinned Rust/contract tools, Node, Agave 4.0.3, and PostgreSQL 17.11 installed, prepare and run the persistent demo without containers:
+
+```sh
+./tools/test fast
+npm ci
+npm run build
+./tools/rustup/cargo build --locked -p volaryn-backend --features localnet
+npm run dev:localnet
+```
+
+Open `http://localhost:8080`. The launcher owns a loopback-only PostgreSQL cluster and Solana validator, supplies the database connection, initializes fixtures, and waits for application readiness. It fails if port 8080 or the persistent runner is already in use. Ctrl+C stops its processes and retains the ledger, manifest, database, and logs under `target/localnet/`. Run the same command to resume. Build changed Rust/frontend sources before restarting; this command does not run a watcher. Only this complete localnet environment needs a running validator; contract tests continue to use LiteSVM.
+
+## Database changes and recovery
+
+Local launchers provision the database and restricted application role; the backend applies the schema before serving requests. No database connection is needed to compile code or export OpenAPI. Native tests allocate their own cluster and per-scenario databases, while container tests use an isolated Compose database service. `VOLARYN_TEST_DATABASE_URL` is an internal runner setting used only to create and remove owned test databases; it is not application configuration.
+
+The SQLite-to-PostgreSQL transition creates a new PostgreSQL migration history and rebuilds agreement projections from the retained Solana ledger. Keep the same Compose project name and run `docker compose up --build`; it creates the new PostgreSQL volume while reusing the ledger and deployment volumes. Old SQLite files/volumes are left untouched and are not imported or automatically removed. Do **not** use `down --volumes` for this migration: that also destroys the ledger. The rebuildable tables contain chain observations, deployment identity, and a checkpoint; any separately added application-owned data needs an explicit export/import plan before discarding its source.
+
+Rebuilding observations cannot recover discarded off-chain history. For retained application data, take a PostgreSQL backup with `pg_dump` and rehearse `pg_restore` into a separate database before upgrading. Never delete volumes as a database repair. PostgreSQL major-version upgrades are deliberate operations, separate from application SQL migrations. Hosted deployment supplies its own restricted credentials and certificate-verified TLS in `DATABASE_URL`; do not reuse the public local fixture credentials.
+
+## Application checks
+
+Use Node **24.15.0**, its bundled npm **11.x**, and PostgreSQL **17.11** for native application checks. Install PostgreSQL through the host package manager with `postgres`, `initdb`, `pg_ctl`, and `psql` on `PATH`; a system database service is unnecessary. Run as an ordinary user because `initdb` refuses root. `.npmrc` enforces engine and peer compatibility; `npm ci` uses the committed lockfile. For native backend/frontend checks without a validator:
+
+```sh
+./tools/test app
+```
+
+This checks Clippy, real PostgreSQL migrations, concurrent startup, numeric precision, rollback, and HTTP boundaries, exported OpenAPI drift, generated program/HTTP clients, TypeScript, ESLint, frontend unit tests, and frontend builds. Formatting is a separate command, consistent with the native contract suite:
+
+```sh
+npm run format:check
+npm run format:write
+```
+
+Prettier owns TypeScript, JavaScript, CSS, and HTML. `tools/format` owns Rust, shell, Python, Markdown, JSON, TOML, YAML, and Dockerfiles. Both gates run in the container build used by CI. Generated program code, HTTP types, IDL, OpenAPI, and lockfiles keep their generators' output; regeneration checks their compatibility.
+
+For the complete isolated environment and browser checks:
+
+```sh
+./tools/test full
+```
+
+The runner builds the contract and application with their checks, then starts a unique Compose project with its own ledger, deployment manifest, and PostgreSQL volume. Backend integration tests run against that server with separate databases before the application starts. The rendered configuration is checked for inherited host ports and external volumes. A loopback forwarder inside the browser-test container supplies a secure browser origin without publishing ports or requiring WebSockets. The default demo can remain running.
+
+Playwright rejects a wallet signature, blocks a changed network, activates through real wallet signing, reopens the tab and reconnects while confirmation is pending, and exercises without the writer. It checks finalized agreement state, gross delivery, issuer fees, full USDC payout, reserve depletion, and writer ownership of the delivered account. Separate interface scenarios verify explicit connection, balance removal on disconnect, wallet loading/empty/error states, and ownership-aware presentation of public agreements. Recovery checks restart PostgreSQL and the validator/application, repeat bootstrap, and rebuild the chain projection while retaining identical financial state. Test cleanup removes only that run's project and volumes. Logs, browser traces on failure, screenshots, and rendered configuration remain under `artifacts/tests/localnet.*`.
+
+For the same browser and recovery checks directly on the host, install Agave **4.0.3**, PostgreSQL **17.11**, Node, the Rust tools above, and Playwright Chromium, then run:
+
+```sh
+./tools/test fast
+./tools/test app
+./tools/rustup/cargo build --locked -p volaryn-backend --features localnet
+npx playwright install chromium
+npm run test:localnet
+```
+
+The native runner allocates separate ports and an artifact directory, starts its own PostgreSQL cluster, validator, and backend, and shuts down only those processes. It also stops PostgreSQL while the application stays running, verifies index degradation while chain transport and direct agreement reads stay available, and restores the database before checking retained financial observations. It preserves evidence and ledger files under `artifacts/localnet/run-*`; PostgreSQL logs and owned cluster data remain under `artifacts/postgres/run-*`. It never uses the manual demo's data or an ambient `DATABASE_URL`. On systems using a packaged Chromium, `PLAYWRIGHT_CHROMIUM_EXECUTABLE` may point to that executable. This optional test-runner setting is not application configuration. Fast contract and application checks remain independent of a validator.
+
+## Application modules and interfaces
+
+| Path                          | Responsibility                                                                                   |
+| ----------------------------- | ------------------------------------------------------------------------------------------------ |
+| `backend/src/application.rs`  | Chain/index availability, direct reads, and reconciliation orchestration.                        |
+| `backend/src/indexer.rs`      | Discovery scheduling and bounded account-pair reconciliation.                                    |
+| `backend/src/queries.rs`      | Validated pagination and agreement filters shared by HTTP and storage.                           |
+| `backend/src/observations.rs` | Public deployment and chain DTOs with exact decimal-string quantities and generated API schemas. |
+| `backend/src/domain.rs`       | Typed application failures and chain-time helpers, independent of HTTP and storage.              |
+| `backend/src/adapters/`       | Bounded Solana reads and transactional PostgreSQL projection storage.                            |
+| `backend/src/http.rs`         | Typed REST endpoints, byte-preserving RPC proxy, health routes, and static delivery.             |
+| `backend/migrations/`         | Ordered immutable SQL migrations embedded in the executable.                                     |
+| `frontend/src/features/`      | Account-scoped observations, persistent transaction journal, and finalized outcome recovery.     |
+| `frontend/src/lib/`           | Generated API types, exact amounts, chain validation, and wallet client construction.            |
+| `frontend/src/localnet/`      | Disposable Wallet Standard implementation, imported only by localnet builds.                     |
+| `packages/protocol/src/`      | Generated Codama client plus explicit PDA resolution and HTTP transaction helpers.               |
+| `tools/postgres/`             | Local role/database initialization and owned native cluster lifecycle.                           |
+| `tools/localnet/`             | Fixture initialization and isolated environment/test lifecycle.                                  |
+| `tests/browser/`              | Browser journeys and authoritative chain assertions.                                             |
+
+Generate changed interfaces explicitly, review the output, then run both check suites:
+
+```sh
+./tools/build-idl
+cp target/idl/volaryn.json packages/protocol/idl/volaryn.json
+npm run generate:protocol
+./tools/rustup/cargo run --locked --quiet -p volaryn-backend --bin export-openapi > packages/api/openapi.json
+npm run generate:api
+```
+
+Client checks generate into temporary files and never rewrite checked-in interfaces. The IDL importer accepts the declared Anchor specification; unsupported versions fail. Explicit PDA helpers supply all instruction accounts, including policy derivations that Codama names differently across instructions. The browser execution test proves that generated instructions match the compiled contract.
+
+`tests/fixtures/recipe.json` defines shared identities, quantities, and localnet token behavior. The Rust fixture verifies its test vocabulary against that recipe, while bootstrap and browser assertions consume it directly. Localnet uses the validator clock for offer deadlines; LiteSVM uses controlled time for exact boundary scenarios.
+
+The application stores exact amount strings in typed JSONB projections and the finalized-slot checkpoint in bounded `NUMERIC(20,0)`. SQLx embeds migrations and validates their checksums under PostgreSQL migration locking. Migration `0002` backfills per-agreement slots/timestamps from the original JSONB rows and adds generated filter columns and indexes. The worker upserts bounded batches without deleting existing records; rows and their high-water checkpoint commit atomically, and older slots cannot overwrite newer observations. List queries bind filters and use `after` address cursors with a default limit of 50 and maximum of 200; `X-Next-Cursor` identifies the next page. Detail reads query one primary key. Tests use the application role, retain the entire `u64` range, reject ledger mismatches and changed migration history, and exercise rollback and concurrent startup. Stop the previous application writer before applying `0002`: the earlier writer does not supply the new required columns. Preserve database backups and use a forward fix, or restore a separately verified compatible application/schema pair; reverting the binary alone is insufficient. An application rollback requires a compatible schema.
+
+`npm run build:live` produces a separate signer-free frontend artifact and `npm run check:live` verifies exclusion of the disposable wallet. This is a build-isolation check, not an external-deployment command. External deployment configuration follows its own pipeline gate; never point the local fixture environment at real assets.
