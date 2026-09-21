@@ -36,7 +36,11 @@ Protection requires delivery of the specified asset before expiry. It does not i
 docker compose up --build
 ```
 
-Open `http://localhost:8080`, connect **Local test wallet**, activate the seeded offer, and exercise it. The local environment uses disposable Token-2022 assets with issuer fees and real on-chain settlement. No environment file or external account is required. Restarting preserves the ledger, database, and balances. Native development can use `npm run dev:localnet`; its pinned prerequisites and build commands are in the development guide.
+Open `http://localhost:8080`. Connect **Local test wallet** for the holder journey or **Local test writer** to fund and manage offers. Disconnect before switching roles. Every financial action opens a terms review before wallet signing. The local environment uses disposable Token-2022 assets with issuer fees and real on-chain settlement. No environment file or external account is required. Restarting preserves the ledger, database, and balances. Native development can use `npm run dev:localnet`; its pinned prerequisites and build commands are in the development guide.
+
+- **Protection** matches funded offers by exact quantity, minimum payout, maximum premium, and holder eligibility; **My protection** shows the connected holder's active agreements.
+- **Writer** creates fully funded offers, lists that wallet's commitments, cancels unaccepted offers, and returns reserves after unused protection expires.
+- **Your wallet** lists each supported token account, including assets received by the writer. Exercise delivers from one selected account; separate balances are not combined.
 
 Run `./tools/test app` for native backend/frontend checks, or `./tools/test full` for the isolated Compose browser and recovery suite. See the [development guide](docs/development.md#run-the-local-application) for setup, reset, native localnet testing, and generated interfaces.
 
