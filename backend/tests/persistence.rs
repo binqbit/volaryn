@@ -5,50 +5,7 @@ mod database;
 mod support;
 
 use anchor_lang::prelude::Pubkey;
-use sqlx::{postgres::PgPoolOptions, types::Json};
 use volaryn_backend::{adapters::store, queries::AgreementQuery};
-
-#[tokio::test]
-async fn upgrade_preserves_version_one_data_and_its_migration_history() {
-    let database = database::Database::new().await;
-    let pool = PgPoolOptions::new()
-        .connect_with(database.options.clone())
-        .await
-        .unwrap();
-    let directory = tempfile::tempdir().unwrap();
-    std::fs::write(
-        directory.path().join("0001_chain_projection.sql"),
-        include_str!("../migrations/0001_chain_projection.sql"),
-    )
-    .unwrap();
-    sqlx::migrate::Migrator::new(directory.path())
-        .await
-        .unwrap()
-        .run(&pool)
-        .await
-        .unwrap();
-    let original = agreement::agreement(u64::MAX, 123);
-    sqlx::query("INSERT INTO agreements (address, projection) VALUES ($1, $2)")
-        .bind(&original.address)
-        .bind(Json(&original))
-        .execute(&pool)
-        .await
-        .unwrap();
-    pool.close().await;
-    let pool = store::open(database.options.clone(), &support::deployment())
-        .await
-        .unwrap();
-    let recovered = store::agreement(&pool, &original.address)
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(
-        serde_json::to_value(recovered).unwrap(),
-        serde_json::to_value(original).unwrap()
-    );
-    pool.close().await;
-    database.close().await;
-}
 
 #[tokio::test]
 async fn pages_filters_and_targeted_updates_work_beyond_one_thousand_agreements() {

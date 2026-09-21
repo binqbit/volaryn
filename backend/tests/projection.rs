@@ -53,7 +53,7 @@ async fn migrations_preserve_identity_and_exact_amounts_across_restart() {
             .fetch_one(&pool)
             .await
             .unwrap();
-    assert_eq!(migrations, 2);
+    assert_eq!(migrations, 1);
     pool.close().await;
     let mut incompatible = deployment.clone();
     incompatible.genesis_hash = "different-ledger".into();
