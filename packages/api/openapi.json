@@ -64,6 +64,40 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "quantity_raw",
+            "in": "query",
+            "description": "Exact underlying quantity in base units; offers are never resized.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "min_payout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "max_premium",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "eligible_holder",
+            "in": "query",
+            "description": "Include unrestricted offers and offers reserved for this holder.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -210,6 +244,40 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "quantity_raw",
+            "in": "query",
+            "description": "Exact underlying quantity in base units; offers are never resized.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "min_payout",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "max_premium",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "eligible_holder",
+            "in": "query",
+            "description": "Include unrestricted offers and offers reserved for this holder.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -237,9 +305,9 @@
         }
       }
     },
-    "/api/positions": {
+    "/api/wallet": {
       "get": {
-        "operationId": "positions",
+        "operationId": "wallet",
         "parameters": [
           {
             "name": "owner",
@@ -256,10 +324,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/PositionView"
-                  }
+                  "$ref": "#/components/schemas/WalletView"
                 }
               }
             }
@@ -487,19 +552,21 @@
           }
         }
       },
-      "PositionView": {
+      "WalletTokenAccount": {
         "type": "object",
         "required": [
-          "owner",
+          "address",
           "mint",
-          "tokenAccount",
+          "tokenProgram",
           "amountRaw",
-          "usdcTokenAccount",
-          "usdcAmountRaw",
+          "frozen",
           "decimals",
           "finalizedSlot"
         ],
         "properties": {
+          "address": {
+            "type": "string"
+          },
           "amountRaw": {
             "type": "string"
           },
@@ -511,19 +578,31 @@
           "finalizedSlot": {
             "type": "string"
           },
+          "frozen": {
+            "type": "boolean"
+          },
           "mint": {
             "type": "string"
           },
+          "tokenProgram": {
+            "type": "string"
+          }
+        }
+      },
+      "WalletView": {
+        "type": "object",
+        "required": [
+          "owner",
+          "accounts"
+        ],
+        "properties": {
+          "accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WalletTokenAccount"
+            }
+          },
           "owner": {
-            "type": "string"
-          },
-          "tokenAccount": {
-            "type": "string"
-          },
-          "usdcAmountRaw": {
-            "type": "string"
-          },
-          "usdcTokenAccount": {
             "type": "string"
           }
         }

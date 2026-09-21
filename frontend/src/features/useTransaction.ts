@@ -1,18 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { submitTransaction } from '@volaryn/protocol';
-import { prepareAction } from '../lib/chain/actions';
+import { prepareTransaction, submitTransaction } from '@volaryn/protocol';
+import { buildAction } from '../lib/chain/buildAction';
+import type { ActionRequest, ActionReview } from '../lib/chain/actionTypes';
 import type { AppClient } from '../lib/chain/client';
-import type { Agreement, Deployment, Position } from '../lib/api/client';
+import type { Deployment } from '../lib/api/client';
 import type { PendingTransaction as Pending } from './pending';
 import { observeAction } from './reconcile';
-import {
-  clearJournal,
-  journalKey,
-  migrateSessionJournal,
-  readJournal,
-  saveJournal,
-  withJournalLock,
-} from './journal';
+import { clearJournal, journalKey, readJournal, saveJournal, withJournalLock } from './journal';
 
 type Phase = 'idle' | 'awaiting-signature' | Awaited<ReturnType<typeof observeAction>>;
 interface Tracking {
@@ -43,10 +37,6 @@ export function useTransaction(
         return;
       }
       try {
-        if (sessionStorage.getItem(`volaryn:pending:${deployment.genesisHash}`))
-          await withJournalLock(key, async () => {
-            migrateSessionJournal(key, deployment.genesisHash, owner);
-          });
         const record = readJournal(key, owner);
         if (!cancelled)
           setTracking((previous) => ({
@@ -137,7 +127,7 @@ export function useTransaction(
   }, [pending, client, key, owner]);
 
   const execute = useCallback(
-    async (agreement: Agreement, position: Position, operation: Pending['operation']) => {
+    async (request: ActionRequest, reviewed: ActionReview) => {
       if (!owner || lock.current || current.pending || current.unavailable || tracking.key !== key)
         return;
       lock.current = true;
@@ -145,7 +135,7 @@ export function useTransaction(
         setTracking((previous) => (previous.key === key ? next : previous));
       update({ ...empty, key, phase: 'awaiting-signature' });
       try {
-        await withJournalLock(key, async () => {
+        return await withJournalLock(key, async () => {
           const existing = readJournal(key, owner);
           if (existing) {
             update({ ...empty, key, pending: existing, phase: 'pending' });
@@ -158,24 +148,33 @@ export function useTransaction(
             !connected.supportedTransactionVersions.has('legacy')
           )
             throw new Error('Connect a wallet supporting legacy transaction signing');
-          const prepared = await prepareAction(
-            client,
-            deployment,
-            agreement,
-            position,
+          const plan = await buildAction(client, deployment, request, connected.signer);
+          if (JSON.stringify(plan.review) !== JSON.stringify(reviewed))
+            throw new Error(
+              'The reviewed conditions changed. Review the action again before signing.',
+            );
+          const prepared = await prepareTransaction(
+            client.rpc,
             connected.signer,
-            operation,
+            plan.instructions,
+            async () => {
+              if ((await client.rpc.getGenesisHash().send()) !== deployment.genesisHash)
+                throw new Error('Network changed before signing');
+              if (client.wallet.getState().connected?.account.address !== owner)
+                throw new Error('Wallet changed before signing');
+            },
           );
-          if (client.wallet.getState().connected?.account.address !== owner)
-            throw new Error('Wallet changed before submission');
           if ((await client.rpc.getGenesisHash().send()) !== deployment.genesisHash)
             throw new Error('Network changed before submission');
+          if (client.wallet.getState().connected?.account.address !== owner)
+            throw new Error('Wallet changed before submission');
           const record: Pending = {
             signature: prepared.signature,
             lastValidBlockHeight: prepared.lastValidBlockHeight,
             owner,
-            agreement: agreement.address,
-            operation,
+            agreement: plan.review.agreement,
+            operation: request.operation,
+            ...(request.operation === 'create' ? { createdTerms: request.terms } : {}),
           };
           saveJournal(key, record);
           update({ ...empty, key, pending: record, phase: 'pending' });
@@ -191,6 +190,7 @@ export function useTransaction(
                 'Submission feedback was lost or rejected. Checking the signature before any retry.',
             });
           }
+          return plan.review.agreement;
         });
       } catch (cause) {
         update({
@@ -207,6 +207,15 @@ export function useTransaction(
   );
   return {
     execute,
+    preview: async (request: ActionRequest) => {
+      const connected = client.wallet.getState().connected;
+      if (!connected?.signer || connected.account.address !== owner)
+        throw new Error('Connect the wallet that will sign this action');
+      const result = await buildAction(client, deployment, request, connected.signer);
+      if (client.wallet.getState().connected?.account.address !== owner)
+        throw new Error('Wallet changed while preparing the review');
+      return result.review;
+    },
     phase: current.phase,
     error: current.error,
     pending,

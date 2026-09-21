@@ -1,11 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  clearJournal,
-  journalKey,
-  migrateSessionJournal,
-  readJournal,
-  saveJournal,
-} from './journal';
+import { clearJournal, journalKey, readJournal, saveJournal } from './journal';
 
 const owner = '11111111111111111111111111111111';
 const saved = {
@@ -25,7 +19,6 @@ function storage() {
 }
 beforeEach(() => {
   vi.stubGlobal('localStorage', storage());
-  vi.stubGlobal('sessionStorage', storage());
 });
 afterEach(() => vi.unstubAllGlobals());
 
@@ -44,17 +37,5 @@ describe('durable public transaction journal', () => {
     expect(readJournal('journal', owner)).toEqual(saved);
     clearJournal('journal', owner, saved.signature);
     expect(readJournal('journal', owner)).toBeNull();
-  });
-  it('migrates the legacy session record without silently replacing another transaction', () => {
-    sessionStorage.setItem('volaryn:pending:network', JSON.stringify(saved));
-    migrateSessionJournal('journal', 'network', owner);
-    expect(readJournal('journal', owner)).toEqual(saved);
-    expect(sessionStorage.getItem('volaryn:pending:network')).toBeNull();
-    sessionStorage.setItem(
-      'volaryn:pending:network',
-      JSON.stringify({ ...saved, signature: '2'.repeat(64) }),
-    );
-    expect(() => migrateSessionJournal('journal', 'network', owner)).toThrow();
-    expect(readJournal('journal', owner)).toEqual(saved);
   });
 });

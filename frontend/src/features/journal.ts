@@ -27,16 +27,3 @@ export function saveJournal(key: string, record: PendingTransaction) {
 export function clearJournal(key: string, owner: string, signature: string) {
   if (readJournal(key, owner)?.signature === signature) localStorage.removeItem(key);
 }
-
-export function migrateSessionJournal(key: string, genesis: string, owner: string) {
-  const legacyKey = `volaryn:pending:${genesis}`;
-  const raw = sessionStorage.getItem(legacyKey);
-  if (!raw) return;
-  const legacy = parsePending(raw);
-  if (legacy.owner !== owner) return;
-  const current = readJournal(key, owner);
-  if (current && current.signature !== legacy.signature)
-    throw new Error('Two saved transactions require reconciliation before submitting again');
-  saveJournal(key, legacy);
-  sessionStorage.removeItem(legacyKey);
-}

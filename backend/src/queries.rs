@@ -17,6 +17,12 @@ pub struct AgreementQuery {
     pub writer: Option<String>,
     pub mint: Option<String>,
     pub status: Option<String>,
+    /// Exact underlying quantity in base units; offers are never resized.
+    pub quantity_raw: Option<String>,
+    pub min_payout: Option<String>,
+    pub max_premium: Option<String>,
+    /// Include unrestricted offers and offers reserved for this holder.
+    pub eligible_holder: Option<String>,
 }
 
 impl AgreementQuery {
@@ -25,11 +31,26 @@ impl AgreementQuery {
         if !(1..=200).contains(&limit) {
             return Err(AppError::Invalid);
         }
-        for value in [&self.after, &self.holder, &self.writer, &self.mint]
+        for value in [
+            &self.after,
+            &self.holder,
+            &self.writer,
+            &self.mint,
+            &self.eligible_holder,
+        ]
+        .into_iter()
+        .flatten()
+        {
+            Pubkey::from_str(value).map_err(|_| AppError::Invalid)?;
+        }
+        for value in [&self.quantity_raw, &self.min_payout, &self.max_premium]
             .into_iter()
             .flatten()
         {
-            Pubkey::from_str(value).map_err(|_| AppError::Invalid)?;
+            let parsed = value.parse::<u64>().map_err(|_| AppError::Invalid)?;
+            if parsed.to_string() != *value {
+                return Err(AppError::Invalid);
+            }
         }
         if self.status.as_deref().is_some_and(|status| {
             !matches!(

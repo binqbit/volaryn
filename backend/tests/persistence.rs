@@ -124,3 +124,60 @@ async fn pages_filters_and_targeted_updates_work_beyond_one_thousand_agreements(
     pool.close().await;
     database.close().await;
 }
+
+#[tokio::test]
+async fn offer_matching_uses_exact_amounts_and_designated_holder_eligibility() {
+    let database = database::Database::new().await;
+    let pool = store::open(database.options.clone(), &support::deployment())
+        .await
+        .unwrap();
+    let holder = Pubkey::new_unique().to_string();
+    let other = Pubkey::new_unique().to_string();
+    let rows: Vec<_> = (0..6)
+        .map(|index| {
+            let mut row = agreement::agreement(10, 100);
+            row.address = Pubkey::new_unique().to_string();
+            row.accept_before = (volaryn_backend::domain::now() + 3600).to_string();
+            if index == 1 {
+                row.designated_holder = Some(holder.clone());
+            }
+            if index == 2 {
+                row.designated_holder = Some(other.clone());
+            }
+            if index == 3 {
+                row.quantity_raw = "9007199254740993".into();
+            }
+            if index == 4 {
+                row.premium = "2".into();
+            }
+            if index == 5 {
+                row.reserve_amount = "0".into();
+            }
+            row
+        })
+        .collect();
+    store::upsert(&pool, &rows, 10, 100).await.unwrap();
+    let query = AgreementQuery {
+        quantity_raw: Some(u64::MAX.to_string()),
+        min_payout: Some(u64::MAX.to_string()),
+        max_premium: Some("1".into()),
+        eligible_holder: Some(holder),
+        ..Default::default()
+    };
+    let page = store::agreements(&pool, &query, true).await.unwrap();
+    assert_eq!(page.items.len(), 2);
+    assert!(page
+        .items
+        .iter()
+        .all(|row| [rows[0].address.clone(), rows[1].address.clone()].contains(&row.address)));
+    for invalid in ["1.2", "01", "-1", "18446744073709551616", "1 OR TRUE"] {
+        assert!(AgreementQuery {
+            quantity_raw: Some(invalid.into()),
+            ..Default::default()
+        }
+        .page_size()
+        .is_err());
+    }
+    pool.close().await;
+    database.close().await;
+}

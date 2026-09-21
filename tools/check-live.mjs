@@ -10,6 +10,7 @@ for (const name of files) {
   const content = await readFile(`frontend/dist-live/assets/${name}`, 'utf8');
   for (const marker of [
     'Local test wallet',
+    'Local test writer',
     'Disposable localnet wallet',
     'Sign this local test transaction',
     'createKeyPairSignerFromPrivateKeyBytes',

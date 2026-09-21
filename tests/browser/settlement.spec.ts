@@ -1,3 +1,4 @@
+import { confirmReview } from './support/actions';
 import { expect, test } from '@playwright/test';
 import { address, createSolanaRpc } from '@solana/kit';
 import { fetchToken } from '@solana-program/token';
@@ -37,6 +38,7 @@ test('holder rejects, isolates tabs, restores after closing a tab, and exercises
   // The wallet can reject; the contract stays funded and no transaction is sent.
   page.once('dialog', (dialog) => dialog.dismiss());
   await activate.click();
+  await confirmReview(page);
   await expect(page.getByRole('alert')).toContainText('Signature rejected');
   expect(submissions).toBe(0);
   expect((await fetchAgreement(rpc, accounts.agreement)).data.status).toBe(AgreementStatus.Funded);
@@ -55,6 +57,7 @@ test('holder rejects, isolates tabs, restores after closing a tab, and exercises
     });
   }, `volaryn:pending:${config.genesisHash}:${config.programId}:${config.holder}`);
   await activate.click();
+  await confirmReview(page);
   await expect(page.getByRole('alert')).toContainText('Another tab is handling this wallet');
   expect(submissions).toBe(0);
   await otherTab.evaluate(() =>
@@ -98,6 +101,7 @@ test('holder rejects, isolates tabs, restores after closing a tab, and exercises
   );
   page.once('dialog', (dialog) => dialog.accept());
   await activate.click();
+  await confirmReview(page);
   await submitted;
   const agreementUrl = page.url();
   await page.close();
@@ -127,6 +131,7 @@ test('holder rejects, isolates tabs, restores after closing a tab, and exercises
 
   page.once('dialog', (dialog) => dialog.accept());
   await exercise.click();
+  await confirmReview(page);
   await expect(page.getByText('SETTLEMENT COMPLETE', { exact: true })).toBeVisible();
   await expect(page.getByRole('status', { name: 'Transaction status' })).toContainText(
     'Transaction finalized',

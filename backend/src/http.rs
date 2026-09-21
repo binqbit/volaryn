@@ -2,7 +2,7 @@ use crate::{
     adapters::rpc::BODY_LIMIT,
     application::Application,
     domain::AppError,
-    observations::{AgreementView, AssetView, Deployment, PositionView},
+    observations::{AgreementView, AssetView, Deployment, WalletView},
     queries::AgreementQuery,
 };
 use axum::{
@@ -64,7 +64,7 @@ fn api() -> OpenApiRouter<Arc<Application>> {
     OpenApiRouter::with_openapi(Api::openapi())
         .routes(routes!(config))
         .routes(routes!(assets))
-        .routes(routes!(positions))
+        .routes(routes!(wallet))
         .routes(routes!(offers))
         .routes(routes!(agreements))
         .routes(routes!(agreement))
@@ -102,7 +102,7 @@ pub fn router(application: Arc<Application>, frontend: PathBuf) -> Router {
 
 async fn serve_frontend(uri: Uri, directory: PathBuf) -> Response {
     let path = uri.path();
-    if path == "/" || path == "/positions" || path.starts_with("/agreements/") {
+    if matches!(path, "/" | "/writer" | "/protection") || path.starts_with("/agreements/") {
         match tokio::fs::read(directory.join("index.html")).await {
             Ok(bytes) => (
                 [
@@ -173,16 +173,14 @@ struct OwnerQuery {
     owner: String,
 }
 
-#[utoipa::path(get, path = "/api/positions", params(("owner" = String, Query)), responses((status = 200, body = [PositionView])))]
-async fn positions(
+#[utoipa::path(get, path = "/api/wallet", params(("owner" = String, Query)), responses((status = 200, body = WalletView)))]
+async fn wallet(
     State(app): State<Arc<Application>>,
     query: Result<Query<OwnerQuery>, axum::extract::rejection::QueryRejection>,
-) -> Result<Json<Vec<PositionView>>, AppError> {
+) -> Result<Json<WalletView>, AppError> {
     app.ensure_chain().await?;
     let Query(query) = query.map_err(|_| AppError::Invalid)?;
-    Ok(Json(
-        app.chain.positions(&app.deployment, &query.owner).await?,
-    ))
+    Ok(Json(app.chain.wallet(&app.deployment, &query.owner).await?))
 }
 
 #[utoipa::path(get, path = "/api/offers", params(AgreementQuery), responses((status = 200, body = [AgreementView], headers(("X-Next-Cursor" = String, description = "Exclusive address cursor for the next page; absent on the last page")))))]
@@ -241,6 +239,8 @@ async fn proxy(State(app): State<Arc<Application>>, body: Bytes) -> Result<Respo
         "getLatestBlockhash",
         "getAccountInfo",
         "getMultipleAccounts",
+        "getTokenAccountsByOwner",
+        "getMinimumBalanceForRentExemption",
         "getSignatureStatuses",
         "getBlockHeight",
         "getSlot",

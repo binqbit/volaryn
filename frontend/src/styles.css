@@ -80,7 +80,9 @@ a:hover {
 }
 button:focus-visible,
 a:focus-visible,
-summary:focus-visible {
+summary:focus-visible,
+input:focus-visible,
+select:focus-visible {
   outline: 3px solid var(--color-accent);
   outline-offset: 4px;
 }

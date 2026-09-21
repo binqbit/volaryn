@@ -51,23 +51,29 @@ pub struct AgreementView {
 
 #[derive(Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct PositionView {
-    pub owner: String,
-    pub mint: String,
-    pub token_account: String,
-    pub amount_raw: String,
-    pub usdc_token_account: String,
-    pub usdc_amount_raw: String,
-    pub decimals: u8,
-    pub finalized_slot: String,
-}
-
-#[derive(Debug, Serialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
 pub struct AssetView {
     pub mint: String,
     pub symbol: String,
     pub name: String,
     pub decimals: u8,
     pub provenance: String,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct WalletTokenAccount {
+    pub address: String,
+    pub mint: String,
+    pub token_program: String,
+    pub amount_raw: String,
+    pub frozen: bool,
+    pub decimals: u8,
+    pub finalized_slot: String,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct WalletView {
+    pub owner: String,
+    pub accounts: Vec<WalletTokenAccount>,
 }

@@ -1,7 +1,7 @@
 use super::rpc::Transport;
 use crate::{
     domain::{now, AppError},
-    observations::{AgreementView, Deployment, PositionView},
+    observations::{AgreementView, Deployment, WalletTokenAccount, WalletView},
 };
 use anchor_lang::{prelude::Pubkey, AccountDeserialize, Discriminator};
 use anchor_spl::token_2022::spl_token_2022::{
@@ -219,50 +219,48 @@ impl Chain {
         Ok((slot, views))
     }
 
-    pub async fn positions(
+    /// Preserve individual sources: combined balances cannot authorize a one-account transfer.
+    pub async fn wallet(
         &self,
         deployment: &Deployment,
         owner: &str,
-    ) -> Result<Vec<PositionView>, AppError> {
+    ) -> Result<WalletView, AppError> {
         Pubkey::from_str(owner).map_err(|_| AppError::Invalid)?;
-        let result = self.request(RpcRequest::GetTokenAccountsByOwner, json!([owner, {"mint":deployment.underlying_mint}, {"encoding":"base64", "commitment":"finalized"}])).await?;
-        let usdc = self.request(RpcRequest::GetTokenAccountsByOwner, json!([owner, {"mint":deployment.usdc_mint}, {"encoding":"base64", "commitment":"finalized"}])).await?;
-        let usdc_accounts = usdc["value"].as_array().ok_or(AppError::Chain)?;
-        let mut funding = (String::new(), 0);
-        for account in usdc_accounts {
-            let amount = token_amount(
-                &account["account"],
-                &deployment.usdc_mint,
-                owner,
-                &anchor_spl::token::ID.to_string(),
-            )?;
-            if funding.0.is_empty() || amount > funding.1 {
-                funding = (
-                    account["pubkey"].as_str().ok_or(AppError::Chain)?.into(),
-                    amount,
-                );
+        let mut accounts = Vec::new();
+        for (mint, program) in [
+            (&deployment.underlying_mint, anchor_spl::token_2022::ID),
+            (&deployment.usdc_mint, anchor_spl::token::ID),
+        ] {
+            let result = self
+                .request(
+                    RpcRequest::GetTokenAccountsByOwner,
+                    json!([owner, {"mint":mint}, {"encoding":"base64", "commitment":"finalized"}]),
+                )
+                .await?;
+            let slot = result["context"]["slot"].as_u64().ok_or(AppError::Chain)?;
+            for entry in result["value"].as_array().ok_or(AppError::Chain)? {
+                let address = entry["pubkey"].as_str().ok_or(AppError::Chain)?;
+                Pubkey::from_str(address).map_err(|_| AppError::Chain)?;
+                let amount = token_amount(&entry["account"], mint, owner, &program.to_string())?;
+                let bytes = data(&entry["account"])?;
+                let token = StateWithExtensions::<TokenAccount>::unpack(&bytes)
+                    .map_err(|_| AppError::Chain)?;
+                accounts.push(WalletTokenAccount {
+                    address: address.into(),
+                    mint: mint.clone(),
+                    token_program: program.to_string(),
+                    amount_raw: amount.to_string(),
+                    frozen: token.base.state
+                        == anchor_spl::token_2022::spl_token_2022::state::AccountState::Frozen,
+                    decimals: 6,
+                    finalized_slot: slot.to_string(),
+                });
             }
         }
-        let slot = result["context"]["slot"].as_u64().ok_or(AppError::Chain)?;
-        let mut positions = Vec::new();
-        for account in result["value"].as_array().ok_or(AppError::Chain)? {
-            positions.push(PositionView {
-                owner: owner.into(),
-                mint: deployment.underlying_mint.clone(),
-                token_account: account["pubkey"].as_str().ok_or(AppError::Chain)?.into(),
-                amount_raw: token_amount(
-                    &account["account"],
-                    &deployment.underlying_mint,
-                    owner,
-                    &anchor_spl::token_2022::ID.to_string(),
-                )?
-                .to_string(),
-                usdc_token_account: funding.0.clone(),
-                usdc_amount_raw: funding.1.to_string(),
-                decimals: 6,
-                finalized_slot: slot.to_string(),
-            });
-        }
-        Ok(positions)
+        accounts.sort_by(|a, b| a.address.cmp(&b.address));
+        Ok(WalletView {
+            owner: owner.into(),
+            accounts,
+        })
     }
 }

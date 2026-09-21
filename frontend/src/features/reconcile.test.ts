@@ -13,6 +13,8 @@ import {
   protocolAddresses,
   VOLARYN_PROGRAM_ADDRESS,
 } from '@volaryn/protocol';
+import type { Operation } from '../lib/chain/actionTypes';
+import type { PendingTransaction } from './pending';
 import { observeAction } from './reconcile';
 
 const owner = address('11111111111111111111111111111111');
@@ -25,10 +27,10 @@ async function fixture({
   program = VOLARYN_PROGRAM_ADDRESS as Address,
   history = null as unknown,
   height = 101,
-  operation = 'activate' as 'activate' | 'exercise',
+  operation = 'activate' as Operation,
 } = {}) {
   const accounts = await protocolAddresses(owner, owner, 1n);
-  const pending = {
+  const pending: PendingTransaction = {
     signature: '1'.repeat(64),
     lastValidBlockHeight: '100',
     owner,
@@ -142,5 +144,34 @@ describe('expired action reconciliation', () => {
         'Agreement identity is unsupported',
       );
     }
+  });
+});
+
+describe('writer action reconciliation', () => {
+  it.each([
+    { operation: 'cancel' as const, status: AgreementStatus.Cancelled, expected: 'reconciled' },
+    { operation: 'cancel' as const, status: AgreementStatus.Active, expected: 'expired' },
+    { operation: 'reclaim' as const, status: AgreementStatus.Expired, expected: 'reconciled' },
+    { operation: 'reclaim' as const, status: AgreementStatus.Active, expected: 'expired' },
+    { operation: 'cleanup' as const, status: AgreementStatus.Exercised, expected: 'unresolved' },
+  ])('checks $operation against terminal chain state $status', async ({ expected, ...options }) => {
+    const { rpc, pending } = await fixture(options);
+    expect(await observeAction(rpc, pending)).toBe(expected);
+  });
+  it('reconciles creation only when immutable terms match the saved request', async () => {
+    const { rpc, pending } = await fixture({ operation: 'create' });
+    expect(await observeAction(rpc, pending)).toBe('unresolved');
+    pending.createdTerms = {
+      nonce: '1',
+      quantityRaw: '10',
+      payout: '20',
+      premium: '1',
+      acceptBefore: '1000',
+      expiresAt: '2000',
+      designatedHolder: null,
+    };
+    expect(await observeAction(rpc, pending)).toBe('reconciled');
+    pending.createdTerms.payout = '21';
+    expect(await observeAction(rpc, pending)).toBe('unresolved');
   });
 });

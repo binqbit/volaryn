@@ -18,17 +18,31 @@ import recipe from '../../../tests/fixtures/recipe.json' with { type: 'json' };
 export async function registerDemoWallet(deployment: Deployment) {
   if (deployment.mode !== 'localnet' || deployment.fixtureVersion !== recipe.version)
     throw new Error('Demo wallet requires the local fixture deployment');
-  const signer = await createKeyPairSignerFromPrivateKeyBytes(
-    new Uint8Array(32).fill(recipe.seeds.holder),
-  );
-  if (signer.address !== deployment.holder)
-    throw new Error('Demo identity does not match the ledger');
+  await Promise.all([
+    registerParticipant(
+      deployment.holder,
+      recipe.seeds.holder,
+      'Local test wallet',
+      'Local test holder',
+    ),
+    registerParticipant(
+      deployment.writer,
+      recipe.seeds.writer,
+      'Local test writer',
+      'Local test writer',
+    ),
+  ]);
+}
+
+async function registerParticipant(expected: string, seed: number, name: string, label: string) {
+  const signer = await createKeyPairSignerFromPrivateKeyBytes(new Uint8Array(32).fill(seed));
+  if (signer.address !== expected) throw new Error('Demo identity does not match the ledger');
   const account: WalletAccount = {
     address: signer.address,
     publicKey: new Uint8Array(getAddressEncoder().encode(signer.address)),
     chains: ['solana:localnet'],
     features: ['solana:signTransaction'],
-    label: 'Local test holder',
+    label,
   };
   let accounts: readonly WalletAccount[] = [];
   const listeners = new Set<StandardEventsListeners['change']>();
@@ -61,7 +75,7 @@ export async function registerDemoWallet(deployment: Deployment) {
   };
   const wallet: Wallet = {
     version: '1.0.0',
-    name: 'Local test wallet',
+    name,
     icon: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAzMiAzMiI+PHJlY3Qgd2lkdGg9IjMyIiBoZWlnaHQ9IjMyIiByeD0iOCIgZmlsbD0iIzFiNmQ1YSIvPjxwYXRoIGQ9Ik04IDEwbDggMTIgOC0xMiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIzIi8+PC9zdmc+',
     chains: ['solana:localnet'],
     get accounts() {

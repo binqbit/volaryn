@@ -84,14 +84,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/positions": {
+    "/api/wallet": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["positions"];
+        get: operations["wallet"];
         put?: never;
         post?: never;
         delete?: never;
@@ -161,16 +161,19 @@ export interface components {
             code: string;
             message: string;
         };
-        PositionView: {
+        WalletTokenAccount: {
+            address: string;
             amountRaw: string;
             /** Format: int32 */
             decimals: number;
             finalizedSlot: string;
+            frozen: boolean;
             mint: string;
+            tokenProgram: string;
+        };
+        WalletView: {
+            accounts: components["schemas"]["WalletTokenAccount"][];
             owner: string;
-            tokenAccount: string;
-            usdcAmountRaw: string;
-            usdcTokenAccount: string;
         };
     };
     responses: never;
@@ -192,6 +195,12 @@ export interface operations {
                 writer?: string;
                 mint?: string;
                 status?: string;
+                /** @description Exact underlying quantity in base units; offers are never resized. */
+                quantity_raw?: string;
+                min_payout?: string;
+                max_premium?: string;
+                /** @description Include unrestricted offers and offers reserved for this holder. */
+                eligible_holder?: string;
             };
             header?: never;
             path?: never;
@@ -281,6 +290,12 @@ export interface operations {
                 writer?: string;
                 mint?: string;
                 status?: string;
+                /** @description Exact underlying quantity in base units; offers are never resized. */
+                quantity_raw?: string;
+                min_payout?: string;
+                max_premium?: string;
+                /** @description Include unrestricted offers and offers reserved for this holder. */
+                eligible_holder?: string;
             };
             header?: never;
             path?: never;
@@ -300,7 +315,7 @@ export interface operations {
             };
         };
     };
-    positions: {
+    wallet: {
         parameters: {
             query: {
                 owner: string;
@@ -316,7 +331,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["PositionView"][];
+                    "application/json": components["schemas"]["WalletView"];
                 };
             };
         };

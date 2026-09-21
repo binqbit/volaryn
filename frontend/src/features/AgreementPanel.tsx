@@ -1,76 +1,95 @@
+import { useState } from 'react';
 import { Link } from 'react-router';
-import { formatUnits, shortAddress, type Agreement, type Position } from '../lib/api/client';
+import { formatUnits, shortAddress, type Agreement, type Wallet } from '../lib/api/client';
+import type { ActionRequest, Operation } from '../lib/chain/actionTypes';
+import { AccountSelect, chooseAccount } from './AccountSelect';
+import { date } from './ActionReview';
 import styles from '../App.module.css';
-
-const date = (seconds: string) =>
-  new Intl.DateTimeFormat('en', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZoneName: 'short',
-    timeZone: 'UTC',
-  }).format(new Date(Number(seconds) * 1000));
 
 export function AgreementPanel({
   agreement,
   owner,
-  position,
+  wallet,
   usable,
-  onAction,
+  now,
+  onReview,
 }: {
-  agreement: Agreement | undefined;
+  agreement: Agreement;
   owner: string | undefined;
-  position: Position | undefined;
+  wallet: Wallet | undefined;
   usable: boolean;
-  onAction: (
-    agreement: Agreement,
-    position: Position,
-    operation: 'activate' | 'exercise',
-  ) => Promise<void>;
+  now: bigint | undefined;
+  onReview: (request: ActionRequest) => Promise<void>;
 }) {
-  if (!agreement) return null;
+  const [usdcSelection, setUsdcSelection] = useState('');
+  const [assetSelection, setAssetSelection] = useState('');
+  const usdcAccounts =
+    wallet?.accounts.filter((account) => account.mint === agreement.usdcMint) ?? [];
+  const assets =
+    wallet?.accounts.filter((account) => account.mint === agreement.underlyingMint) ?? [];
+  const usdc = chooseAccount(usdcAccounts, usdcSelection);
+  const asset = chooseAccount(assets, assetSelection);
   const active = agreement.status === 'active';
   const completed = agreement.status === 'exercised';
   const funded = agreement.status === 'funded';
   const isHolder = !!owner && agreement.holder === owner;
-  const reservedForAnother =
-    !!owner && !!agreement.designatedHolder && agreement.designatedHolder !== owner;
-  const canAct = !!owner && (active ? isHolder : funded && !reservedForAnother);
+  const isWriter = !!owner && agreement.writer === owner;
+  const reservedForAnother = !!agreement.designatedHolder && agreement.designatedHolder !== owner;
+  const expired = now !== undefined && now >= BigInt(agreement.expiresAt);
+  const acceptanceEnded = now !== undefined && now >= BigInt(agreement.acceptBefore);
+  const terminal = !active && !funded;
+  const holderAction = (funded && !reservedForAnother) || (active && isHolder);
+  const writerAction = isWriter && (funded || (active && expired) || terminal);
+  const eligible = !!owner && now !== undefined && !!usdc && usable;
+  const deliverable =
+    !!asset && BigInt(asset.amountRaw) >= BigInt(agreement.quantityRaw) && !asset.frozen;
+  const review = (operation: Exclude<Operation, 'create'>) => {
+    if (usdc)
+      void onReview({
+        operation,
+        agreement,
+        usdcAccount: usdc.address,
+        underlyingAccount: asset?.address,
+      });
+  };
   return (
-    <>
+    <article className={styles.agreement} aria-label={`Agreement ${agreement.address}`}>
       <div className={styles.cardHeading}>
         <p className={styles.eyebrow}>
           {completed
             ? 'SETTLEMENT COMPLETE'
             : active
               ? isHolder
-                ? 'YOUR ACTIVE PROTECTION'
+                ? 'YOUR PROTECTION'
                 : 'ACTIVE AGREEMENT'
               : funded
                 ? 'FUNDED PROTECTION OFFER'
                 : 'CLOSED AGREEMENT'}
         </p>
         <span className={styles.status}>
-          {completed
-            ? 'Exercised'
-            : active
-              ? 'Active'
-              : agreement.status === 'funded'
-                ? 'Fully funded'
-                : agreement.status}
+          {active && expired
+            ? 'Expired · awaiting reclaim'
+            : funded && acceptanceEnded
+              ? 'Acceptance ended'
+              : completed
+                ? 'Exercised'
+                : active
+                  ? 'Active'
+                  : funded
+                    ? 'Fully funded'
+                    : agreement.status}
         </span>
       </div>
       <p className={styles.note}>
         {funded
-          ? 'A writer has reserved the payout. This offer becomes your protection only after you activate it and pay the premium.'
-          : active && !isHolder
-            ? owner
-              ? 'This agreement belongs to another wallet. Only its holder can exercise it.'
-              : 'Only the holder can exercise this agreement. Connect a wallet to check whether it is yours.'
-            : active
+          ? 'A writer has reserved the payout. Protection begins only after activation and payment of the premium.'
+          : active && expired
+            ? 'The exercise window has ended. The writer can now reclaim the reserve.'
+            : active && isHolder
               ? 'Your connected wallet is the holder of this agreement.'
-              : 'This agreement is closed; no protection can be activated or exercised.'}
+              : active
+                ? 'Only the holder can exercise this agreement. The writer cannot withdraw an active reserve before expiry.'
+                : 'This agreement is closed and remains a public record of its terms and outcome.'}
       </p>
       <div className={styles.payout}>
         <span>Agreed payout</span>
@@ -78,14 +97,17 @@ export function AgreementPanel({
           {formatUnits(agreement.payout)} <small>USDC</small>
         </strong>
         <p>
-          For delivery of {formatUnits(agreement.quantityRaw)} raw-token unit (
+          For delivery of {formatUnits(agreement.quantityRaw)} raw-token units (
           {agreement.quantityRaw} base units).
         </p>
       </div>
       <dl className={styles.terms}>
         <div>
           <dt>Writer</dt>
-          <dd title={agreement.writer}>{shortAddress(agreement.writer)}</dd>
+          <dd title={agreement.writer}>
+            {isWriter ? 'Your wallet · ' : ''}
+            {shortAddress(agreement.writer)}
+          </dd>
         </div>
         <div>
           <dt>{funded ? 'Eligible holder' : 'Holder'}</dt>
@@ -93,7 +115,7 @@ export function AgreementPanel({
             {agreement.holder
               ? `${isHolder ? 'Your wallet · ' : ''}${shortAddress(agreement.holder)}`
               : agreement.designatedHolder
-                ? `${owner === agreement.designatedHolder ? 'Your wallet · ' : ''}${shortAddress(agreement.designatedHolder)}`
+                ? shortAddress(agreement.designatedHolder)
                 : funded
                   ? 'Any eligible wallet'
                   : 'Not activated'}
@@ -122,34 +144,79 @@ export function AgreementPanel({
           </div>
         )}
       </dl>
-      <div className={styles.explanation}>
-        <span>↳</span>
-        <p>
-          {completed
-            ? 'The asset was delivered and the reserved payout was transferred atomically. The writer controls the delivered token account.'
-            : active
-              ? 'The holder chooses whether to exercise and deliver the full quantity before expiry. No additional writer signature is required.'
-              : funded
-                ? 'After activation, the underlying stays in the holder’s wallet, and the writer cannot reclaim the reserve while protection is active.'
-                : 'The agreement remains available as a public record of its terms and outcome.'}
+      {completed && (
+        <p className={styles.note}>
+          The asset was delivered and the payout transferred atomically. The writer controls the
+          delivered token account: <code>{agreement.settlement}</code>
         </p>
-      </div>
-      <p className={styles.note}>
-        Issuer transfer fees reduce the writer's net receipt, not the holder's USDC payout.
-        Transfers can still be restricted by the issuer. Premium and network fees are separate
-        costs.
-      </p>
-      {(funded || (active && isHolder)) && (
+      )}
+      {(holderAction || writerAction) && owner && (
+        <div className={styles.formGrid}>
+          <AccountSelect
+            label="USDC account"
+            accounts={usdcAccounts}
+            selected={usdcSelection}
+            onChange={setUsdcSelection}
+          />
+          {active && isHolder && !expired && (
+            <AccountSelect
+              label="Delivery token account"
+              accounts={assets}
+              selected={assetSelection}
+              onChange={setAssetSelection}
+            />
+          )}
+        </div>
+      )}
+      {holderAction && (
         <button
           className={styles.primaryButton}
-          disabled={!usable || !canAct}
-          onClick={() => {
-            if (position && canAct)
-              void onAction(agreement, position, active ? 'exercise' : 'activate');
-          }}
+          disabled={
+            !eligible ||
+            (active
+              ? expired || !deliverable
+              : acceptanceEnded || BigInt(usdc?.amountRaw ?? '0') < BigInt(agreement.premium))
+          }
+          onClick={() => review(active ? 'exercise' : 'activate')}
         >
           {active ? 'Exercise protection' : 'Activate protection'}
           <span>↗</span>
+        </button>
+      )}
+      {active && isHolder && !expired && !deliverable && (
+        <p className={styles.note}>
+          The selected account must contain the full gross delivery quantity. Balances in other
+          accounts are not combined.
+        </p>
+      )}
+      {funded && reservedForAnother && owner && (
+        <p className={styles.connectHint}>This offer is reserved for another wallet.</p>
+      )}
+      {isWriter && funded && (
+        <button
+          className={styles.outlineButton}
+          disabled={!eligible}
+          onClick={() => review('cancel')}
+        >
+          Cancel offer
+        </button>
+      )}
+      {isWriter && active && (
+        <button
+          className={styles.outlineButton}
+          disabled={!eligible || !expired}
+          onClick={() => review('reclaim')}
+        >
+          Reclaim expired reserve
+        </button>
+      )}
+      {isWriter && terminal && (
+        <button
+          className={styles.outlineButton}
+          disabled={!eligible}
+          onClick={() => review('cleanup')}
+        >
+          Recover residual funds
         </button>
       )}
       {!owner && (funded || active) && (
@@ -158,12 +225,18 @@ export function AgreementPanel({
           automatically.
         </p>
       )}
-      {funded && reservedForAnother && (
-        <p className={styles.connectHint}>This offer is reserved for another wallet.</p>
+      {now === undefined && !terminal && (
+        <p className={styles.note}>
+          Waiting for the network clock. Actions are paused until deadlines can be checked.
+        </p>
       )}
+      <p className={styles.note}>
+        Issuer transfer fees reduce the writer's net receipt, not the holder's USDC payout. Issuer
+        restrictions can prevent delivery. The premium is not refunded when protection expires.
+      </p>
       <Link className={styles.agreementLink} to={`/agreements/${agreement.address}`}>
         Agreement {shortAddress(agreement.address)} ↗
       </Link>
-    </>
+    </article>
   );
 }

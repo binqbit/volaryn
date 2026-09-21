@@ -146,6 +146,28 @@ pub async fn agreements(
             .push_bind(crate::domain::now())
             .push(" AND (projection ->> 'reserveAmount')::NUMERIC >= (projection ->> 'payout')::NUMERIC");
     }
+    for (expression, value) in [
+        (
+            " AND (projection ->> 'quantityRaw')::NUMERIC = ",
+            &query.quantity_raw,
+        ),
+        (
+            " AND (projection ->> 'payout')::NUMERIC >= ",
+            &query.min_payout,
+        ),
+        (
+            " AND (projection ->> 'premium')::NUMERIC <= ",
+            &query.max_premium,
+        ),
+    ] {
+        if let Some(value) = value {
+            sql.push(expression).push_bind(value).push("::NUMERIC");
+        }
+    }
+    if let Some(holder) = &query.eligible_holder {
+        sql.push(" AND (projection ->> 'designatedHolder' IS NULL OR projection ->> 'designatedHolder' = ")
+            .push_bind(holder).push(")");
+    }
     sql.push(" ORDER BY address LIMIT ").push_bind(limit + 1);
     let rows: Vec<(Json<AgreementView>,)> = sql.build_query_as().fetch_all(pool).await?;
     let mut items: Vec<_> = rows.into_iter().map(|(Json(value),)| value).collect();

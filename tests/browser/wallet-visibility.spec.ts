@@ -10,7 +10,7 @@ test('holdings load only after connection and disappear on disconnect or reload'
   let submissions = 0;
   page.on('request', (request) => {
     const url = new URL(request.url());
-    if (url.pathname === '/api/positions') owners.push(url.searchParams.get('owner') ?? '');
+    if (url.pathname === '/api/wallet') owners.push(url.searchParams.get('owner') ?? '');
     if (url.pathname === '/rpc' && request.postDataJSON()?.method === 'sendTransaction')
       submissions++;
   });
@@ -76,18 +76,18 @@ test('public agreement ownership and reserved offers never imply personal protec
   );
   await page.goto('/');
   await expect(page.getByText('ACTIVE AGREEMENT', { exact: true })).toBeVisible();
-  await expect(page.getByText('YOUR ACTIVE PROTECTION', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('YOUR PROTECTION', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Exercise protection' })).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Connect Local test wallet' }).click();
   await expect(
-    page.getByText('This agreement belongs to another wallet.', { exact: false }),
+    page.getByText('Only the holder can exercise this agreement.', { exact: false }),
   ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Exercise protection' })).toHaveCount(0);
 
   agreement = { ...agreement, holder: config.holder };
   await page.getByRole('link', { name: /Agreement .* ↗/ }).click();
-  await expect(page.getByText('YOUR ACTIVE PROTECTION', { exact: true })).toBeVisible();
+  await expect(page.getByText('YOUR PROTECTION', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Exercise protection' })).toBeEnabled();
 
   agreement = { ...agreement, status: 'funded', holder: null, designatedHolder: config.writer };
@@ -95,7 +95,7 @@ test('public agreement ownership and reserved offers never imply personal protec
   await expect(
     page.getByText('This offer is reserved for another wallet.', { exact: true }),
   ).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Activate protection' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Activate protection' })).toHaveCount(0);
 });
 
 test('wallet loading, empty and unavailable states do not invent holdings', async ({ page }) => {
@@ -104,10 +104,14 @@ test('wallet loading, empty and unavailable states do not invent holdings', asyn
     release = resolve;
   });
   let unavailable = false;
-  await page.route('**/api/positions?**', async (route) => {
+  await page.route('**/api/wallet?**', async (route) => {
     await pending;
     await route.fulfill(
-      unavailable ? { status: 503, json: { error: 'unavailable' } } : { json: [] },
+      unavailable
+        ? { status: 503, json: { error: 'unavailable' } }
+        : {
+            json: { owner: new URL(route.request().url()).searchParams.get('owner'), accounts: [] },
+          },
     );
   });
   await page.goto('/');
@@ -120,7 +124,103 @@ test('wallet loading, empty and unavailable states do not invent holdings', asyn
 
   unavailable = true;
   await page.getByRole('link', { name: /Agreement .* ↗/ }).click();
-  await expect(wallet).toContainText('Wallet data is unavailable.');
-  await expect(wallet).not.toContainText('No supported token accounts were found');
-  await expect(wallet.getByText('Available test USDC', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('alert')).toContainText('Chain data is unavailable.');
+  await expect(wallet).toContainText('Unavailable · last known');
+});
+
+test('split and frozen accounts never authorize delivery from a combined balance', async ({
+  page,
+  request,
+}) => {
+  const config = (await (await request.get('/api/config')).json()) as Deployment;
+  const [original] = (await (await request.get('/api/agreements')).json()) as Agreement[];
+  if (!original) throw new Error('Missing agreement');
+  const agreement = {
+    ...original,
+    status: 'active',
+    holder: config.holder,
+    quantityRaw: '1000000',
+    expiresAt: '4102444800',
+  };
+  await page.route('**/api/agreements**', (route) => route.fulfill({ json: [agreement] }));
+  await page.route('**/api/wallet?**', (route) =>
+    route.fulfill({
+      json: {
+        owner: config.holder,
+        accounts: [
+          {
+            address: config.holderUsdc,
+            mint: config.usdcMint,
+            tokenProgram: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+            amountRaw: '1000000',
+            frozen: false,
+            decimals: 6,
+            finalizedSlot: '100',
+          },
+          {
+            address: config.holderUnderlying,
+            mint: config.underlyingMint,
+            tokenProgram: 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',
+            amountRaw: '600000',
+            frozen: false,
+            decimals: 6,
+            finalizedSlot: '100',
+          },
+          {
+            address: config.writer,
+            mint: config.underlyingMint,
+            tokenProgram: 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',
+            amountRaw: '600000',
+            frozen: false,
+            decimals: 6,
+            finalizedSlot: '100',
+          },
+          {
+            address: config.authority,
+            mint: config.underlyingMint,
+            tokenProgram: 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',
+            amountRaw: '2000000',
+            frozen: true,
+            decimals: 6,
+            finalizedSlot: '100',
+          },
+        ],
+      },
+    }),
+  );
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Connect Local test wallet' }).click();
+  await expect(page.getByRole('region', { name: 'Your wallet' })).toContainText('3.2');
+  await expect(page.getByRole('button', { name: 'Exercise protection' })).toBeDisabled();
+  await expect(
+    page.getByLabel('Delivery token account').getByRole('option', { name: /frozen/ }),
+  ).toHaveJSProperty('disabled', true);
+  await expect(
+    page.getByText('The selected account must contain the full gross delivery quantity.', {
+      exact: false,
+    }),
+  ).toBeVisible();
+});
+
+test('returning to protection shows the same criteria used by the offer query', async ({
+  page,
+}) => {
+  await page.goto('/protection');
+  await page.getByLabel('Exact quantity (raw-token units)').fill('0.2');
+  await page.getByLabel('Minimum payout (USDC)').fill('5');
+  await page.getByLabel('Maximum premium (USDC)').fill('0.1');
+  const query = page.waitForRequest(
+    (request) =>
+      request.url().includes('/api/offers?') &&
+      new URL(request.url()).searchParams.get('quantity_raw') === '200000',
+  );
+  await page.getByRole('button', { name: 'Find matching offers' }).click();
+  const url = new URL((await query).url());
+  expect(url.searchParams.get('min_payout')).toBe('5000000');
+  expect(url.searchParams.get('max_premium')).toBe('100000');
+  await page.getByRole('link', { name: 'Writer', exact: true }).click();
+  await page.getByRole('link', { name: 'Protection', exact: true }).click();
+  await expect(page.getByLabel('Exact quantity (raw-token units)')).toHaveValue('0.2');
+  await expect(page.getByLabel('Minimum payout (USDC)')).toHaveValue('5');
+  await expect(page.getByLabel('Maximum premium (USDC)')).toHaveValue('0.1');
 });

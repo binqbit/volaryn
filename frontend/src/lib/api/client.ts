@@ -9,7 +9,8 @@ export const api = createClient<paths>({
 });
 export type Deployment = components['schemas']['Deployment'];
 export type Agreement = components['schemas']['AgreementView'];
-export type Position = components['schemas']['PositionView'];
+export type Wallet = components['schemas']['WalletView'];
+export type TokenAccount = components['schemas']['WalletTokenAccount'];
 
 export function validateDeployment(value: Deployment): Deployment {
   if (
@@ -43,7 +44,8 @@ export function amount(value: string): bigint {
 }
 
 export function formatUnits(raw: string, decimals = 6): string {
-  const value = amount(raw);
+  if (!/^(0|[1-9][0-9]*)$/.test(raw)) throw new Error('Invalid display amount');
+  const value = BigInt(raw);
   const base = 10n ** BigInt(decimals);
   const fraction = (value % base).toString().padStart(decimals, '0').replace(/0+$/, '');
   return `${value / base}${fraction ? `.${fraction}` : ''}`;
@@ -51,4 +53,18 @@ export function formatUnits(raw: string, decimals = 6): string {
 
 export function shortAddress(value: string): string {
   return `${value.slice(0, 5)}…${value.slice(-5)}`;
+}
+
+/** Decimal user input is never routed through a floating-point number. */
+export function parseUnits(value: string, decimals = 6): bigint {
+  if (!/^(0|[1-9][0-9]*)(\.[0-9]+)?$/.test(value))
+    throw new Error('Enter a positive decimal amount');
+  const [whole, fraction = ''] = value.split('.');
+  if (fraction.length > decimals) throw new Error(`Use at most ${decimals} decimal places`);
+  return amount(
+    (
+      BigInt(whole!) * 10n ** BigInt(decimals) +
+      BigInt(fraction.padEnd(decimals, '0') || '0')
+    ).toString(),
+  );
 }

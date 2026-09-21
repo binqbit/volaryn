@@ -1,12 +1,14 @@
 import { address, signature } from '@solana/kit';
 import { amount } from '../lib/api/client';
+import { operations, type OfferTerms, type Operation } from '../lib/chain/actionTypes';
 
 export interface PendingTransaction {
   signature: string;
   lastValidBlockHeight: string;
   owner: string;
   agreement: string;
-  operation: 'activate' | 'exercise';
+  operation: Operation;
+  createdTerms?: OfferTerms;
 }
 
 export function parsePending(raw: string): PendingTransaction {
@@ -23,7 +25,7 @@ export function parsePending(raw: string): PendingTransaction {
     !('agreement' in value) ||
     typeof value.agreement !== 'string' ||
     !('operation' in value) ||
-    (value.operation !== 'activate' && value.operation !== 'exercise')
+    !operations.includes(value.operation as Operation)
   ) {
     throw new Error('Saved transaction state is invalid');
   }
@@ -31,11 +33,45 @@ export function parsePending(raw: string): PendingTransaction {
   address(value.owner);
   address(value.agreement);
   amount(value.lastValidBlockHeight);
+  let createdTerms: OfferTerms | undefined;
+  if (value.operation === 'create') {
+    const terms = 'createdTerms' in value ? value.createdTerms : null;
+    if (!terms || typeof terms !== 'object') throw new Error('Missing saved offer terms');
+    for (const key of [
+      'nonce',
+      'quantityRaw',
+      'payout',
+      'premium',
+      'acceptBefore',
+      'expiresAt',
+    ] as const) {
+      if (!(key in terms) || typeof (terms as Record<string, unknown>)[key] !== 'string')
+        throw new Error('Invalid saved offer terms');
+      amount((terms as Record<string, string>)[key]!);
+    }
+    if (
+      !('designatedHolder' in terms) ||
+      (terms.designatedHolder !== null && typeof terms.designatedHolder !== 'string')
+    )
+      throw new Error('Invalid designated holder');
+    if (terms.designatedHolder) address(terms.designatedHolder);
+    const checked = terms as OfferTerms;
+    createdTerms = {
+      nonce: checked.nonce,
+      quantityRaw: checked.quantityRaw,
+      payout: checked.payout,
+      premium: checked.premium,
+      acceptBefore: checked.acceptBefore,
+      expiresAt: checked.expiresAt,
+      designatedHolder: checked.designatedHolder,
+    };
+  }
   return {
     signature: value.signature,
     lastValidBlockHeight: value.lastValidBlockHeight,
     owner: value.owner,
     agreement: value.agreement,
-    operation: value.operation,
+    operation: value.operation as Operation,
+    ...(createdTerms ? { createdTerms } : {}),
   };
 }

@@ -2,59 +2,89 @@ import { useCallback, useEffect } from 'react';
 import { useRequest } from '@solana/react';
 import { api, amount, type Deployment } from '../lib/api/client';
 
+export interface PortfolioQuery {
+  mode: 'all' | 'offers' | 'writer' | 'holder';
+  quantityRaw?: string;
+  minPayout?: string;
+  maxPremium?: string;
+}
+
 export function usePortfolio(
   deployment: Deployment,
   owner: string | undefined,
   selected?: string,
   after?: string,
+  query: PortfolioQuery = { mode: 'all' },
 ) {
+  const { mode, quantityRaw, minPayout, maxPremium } = query;
+  const identity = JSON.stringify([
+    deployment.genesisHash,
+    owner,
+    selected,
+    after,
+    mode,
+    quantityRaw,
+    minPayout,
+    maxPremium,
+  ]);
   const source = useCallback(
     async (signal: AbortSignal) => {
-      const [result, positions] = await Promise.all([
-        selected
-          ? api.GET('/api/agreements/{address}', {
-              params: { path: { address: selected } },
-              signal,
-            })
-          : api.GET('/api/agreements', { params: { query: { after } }, signal }),
-        owner ? api.GET('/api/positions', { params: { query: { owner } }, signal }) : null,
-      ]);
-      if (!result.data) throw new Error('Agreement data is unavailable. Refresh before signing.');
+      const params = {
+        after,
+        mint: deployment.underlyingMint,
+        writer: mode === 'writer' ? owner : undefined,
+        holder: mode === 'holder' ? owner : undefined,
+        status: mode === 'holder' ? 'active' : undefined,
+        eligible_holder: mode === 'offers' ? owner : undefined,
+        quantity_raw: quantityRaw,
+        min_payout: minPayout,
+        max_premium: maxPremium,
+      };
+      if ((mode === 'writer' || mode === 'holder') && !owner && !selected)
+        return { identity, agreements: [], next: null };
+      const result = selected
+        ? await api.GET('/api/agreements/{address}', {
+            params: { path: { address: selected } },
+            signal,
+          })
+        : mode === 'offers'
+          ? await api.GET('/api/offers', { params: { query: params }, signal })
+          : await api.GET('/api/agreements', { params: { query: params }, signal });
+      if (!result.data)
+        throw new Error('Agreement lookup is unavailable. This does not mean no offers exist.');
       const agreements = Array.isArray(result.data) ? result.data : [result.data];
       for (const value of agreements) {
         if (value.version !== 1) throw new Error('An agreement version is unsupported');
-        amount(value.quantityRaw);
-        amount(value.payout);
-        amount(value.premium);
-        amount(value.reserveAmount);
+        for (const raw of [
+          value.quantityRaw,
+          value.payout,
+          value.premium,
+          value.reserveAmount,
+          value.acceptBefore,
+          value.expiresAt,
+        ])
+          amount(raw);
       }
-      if (owner && !positions?.data) throw new Error('Position data is unavailable.');
-      return {
-        owner,
-        selected,
-        after,
-        genesis: deployment.genesisHash,
-        agreements,
-        next: result.response.headers.get('X-Next-Cursor'),
-        positions: positions?.data ?? [],
-      };
+      return { identity, agreements, next: result.response.headers.get('X-Next-Cursor') };
     },
-    [deployment.genesisHash, owner, selected, after],
+    [
+      deployment.underlyingMint,
+      owner,
+      selected,
+      after,
+      mode,
+      quantityRaw,
+      minPayout,
+      maxPremium,
+      identity,
+    ],
   );
   const request = useRequest(source, { getAbortSignal: () => AbortSignal.timeout(8000) });
   const { refresh, status } = request;
   useEffect(() => {
     if (status === 'fetching') return;
-    const timer = window.setTimeout(() => refresh(), 3000);
-    return () => window.clearTimeout(timer);
+    const timer = setTimeout(refresh, 3000);
+    return () => clearTimeout(timer);
   }, [refresh, status]);
-  const data =
-    request.data &&
-    request.data.owner === owner &&
-    request.data.genesis === deployment.genesisHash &&
-    request.data.selected === selected &&
-    request.data.after === after
-      ? request.data
-      : undefined;
-  return { ...request, data };
+  return { ...request, data: request.data?.identity === identity ? request.data : undefined };
 }
