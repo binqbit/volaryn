@@ -1,6 +1,8 @@
 import {
   appendTransactionMessageInstructions,
   createTransactionMessage,
+  compileTransaction,
+  getBase64Decoder,
   getBase64EncodedWireTransaction,
   getSignatureFromTransaction,
   pipe,
@@ -26,6 +28,7 @@ export async function prepareTransaction(
   rpc: Rpc<SolanaRpcApi>,
   payer: TransactionSigner,
   instructions: readonly Instruction[],
+  beforeSign?: () => Promise<void>,
 ): Promise<PreparedTransaction> {
   const { value: lifetime } = await rpc.getLatestBlockhash({ commitment: 'confirmed' }).send();
   const message = pipe(
@@ -34,6 +37,7 @@ export async function prepareTransaction(
     (tx) => setTransactionMessageLifetimeUsingBlockhash(lifetime, tx),
     (tx) => appendTransactionMessageInstructions(instructions, tx),
   );
+  await beforeSign?.();
   const transaction = await signTransactionMessageWithSigners(message);
   return {
     signature: getSignatureFromTransaction(transaction),
@@ -41,6 +45,30 @@ export async function prepareTransaction(
     lastValidBlockHeight: lifetime.lastValidBlockHeight.toString(),
     blockhash: lifetime.blockhash,
   };
+}
+
+/** Quote the unsigned message through RPC; no wallet signature is requested. */
+export async function estimateFee(
+  rpc: Rpc<SolanaRpcApi>,
+  payer: TransactionSigner,
+  instructions: readonly Instruction[],
+) {
+  const { value: lifetime } = await rpc.getLatestBlockhash({ commitment: 'confirmed' }).send();
+  const message = pipe(
+    createTransactionMessage({ version: 'legacy' }),
+    (tx) => setTransactionMessageFeePayerSigner(payer, tx),
+    (tx) => setTransactionMessageLifetimeUsingBlockhash(lifetime, tx),
+    (tx) => appendTransactionMessageInstructions(instructions, tx),
+  );
+  const bytes = compileTransaction(message).messageBytes;
+  const { value } = await rpc
+    .getFeeForMessage(
+      getBase64Decoder().decode(bytes) as Parameters<typeof rpc.getFeeForMessage>[0],
+      { commitment: 'confirmed' },
+    )
+    .send();
+  if (value === null) throw new Error('The network fee estimate is unavailable');
+  return value;
 }
 
 export async function submitTransaction(rpc: Rpc<SolanaRpcApi>, prepared: PreparedTransaction) {
