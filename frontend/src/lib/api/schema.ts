@@ -52,6 +52,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/assets/official": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["official_assets"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/config": {
         parameters: {
             query?: never;
@@ -157,10 +173,94 @@ export interface components {
             writer: string;
             writerUsdc: string;
         };
+        /** @enum {string} */
+        Eligibility: "compatible" | "unsupported" | "unreviewed" | "expired" | "stale" | "unavailable";
         ErrorBody: {
             code: string;
             message: string;
         };
+        FeeSchedule: {
+            /** Format: int32 */
+            basisPoints: number;
+            epoch: string;
+            maximumRaw: string;
+        };
+        MarketContext: {
+            impliedValuation?: string | null;
+            markPrice?: string | null;
+            markValuation?: string | null;
+            /**
+             * Format: int64
+             * @description The public response supplies no price timestamp or verified price/display-unit contract.
+             */
+            observedAt?: number | null;
+            supply?: string | null;
+            tokenPrice?: string | null;
+            unitsVerified: boolean;
+        };
+        MintEvidence: {
+            authorities: {
+                [key: string]: string | null;
+            };
+            currentFee?: null | components["schemas"]["FeeSchedule"];
+            /** Format: int32 */
+            decimals: number;
+            displayMultiplier?: string | null;
+            extensions: string[];
+            /** Format: int64 */
+            multiplierEffectiveAt?: number | null;
+            nextDisplayMultiplier?: string | null;
+            nextFee?: null | components["schemas"]["FeeSchedule"];
+            restrictions: string[];
+            supplyRaw: string;
+            tokenProgram: string;
+            transparentTransferSupported: boolean;
+        };
+        OfficialAsset: {
+            chain?: null | components["schemas"]["MintEvidence"];
+            eligibility: components["schemas"]["Eligibility"];
+            market?: null | components["schemas"]["MarketContext"];
+            mint: string;
+            name: string;
+            policy?: null | components["schemas"]["ReviewedAsset"];
+            reason: string;
+            symbol: string;
+        };
+        OfficialCatalog: {
+            assets: components["schemas"]["OfficialAsset"][];
+            chainSource: components["schemas"]["SourceObservation"];
+            finalizedSlot?: string | null;
+            genesisHash: string;
+            marketSource: components["schemas"]["SourceObservation"];
+            network: string;
+            source: string;
+        };
+        ReviewedAsset: {
+            /** Format: int64 */
+            conversionDeadline?: number | null;
+            /** Format: int32 */
+            decimals: number;
+            /** Format: int64 */
+            expiryBufferSeconds: number;
+            /** Format: int64 */
+            maxExpiry: number;
+            mint: string;
+            name: string;
+            /** Format: int64 */
+            reviewedAt: number;
+            /** Format: int64 */
+            reviewedUntil: number;
+            source: string;
+            symbol: string;
+        };
+        SourceObservation: {
+            error?: string | null;
+            /** Format: int64 */
+            receivedAt?: number | null;
+            status: components["schemas"]["SourceStatus"];
+        };
+        /** @enum {string} */
+        SourceStatus: "fresh" | "stale" | "unavailable";
         WalletTokenAccount: {
             address: string;
             amountRaw: string;
@@ -256,6 +356,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AssetView"][];
+                };
+            };
+        };
+    };
+    official_assets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OfficialCatalog"];
                 };
             };
         };

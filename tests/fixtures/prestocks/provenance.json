@@ -1,0 +1,9 @@
+{
+  "api": "https://prestocks.com/api/prestocks",
+  "rpc": "https://api.mainnet-beta.solana.com",
+  "genesisHash": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+  "capturedAt": "2026-09-21T00:53:29.092719+00:00",
+  "commitment": "finalized",
+  "slot": 448898437,
+  "notes": "API fixture retains the consumed fields. Mint account bytes are unmodified public mainnet observations; these snapshots are test evidence, never a runtime freshness fallback."
+}

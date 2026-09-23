@@ -14,6 +14,7 @@ use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
 
 pub struct Application {
+    pub catalog: crate::catalog::Catalog,
     pub deployment: Deployment,
     pub chain: Arc<Chain>,
     pub pool: PgPool,
@@ -23,8 +24,14 @@ pub struct Application {
 }
 
 impl Application {
-    pub fn new(deployment: Deployment, chain: Chain, pool: PgPool) -> Arc<Self> {
+    pub fn new(
+        deployment: Deployment,
+        chain: Chain,
+        pool: PgPool,
+        catalog: crate::catalog::Catalog,
+    ) -> Arc<Self> {
         Arc::new(Self {
+            catalog,
             deployment,
             chain: Arc::new(chain),
             pool,

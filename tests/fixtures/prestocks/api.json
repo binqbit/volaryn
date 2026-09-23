@@ -1,0 +1,82 @@
+[
+  {
+    "name": "Anduril PreStocks",
+    "symbol": "ANDURIL",
+    "contract_address": "PresTj4Yc2bAR197Er7wz4UUKSfqt6FryBEdAriBoQB",
+    "markPrice": 154.9173638,
+    "markValuation": 137055245711,
+    "tokenPrice": 158.25883158613024,
+    "impliedValuation": 140011439112,
+    "supply": 11805.856351985
+  },
+  {
+    "name": "Anthropic PreStocks",
+    "symbol": "ANTHROPIC",
+    "contract_address": "Pren1FvFX6J3E4kXhJuCiAD5aDmGEb7qJRncwA8Lkhw",
+    "markPrice": 1038.5747449,
+    "markValuation": 1701540939591,
+    "tokenPrice": 1043.2224726928662,
+    "impliedValuation": 1709155508648,
+    "supply": 7381.878203598
+  },
+  {
+    "name": "Figure AI PreStocks",
+    "symbol": "FIGUREAI",
+    "contract_address": "PreZad18qfPtbxNpMtMuAuX2zVpvkEU8DnJx56faCWd",
+    "markPrice": 181.01657127,
+    "markValuation": 39466497096,
+    "tokenPrice": 176.80452307662514,
+    "impliedValuation": 38548156932,
+    "supply": 3012.910074075
+  },
+  {
+    "name": "Kalshi PreStocks",
+    "symbol": "KALSHI",
+    "contract_address": "PreLWGkkeqG1s4HEfFZSy9moCrJ7btsHuUtfcCeoRua",
+    "markPrice": 895.83668023,
+    "markValuation": 32583419246,
+    "tokenPrice": 912.2399509004089,
+    "impliedValuation": 33180039877,
+    "supply": 904.89560078
+  },
+  {
+    "name": "Neuralink PreStocks",
+    "symbol": "NEURALINK",
+    "contract_address": "PrekqLJvJ3qVdXmBGDiexvwUTF4rLFDa6HWS4HJbw9S",
+    "markPrice": 336.642934,
+    "markValuation": 64128812378,
+    "tokenPrice": 422.2285395357519,
+    "impliedValuation": 80432446541,
+    "supply": 2595.331259192
+  },
+  {
+    "name": "OpenAI PreStocks",
+    "symbol": "OPENAI",
+    "contract_address": "PreweJYECqtQwBtpxHL171nL2K6umo692gTm7Q3rpgF",
+    "markPrice": 995.8097514511976,
+    "markValuation": 1233738871965,
+    "tokenPrice": 1132.9337278806368,
+    "impliedValuation": 1403625920924,
+    "supply": 2826.442527303587
+  },
+  {
+    "name": "Polymarket PreStocks",
+    "symbol": "POLYMARKET",
+    "contract_address": "Pre8AREmFPtoJFT8mQSXQLh56cwJmM7CFDRuoGBZiUP",
+    "markPrice": 143.83333514,
+    "markValuation": 14185672490,
+    "tokenPrice": 143.21227804385447,
+    "impliedValuation": 14124420260,
+    "supply": 4817.084173597
+  },
+  {
+    "name": "SpaceX PreStocks",
+    "symbol": "SPACEX",
+    "contract_address": "PreANxuXjsy2pvisWWMNB6YaJNzr7681wJJr2rHsfTh",
+    "markPrice": 153.3075535296509,
+    "markValuation": 2010032368500,
+    "tokenPrice": 120.6869953806347,
+    "impliedValuation": 1582340606102,
+    "supply": 43712.533765345
+  }
+]

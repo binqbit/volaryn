@@ -20,7 +20,12 @@ async fn discovery_batches_pairs_and_refreshes_only_live_agreements() {
     let pool = store::open(database.options.clone(), &deployment)
         .await
         .unwrap();
-    let app = Application::new(deployment, Chain::new(url).unwrap(), pool);
+    let app = Application::new(
+        deployment,
+        Chain::new(url.clone()).unwrap(),
+        pool,
+        volaryn_backend::catalog::Catalog::new(url).unwrap(),
+    );
     app.reconcile().await.unwrap();
     assert_eq!(ledger.discoveries.load(Ordering::Relaxed), 1);
     assert_eq!(ledger.batches.load(Ordering::Relaxed), 21);

@@ -1,5 +1,7 @@
 pub mod adapters;
 pub mod application;
+pub mod assets;
+pub mod catalog;
 pub mod config;
 pub mod domain;
 pub mod http;

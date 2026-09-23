@@ -17,6 +17,9 @@ pub struct Config {
     pub bind: SocketAddr,
     #[arg(long, default_value = "http://127.0.0.1:8899")]
     pub rpc_url: String,
+    /// Read-only mainnet source for the official asset catalog; never used for signing.
+    #[arg(long, default_value = crate::assets::MAINNET_RPC)]
+    pub official_rpc_url: String,
     /// Check an existing server without requiring curl in the runtime image.
     #[arg(long)]
     pub healthcheck: bool,

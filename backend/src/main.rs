@@ -34,7 +34,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .parse()
         .map_err(|_| "Invalid PostgreSQL connection URL")?;
     let pool = store::open(database_options, &deployment).await?;
-    let app = Application::new(deployment, chain, pool);
+    let catalog = volaryn_backend::catalog::Catalog::new(config.official_rpc_url)?;
+    let app = Application::new(deployment, chain, pool, catalog);
     let worker_app = Arc::clone(&app);
     let worker = tokio::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(2));

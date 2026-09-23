@@ -172,6 +172,23 @@
         }
       }
     },
+    "/api/assets/official": {
+      "get": {
+        "operationId": "official_assets",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OfficialCatalog"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/config": {
       "get": {
         "operationId": "config",
@@ -537,6 +554,17 @@
         },
         "additionalProperties": false
       },
+      "Eligibility": {
+        "type": "string",
+        "enum": [
+          "compatible",
+          "unsupported",
+          "unreviewed",
+          "expired",
+          "stale",
+          "unavailable"
+        ]
+      },
       "ErrorBody": {
         "type": "object",
         "required": [
@@ -551,6 +579,353 @@
             "type": "string"
           }
         }
+      },
+      "FeeSchedule": {
+        "type": "object",
+        "required": [
+          "epoch",
+          "basisPoints",
+          "maximumRaw"
+        ],
+        "properties": {
+          "basisPoints": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "epoch": {
+            "type": "string"
+          },
+          "maximumRaw": {
+            "type": "string"
+          }
+        }
+      },
+      "MarketContext": {
+        "type": "object",
+        "required": [
+          "unitsVerified"
+        ],
+        "properties": {
+          "impliedValuation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "markPrice": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "markValuation": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "observedAt": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "The public response supplies no price timestamp or verified price/display-unit contract."
+          },
+          "supply": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "tokenPrice": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "unitsVerified": {
+            "type": "boolean"
+          }
+        }
+      },
+      "MintEvidence": {
+        "type": "object",
+        "required": [
+          "tokenProgram",
+          "decimals",
+          "supplyRaw",
+          "extensions",
+          "authorities",
+          "transparentTransferSupported",
+          "restrictions"
+        ],
+        "properties": {
+          "authorities": {
+            "type": "object",
+            "additionalProperties": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "propertyNames": {
+              "type": "string"
+            }
+          },
+          "currentFee": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FeeSchedule"
+              }
+            ]
+          },
+          "decimals": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "displayMultiplier": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "extensions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "multiplierEffectiveAt": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "nextDisplayMultiplier": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "nextFee": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FeeSchedule"
+              }
+            ]
+          },
+          "restrictions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "supplyRaw": {
+            "type": "string"
+          },
+          "tokenProgram": {
+            "type": "string"
+          },
+          "transparentTransferSupported": {
+            "type": "boolean"
+          }
+        }
+      },
+      "OfficialAsset": {
+        "type": "object",
+        "required": [
+          "mint",
+          "name",
+          "symbol",
+          "eligibility",
+          "reason"
+        ],
+        "properties": {
+          "chain": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MintEvidence"
+              }
+            ]
+          },
+          "eligibility": {
+            "$ref": "#/components/schemas/Eligibility"
+          },
+          "market": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/MarketContext"
+              }
+            ]
+          },
+          "mint": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "policy": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ReviewedAsset"
+              }
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "symbol": {
+            "type": "string"
+          }
+        }
+      },
+      "OfficialCatalog": {
+        "type": "object",
+        "required": [
+          "network",
+          "genesisHash",
+          "source",
+          "marketSource",
+          "chainSource",
+          "assets"
+        ],
+        "properties": {
+          "assets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OfficialAsset"
+            }
+          },
+          "chainSource": {
+            "$ref": "#/components/schemas/SourceObservation"
+          },
+          "finalizedSlot": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "genesisHash": {
+            "type": "string"
+          },
+          "marketSource": {
+            "$ref": "#/components/schemas/SourceObservation"
+          },
+          "network": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          }
+        }
+      },
+      "ReviewedAsset": {
+        "type": "object",
+        "required": [
+          "mint",
+          "name",
+          "symbol",
+          "decimals",
+          "source",
+          "reviewedAt",
+          "reviewedUntil",
+          "maxExpiry",
+          "expiryBufferSeconds"
+        ],
+        "properties": {
+          "conversionDeadline": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "decimals": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "expiryBufferSeconds": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "maxExpiry": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "mint": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "reviewedAt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "reviewedUntil": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "source": {
+            "type": "string"
+          },
+          "symbol": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
+      },
+      "SourceObservation": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "error": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "receivedAt": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64"
+          },
+          "status": {
+            "$ref": "#/components/schemas/SourceStatus"
+          }
+        }
+      },
+      "SourceStatus": {
+        "type": "string",
+        "enum": [
+          "fresh",
+          "stale",
+          "unavailable"
+        ]
       },
       "WalletTokenAccount": {
         "type": "object",

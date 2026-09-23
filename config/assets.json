@@ -1,0 +1,116 @@
+{
+  "version": 1,
+  "genesisHash": "5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d",
+  "tokenProgram": "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
+  "issuerAuthority": "WV9PJN7XTmTLVwbutCLFxp8TyePee6Xq5mRq6Fti5Wc",
+  "extensions": [
+    "ConfidentialTransferFeeConfig",
+    "ConfidentialTransferMint",
+    "DefaultAccountState",
+    "MetadataPointer",
+    "Pausable",
+    "PermanentDelegate",
+    "ScaledUiAmount",
+    "TokenMetadata",
+    "TransferFeeConfig",
+    "TransferHook"
+  ],
+  "assets": [
+    {
+      "mint": "PresTj4Yc2bAR197Er7wz4UUKSfqt6FryBEdAriBoQB",
+      "name": "Anduril PreStocks",
+      "symbol": "ANDURIL",
+      "decimals": 9,
+      "source": "https://prestocks.com/anduril",
+      "reviewedAt": 1789948800,
+      "reviewedUntil": 1792540800,
+      "maxExpiry": 1792540800,
+      "conversionDeadline": null,
+      "expiryBufferSeconds": 0
+    },
+    {
+      "mint": "Pren1FvFX6J3E4kXhJuCiAD5aDmGEb7qJRncwA8Lkhw",
+      "name": "Anthropic PreStocks",
+      "symbol": "ANTHROPIC",
+      "decimals": 9,
+      "source": "https://prestocks.com/anthropic",
+      "reviewedAt": 1789948800,
+      "reviewedUntil": 1792540800,
+      "maxExpiry": 1792540800,
+      "conversionDeadline": null,
+      "expiryBufferSeconds": 0
+    },
+    {
+      "mint": "PreZad18qfPtbxNpMtMuAuX2zVpvkEU8DnJx56faCWd",
+      "name": "Figure AI PreStocks",
+      "symbol": "FIGUREAI",
+      "decimals": 9,
+      "source": "https://prestocks.com/figureai",
+      "reviewedAt": 1789948800,
+      "reviewedUntil": 1792540800,
+      "maxExpiry": 1792540800,
+      "conversionDeadline": null,
+      "expiryBufferSeconds": 0
+    },
+    {
+      "mint": "PreLWGkkeqG1s4HEfFZSy9moCrJ7btsHuUtfcCeoRua",
+      "name": "Kalshi PreStocks",
+      "symbol": "KALSHI",
+      "decimals": 9,
+      "source": "https://prestocks.com/kalshi",
+      "reviewedAt": 1789948800,
+      "reviewedUntil": 1792540800,
+      "maxExpiry": 1792540800,
+      "conversionDeadline": null,
+      "expiryBufferSeconds": 0
+    },
+    {
+      "mint": "PrekqLJvJ3qVdXmBGDiexvwUTF4rLFDa6HWS4HJbw9S",
+      "name": "Neuralink PreStocks",
+      "symbol": "NEURALINK",
+      "decimals": 9,
+      "source": "https://prestocks.com/neuralink",
+      "reviewedAt": 1789948800,
+      "reviewedUntil": 1792540800,
+      "maxExpiry": 1792540800,
+      "conversionDeadline": null,
+      "expiryBufferSeconds": 0
+    },
+    {
+      "mint": "PreweJYECqtQwBtpxHL171nL2K6umo692gTm7Q3rpgF",
+      "name": "OpenAI PreStocks",
+      "symbol": "OPENAI",
+      "decimals": 9,
+      "source": "https://prestocks.com/openai",
+      "reviewedAt": 1789948800,
+      "reviewedUntil": 1792540800,
+      "maxExpiry": 1792540800,
+      "conversionDeadline": null,
+      "expiryBufferSeconds": 0
+    },
+    {
+      "mint": "Pre8AREmFPtoJFT8mQSXQLh56cwJmM7CFDRuoGBZiUP",
+      "name": "Polymarket PreStocks",
+      "symbol": "POLYMARKET",
+      "decimals": 9,
+      "source": "https://prestocks.com/polymarket",
+      "reviewedAt": 1789948800,
+      "reviewedUntil": 1792540800,
+      "maxExpiry": 1792540800,
+      "conversionDeadline": null,
+      "expiryBufferSeconds": 0
+    },
+    {
+      "mint": "PreANxuXjsy2pvisWWMNB6YaJNzr7681wJJr2rHsfTh",
+      "name": "SpaceX PreStocks",
+      "symbol": "SPACEX",
+      "decimals": 9,
+      "source": "https://prestocks.com/spacex",
+      "reviewedAt": 1789948800,
+      "reviewedUntil": 1792540800,
+      "maxExpiry": 1792540800,
+      "conversionDeadline": 1804895940,
+      "expiryBufferSeconds": 86400
+    }
+  ]
+}

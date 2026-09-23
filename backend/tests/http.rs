@@ -57,7 +57,12 @@ async fn readiness_proxy_and_static_routes_keep_their_boundaries() {
     let pool = store::open(database.options.clone(), &deployment)
         .await
         .unwrap();
-    let app = Application::new(deployment, Chain::new(endpoint).unwrap(), pool);
+    let app = Application::new(
+        deployment,
+        Chain::new(endpoint.clone()).unwrap(),
+        pool,
+        volaryn_backend::catalog::Catalog::new(endpoint).unwrap(),
+    );
     let service = router(app.clone(), directory.path().to_owned());
     let response = service
         .clone()

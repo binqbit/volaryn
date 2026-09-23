@@ -64,6 +64,7 @@ fn api() -> OpenApiRouter<Arc<Application>> {
     OpenApiRouter::with_openapi(Api::openapi())
         .routes(routes!(config))
         .routes(routes!(assets))
+        .routes(routes!(official_assets))
         .routes(routes!(wallet))
         .routes(routes!(offers))
         .routes(routes!(agreements))
@@ -171,6 +172,14 @@ async fn assets(State(app): State<Arc<Application>>) -> Result<Json<Vec<AssetVie
 #[derive(Deserialize)]
 struct OwnerQuery {
     owner: String,
+}
+
+#[utoipa::path(get, path = "/api/assets/official", responses((status = 200, body = crate::assets::OfficialCatalog)))]
+async fn official_assets(
+    State(app): State<Arc<Application>>,
+) -> Json<crate::assets::OfficialCatalog> {
+    // Independent of the local ledger, projection and signing readiness.
+    Json(app.catalog.observe().await)
 }
 
 #[utoipa::path(get, path = "/api/wallet", params(("owner" = String, Query)), responses((status = 200, body = WalletView)))]
