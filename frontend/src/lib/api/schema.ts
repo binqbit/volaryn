@@ -4,6 +4,22 @@
  */
 
 export interface paths {
+    "/api/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["activity"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/agreements": {
         parameters: {
             query?: never;
@@ -120,6 +136,26 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        Activity: {
+            agreement: string;
+            /** Format: int64 */
+            createdAt: number;
+            createdTerms?: null | components["schemas"]["Terms"];
+            id: string;
+            lastValidBlockHeight: string;
+            operation: components["schemas"]["Operation"];
+            owner: string;
+            signature: string;
+            status: components["schemas"]["Status"];
+            /** Format: int64 */
+            updatedAt: number;
+        };
+        ActivityPage: {
+            items: components["schemas"]["Activity"][];
+            next?: string | null;
+            /** @description Independent of pagination, so older unresolved operations remain recoverable. */
+            pending: components["schemas"]["Activity"][];
+        };
         AgreementView: {
             acceptBefore: string;
             address: string;
@@ -237,6 +273,8 @@ export interface components {
             network: string;
             source: string;
         };
+        /** @enum {string} */
+        Operation: "create" | "activate" | "exercise" | "cancel" | "reclaim" | "cleanup";
         ReviewedAsset: {
             /** Format: int64 */
             conversionDeadline?: number | null;
@@ -263,6 +301,18 @@ export interface components {
         };
         /** @enum {string} */
         SourceStatus: "fresh" | "stale" | "unavailable";
+        /** @enum {string} */
+        Status: "pending" | "provisional" | "finalized" | "failed" | "expired" | "reconciled" | "unresolved";
+        Terms: {
+            acceptBefore: string;
+            designatedHolder?: string | null;
+            expiresAt: string;
+            nonce: string;
+            payout: string;
+            premium: string;
+            quantityRaw: string;
+            underlyingMint: string;
+        };
         WalletTokenAccount: {
             address: string;
             amountRaw: string;
@@ -286,6 +336,28 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    activity: {
+        parameters: {
+            query: {
+                owner: string;
+                before?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActivityPage"];
+                };
+            };
+        };
+    };
     agreements: {
         parameters: {
             query?: {

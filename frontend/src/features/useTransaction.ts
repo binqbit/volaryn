@@ -4,11 +4,19 @@ import { buildAction } from '../lib/chain/buildAction';
 import type { ActionRequest, ActionReview } from '../lib/chain/actionTypes';
 import type { AppClient } from '../lib/chain/client';
 import type { Deployment } from '../lib/api/client';
-import type { PendingTransaction as Pending } from './pending';
+import { parsePending, type PendingTransaction as Pending } from './pending';
 import { observeAction } from './reconcile';
 import { clearJournal, journalKey, readJournal, saveJournal, withJournalLock } from './journal';
+import { useActivity } from './activity/useActivity';
+import { asPending } from './activity/model';
+import { readActivity, recoverInterrupted, saveActivity, updateActivity } from './activity/storage';
 
-type Phase = 'idle' | 'awaiting-signature' | Awaited<ReturnType<typeof observeAction>>;
+type Phase =
+  | 'idle'
+  | 'preparing'
+  | 'awaiting-signature'
+  | 'not-submitted'
+  | Awaited<ReturnType<typeof observeAction>>;
 interface Tracking {
   key: string;
   pending: Pending | null;
@@ -22,12 +30,14 @@ export function useTransaction(
   client: AppClient,
   deployment: Deployment,
   owner: string | undefined,
+  before?: string,
 ) {
   const key = owner ? journalKey(deployment.genesisHash, deployment.programId, owner) : '';
   const [tracking, setTracking] = useState(empty);
   const current = tracking.key === key ? tracking : empty;
   const pending = current.pending;
   const lock = useRef(false);
+  const activity = useActivity(key, owner, before);
 
   useEffect(() => {
     let cancelled = false;
@@ -38,6 +48,17 @@ export function useTransaction(
       }
       try {
         const record = readJournal(key, owner);
+        if (record && !readActivity(key, owner).some((item) => item.signature === record.signature))
+          saveActivity(key, {
+            ...record,
+            id: record.signature,
+            status: 'pending',
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            source: 'browser',
+          });
+        // If another tab still owns the signing lock, its approval remains in progress.
+        void withJournalLock(key, async () => recoverInterrupted(key, owner)).catch(() => {});
         if (!cancelled)
           setTracking((previous) => ({
             key,
@@ -73,6 +94,34 @@ export function useTransaction(
     };
   }, [key, owner, deployment.genesisHash]);
 
+  const recoverable = activity.pending.map(asPending).find((item) => item !== null);
+  const recoverableSignature = recoverable?.signature;
+  const recovery = recoverable ? JSON.stringify(recoverable) : null;
+  useEffect(() => {
+    if (!owner || !recovery || pending || lock.current || tracking.key !== key) return;
+    let cancelled = false;
+    void withJournalLock(key, async () => {
+      if (cancelled) return;
+      const record = readJournal(key, owner) ?? parsePending(recovery);
+      saveJournal(key, record);
+      if (!readActivity(key, owner).some((item) => item.signature === record.signature))
+        saveActivity(key, {
+          ...record,
+          id: record.signature,
+          status: 'pending',
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          source: 'browser',
+        });
+      setTracking((previous) =>
+        previous.key === key ? { ...empty, key, pending: record, phase: 'pending' } : previous,
+      );
+    }).catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [key, owner, pending, tracking.key, recovery]);
+
   useEffect(() => {
     if (!pending || !owner) return;
     let cancelled = false;
@@ -82,12 +131,11 @@ export function useTransaction(
         const phase = await observeAction(client.rpc, pending!);
         if (cancelled) return;
         const complete = ['finalized', 'failed', 'expired', 'reconciled'].includes(phase);
-        if (complete) {
-          await withJournalLock(key, async () => {
-            clearJournal(key, owner!, pending!.signature);
-          });
-          if (cancelled) return;
-        }
+        await withJournalLock(key, async () => {
+          updateActivity(key, owner!, pending!.signature, { status: phase });
+          if (complete) clearJournal(key, owner!, pending!.signature);
+        });
+        if (cancelled) return;
         setTracking({
           key,
           pending: complete ? null : pending,
@@ -133,7 +181,9 @@ export function useTransaction(
       lock.current = true;
       const update = (next: Tracking) =>
         setTracking((previous) => (previous.key === key ? next : previous));
-      update({ ...empty, key, phase: 'awaiting-signature' });
+      update({ ...empty, key, phase: 'preparing' });
+      const attempt = crypto.randomUUID();
+      let signed = false;
       try {
         return await withJournalLock(key, async () => {
           const existing = readJournal(key, owner);
@@ -141,6 +191,21 @@ export function useTransaction(
             update({ ...empty, key, pending: existing, phase: 'pending' });
             return;
           }
+          if (!activity.ready || activity.status === 'error' || recoverableSignature)
+            throw new Error(
+              'Wait for your operation history to refresh before submitting another action.',
+            );
+          saveActivity(key, {
+            id: attempt,
+            owner,
+            agreement: reviewed.agreement,
+            operation: request.operation,
+            ...(request.operation === 'create' ? { createdTerms: request.terms } : {}),
+            status: 'preparing',
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            source: 'browser',
+          });
           const connected = client.wallet.getState().connected;
           if (
             !connected?.signer ||
@@ -162,6 +227,8 @@ export function useTransaction(
                 throw new Error('Network changed before signing');
               if (client.wallet.getState().connected?.account.address !== owner)
                 throw new Error('Wallet changed before signing');
+              updateActivity(key, owner, attempt, { status: 'awaiting-signature' });
+              update({ ...empty, key, phase: 'awaiting-signature' });
             },
           );
           if ((await client.rpc.getGenesisHash().send()) !== deployment.genesisHash)
@@ -177,10 +244,14 @@ export function useTransaction(
             ...(request.operation === 'create' ? { createdTerms: request.terms } : {}),
           };
           saveJournal(key, record);
+          signed = true;
+          updateActivity(key, owner, attempt, { ...record, status: 'pending' });
           update({ ...empty, key, pending: record, phase: 'pending' });
           try {
             await submitTransaction(client.rpc, prepared);
+            activity.refresh();
           } catch {
+            updateActivity(key, owner, attempt, { status: 'unresolved' });
             update({
               ...empty,
               key,
@@ -193,17 +264,41 @@ export function useTransaction(
           return plan.review.agreement;
         });
       } catch (cause) {
+        const error = cause instanceof Error ? cause.message : 'Unable to prepare the transaction';
+        // Once the signed identifier is journaled it must remain recoverable, even if storage or HTTP fails.
+        if (signed) {
+          const record = readJournal(key, owner);
+          update({ ...empty, key, pending: record, phase: 'unresolved', error });
+          return reviewed.agreement;
+        }
+        try {
+          await withJournalLock(key, async () =>
+            updateActivity(key, owner, attempt, { status: 'not-submitted', error }),
+          );
+        } catch {
+          /* The pending journal, rather than optional history, gates retries. */
+        }
         update({
           ...empty,
           key,
-          phase: 'failed',
-          error: cause instanceof Error ? cause.message : 'Unable to prepare the transaction',
+          phase: 'not-submitted',
+          error,
         });
       } finally {
         lock.current = false;
       }
     },
-    [client, deployment, key, owner, current.pending, current.unavailable, tracking.key],
+    [
+      client,
+      deployment,
+      key,
+      owner,
+      current.pending,
+      current.unavailable,
+      tracking.key,
+      activity,
+      recoverableSignature,
+    ],
   );
   return {
     execute,
@@ -219,11 +314,16 @@ export function useTransaction(
     phase: current.phase,
     error: current.error,
     pending,
+    activity,
     busy:
       !owner ||
       tracking.key !== key ||
       current.unavailable ||
+      !activity.ready ||
+      activity.status === 'error' ||
+      !!recoverableSignature ||
       !!pending ||
+      current.phase === 'preparing' ||
       current.phase === 'awaiting-signature',
   };
 }

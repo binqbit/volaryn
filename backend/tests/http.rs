@@ -79,6 +79,7 @@ async fn readiness_proxy_and_static_routes_keep_their_boundaries() {
         ("/offers?after=example", 200),
         ("/portfolio", 200),
         ("/portfolio/written", 200),
+        ("/portfolio/activity", 200),
         ("/agreements/example", 200),
         ("/offers/missing", 404),
         ("/portfolio/missing", 404),

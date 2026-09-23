@@ -8,6 +8,49 @@ mod agreement;
 use volaryn_backend::adapters::store;
 
 #[tokio::test]
+async fn adding_activity_to_an_existing_projection_preserves_agreements() {
+    let database = database::Database::new().await;
+    let pool = sqlx::postgres::PgPoolOptions::new()
+        .connect_with(database.options.clone())
+        .await
+        .unwrap();
+    let initial = tempfile::tempdir().unwrap();
+    std::fs::write(
+        initial.path().join("0001_chain_projection.sql"),
+        include_str!("../migrations/0001_chain_projection.sql"),
+    )
+    .unwrap();
+    sqlx::migrate::Migrator::new(initial.path())
+        .await
+        .unwrap()
+        .run(&pool)
+        .await
+        .unwrap();
+    store::upsert(&pool, &[agreement::agreement(10, 100)], 10, 100)
+        .await
+        .unwrap();
+    pool.close().await;
+    let upgraded = store::open(database.options.clone(), &support::deployment())
+        .await
+        .unwrap();
+    assert_eq!(
+        store::agreement(&upgraded, "agreement")
+            .await
+            .unwrap()
+            .unwrap()
+            .payout,
+        u64::MAX.to_string()
+    );
+    let (receipts,): (i64,) = sqlx::query_as("SELECT COUNT(*) FROM activity")
+        .fetch_one(&upgraded)
+        .await
+        .unwrap();
+    assert_eq!(receipts, 0);
+    upgraded.close().await;
+    database.close().await;
+}
+
+#[tokio::test]
 async fn migrations_preserve_identity_and_exact_amounts_across_restart() {
     let database = database::Database::new().await;
     let deployment = support::deployment();
@@ -53,7 +96,7 @@ async fn migrations_preserve_identity_and_exact_amounts_across_restart() {
             .fetch_one(&pool)
             .await
             .unwrap();
-    assert_eq!(migrations, 1);
+    assert_eq!(migrations as usize, sqlx::migrate!().iter().count());
     pool.close().await;
     let mut incompatible = deployment.clone();
     incompatible.genesis_hash = "different-ledger".into();

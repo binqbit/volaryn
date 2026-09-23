@@ -73,6 +73,8 @@ export async function balanceFixture(page: Page) {
   await page.route('**/api/**', async (route) => {
     const url = new URL(route.request().url());
     if (url.pathname === '/api/config') return route.fulfill({ json: deployment });
+    if (url.pathname === '/api/activity')
+      return route.fulfill({ json: { items: [], pending: [], next: null } });
     if (url.pathname === '/api/wallet') {
       await state.walletDelay;
       if (state.walletUnavailable)

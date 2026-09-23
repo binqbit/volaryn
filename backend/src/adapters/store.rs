@@ -206,7 +206,7 @@ pub async fn active_addresses(pool: &PgPool, after: &str) -> Result<Vec<String>,
 
 impl From<sqlx::Error> for AppError {
     fn from(error: sqlx::Error) -> Self {
-        tracing::error!(%error, "projection operation failed");
+        tracing::error!(%error, "database operation failed");
         Self::Storage
     }
 }

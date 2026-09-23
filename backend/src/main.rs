@@ -48,6 +48,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
     let listener = tokio::net::TcpListener::bind(config.bind).await?;
+    let activity_app = Arc::clone(&app);
+    let activity_worker = tokio::spawn(async move {
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(2));
+        interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            interval.tick().await;
+            if let Err(error) = activity_app.reconcile_activity().await {
+                tracing::warn!(%error, "activity reconciliation unavailable");
+            }
+        }
+    });
     tracing::info!(address = %listener.local_addr()?, "application ready");
     axum::serve(listener, http::router(Arc::clone(&app), config.frontend))
         .with_graceful_shutdown(async {
@@ -58,7 +69,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         })
         .await?;
     worker.abort();
+    activity_worker.abort();
     let _ = worker.await;
+    let _ = activity_worker.await;
     app.pool.close().await;
     Ok(())
 }

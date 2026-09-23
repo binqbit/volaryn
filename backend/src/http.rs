@@ -69,6 +69,7 @@ fn api() -> OpenApiRouter<Arc<Application>> {
         .routes(routes!(offers))
         .routes(routes!(agreements))
         .routes(routes!(agreement))
+        .routes(routes!(activity))
 }
 
 pub fn openapi() -> utoipa::openapi::OpenApi {
@@ -109,6 +110,7 @@ async fn serve_frontend(uri: Uri, directory: PathBuf) -> Response {
             | "/offers/new"
             | "/portfolio"
             | "/portfolio/written"
+            | "/portfolio/activity"
             | "/writer"
             | "/protection"
             | "/issuer-assets"
@@ -233,6 +235,16 @@ async fn agreement(
     app.agreement(&address).await.map(Json)
 }
 
+#[utoipa::path(get, path = "/api/activity", params(crate::activity::ActivityQuery), responses((status = 200, body = crate::activity::ActivityPage)))]
+async fn activity(
+    State(app): State<Arc<Application>>,
+    query: Result<Query<crate::activity::ActivityQuery>, axum::extract::rejection::QueryRejection>,
+) -> Result<Json<crate::activity::ActivityPage>, AppError> {
+    app.activity(&query.map_err(|_| AppError::Invalid)?.0)
+        .await
+        .map(Json)
+}
+
 #[derive(Deserialize)]
 struct Envelope {
     jsonrpc: String,
@@ -270,6 +282,10 @@ async fn proxy(State(app): State<Arc<Application>>, body: Bytes) -> Result<Respo
     }
     if !METHODS.contains(&envelope.method.as_str()) {
         return Ok(Json(json!({"jsonrpc":"2.0", "id":envelope.id, "error":{"code":-32601, "message":"Method not allowed"}})).into_response());
+    }
+    if envelope.method == "sendTransaction" {
+        let params = serde_json::from_str(envelope.params.get()).map_err(|_| AppError::Invalid)?;
+        app.record_submission(&params).await?;
     }
     let bytes = app.chain.transport.raw(body).await?;
     Ok(([(header::CONTENT_TYPE, "application/json")], bytes).into_response())

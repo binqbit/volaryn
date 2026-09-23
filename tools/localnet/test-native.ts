@@ -95,6 +95,20 @@ try {
     }),
   );
   const before = await observations();
+  const deployment = JSON.parse(await readFile(manifest, 'utf8')) as {
+    holder: string;
+    writer: string;
+  };
+  const history = async () =>
+    Promise.all(
+      [deployment.holder, deployment.writer].map(async (owner) => {
+        const response = await fetch(`${appUrl}/api/activity?owner=${owner}`);
+        assert.equal(response.status, 200);
+        const page = (await response.json()) as { items: { signature: string }[] };
+        return page.items.map((item) => item.signature).sort();
+      }),
+    );
+  const recorded = await history();
   const pgdata = process.env.VOLARYN_TEST_PGDATA;
   if (!pgdata || !process.env.VOLARYN_TEST_DATABASE_URL)
     throw new Error('Use the isolated PostgreSQL test runner');
@@ -144,6 +158,7 @@ try {
     ),
   );
   await waitFor(`${appUrl}/health/index`, app);
+  assert.deepEqual(await history(), recorded, 'Database recovery must preserve operation receipts');
   assert.deepEqual(
     await observations(),
     before,
@@ -158,6 +173,11 @@ try {
   assert.equal(await readFile(manifest, 'utf8'), identity, 'Bootstrap must retain ledger identity');
   assert.deepEqual(await fixtureState(), balances, 'Bootstrap must not reset used token balances');
   await bootApp('app-restart.log');
+  assert.deepEqual(
+    await history(),
+    recorded,
+    'Application restart must preserve operation history',
+  );
   assert.deepEqual(await observations(), before, 'Restart must retain finalized agreements');
   await stop(app);
   execFileSync(
@@ -166,6 +186,11 @@ try {
     { stdio: 'ignore' },
   );
   await bootApp('app-rebuild.log');
+  assert.deepEqual(
+    await history(),
+    recorded,
+    'Rebuilding projections must not erase operation history',
+  );
   assert.deepEqual(
     await observations(),
     before,

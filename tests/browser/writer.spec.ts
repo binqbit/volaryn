@@ -68,11 +68,31 @@ test('writer funds and cancels offers, holder matches and exercises, writer rece
   );
   expect(submissions).toBe(1);
   const cancelledAddress = address(page.url().split('/').at(-1)!);
+  const activities = async (owner: string) =>
+    (await (await request.get(`/api/activity?owner=${owner}`)).json()) as {
+      items: { agreement: string; operation: string; status: string }[];
+    };
+  await expect
+    .poll(
+      async () =>
+        (await activities(config.writer)).items.find(
+          (item) => item.agreement === cancelledAddress && item.operation === 'create',
+        )?.status,
+    )
+    .toBe('finalized');
   expect(await balance()).toBe(start - 5_000_000n);
   await signAction(page, 'Cancel offer');
   expect((await fetchAgreement(rpc, cancelledAddress)).data.status).toBe(AgreementStatus.Cancelled);
   expect(await balance()).toBe(start);
   await signAction(page, 'Recover residual funds');
+  await expect
+    .poll(async () =>
+      (await activities(config.writer)).items
+        .filter((item) => item.agreement === cancelledAddress && item.status === 'finalized')
+        .map((item) => item.operation)
+        .sort(),
+    )
+    .toEqual(['cancel', 'cleanup', 'create']);
 
   await fillOffer(page);
   await page.getByText('Restrict to a wallet', { exact: true }).click();
@@ -135,6 +155,14 @@ test('writer funds and cancels offers, holder matches and exercises, writer rece
   );
   expect(settled.underlyingDecimals).toBe(9);
   expect(settled.status).toBe(AgreementStatus.Exercised);
+  await expect
+    .poll(async () =>
+      (await activities(config.holder)).items
+        .filter((item) => item.agreement === agreementAddress && item.status === 'finalized')
+        .map((item) => item.operation)
+        .sort(),
+    )
+    .toEqual(['activate', 'exercise']);
   expect(settled.netReceived).toBe(198500000n);
   const accounts = await protocolAddresses(settled.underlyingMint, settled.writer, settled.nonce);
   const receipt = (await fetchAsset(rpc, accounts.settlement)).data;

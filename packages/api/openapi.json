@@ -9,6 +9,41 @@
     "version": "1.0.0"
   },
   "paths": {
+    "/api/activity": {
+      "get": {
+        "operationId": "activity",
+        "parameters": [
+          {
+            "name": "owner",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "before",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActivityPage"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/agreements": {
       "get": {
         "operationId": "agreements",
@@ -352,6 +387,89 @@
   },
   "components": {
     "schemas": {
+      "Activity": {
+        "type": "object",
+        "required": [
+          "id",
+          "signature",
+          "owner",
+          "agreement",
+          "operation",
+          "lastValidBlockHeight",
+          "status",
+          "createdAt",
+          "updatedAt"
+        ],
+        "properties": {
+          "agreement": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "createdTerms": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/Terms"
+              }
+            ]
+          },
+          "id": {
+            "type": "string"
+          },
+          "lastValidBlockHeight": {
+            "type": "string"
+          },
+          "operation": {
+            "$ref": "#/components/schemas/Operation"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "signature": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/Status"
+          },
+          "updatedAt": {
+            "type": "integer",
+            "format": "int64"
+          }
+        }
+      },
+      "ActivityPage": {
+        "type": "object",
+        "required": [
+          "items",
+          "pending"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Activity"
+            }
+          },
+          "next": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "pending": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Activity"
+            },
+            "description": "Independent of pagination, so older unresolved operations remain recoverable."
+          }
+        }
+      },
       "AgreementView": {
         "type": "object",
         "required": [
@@ -848,6 +966,17 @@
           }
         }
       },
+      "Operation": {
+        "type": "string",
+        "enum": [
+          "create",
+          "activate",
+          "exercise",
+          "cancel",
+          "reclaim",
+          "cleanup"
+        ]
+      },
       "ReviewedAsset": {
         "type": "object",
         "required": [
@@ -936,6 +1065,59 @@
           "stale",
           "unavailable"
         ]
+      },
+      "Status": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "provisional",
+          "finalized",
+          "failed",
+          "expired",
+          "reconciled",
+          "unresolved"
+        ]
+      },
+      "Terms": {
+        "type": "object",
+        "required": [
+          "underlyingMint",
+          "nonce",
+          "quantityRaw",
+          "payout",
+          "premium",
+          "acceptBefore",
+          "expiresAt"
+        ],
+        "properties": {
+          "acceptBefore": {
+            "type": "string"
+          },
+          "designatedHolder": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "expiresAt": {
+            "type": "string"
+          },
+          "nonce": {
+            "type": "string"
+          },
+          "payout": {
+            "type": "string"
+          },
+          "premium": {
+            "type": "string"
+          },
+          "quantityRaw": {
+            "type": "string"
+          },
+          "underlyingMint": {
+            "type": "string"
+          }
+        }
       },
       "WalletTokenAccount": {
         "type": "object",

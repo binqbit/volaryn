@@ -46,7 +46,14 @@ export function App({ deployment }: { deployment: Deployment }) {
   const [filters, setFilters] = useState<PortfolioQuery>({ mode: 'offers' });
   const [revision, setRevision] = useState(0);
   // Keep transaction recovery mounted when the user moves between pages.
-  const transaction = useTransaction(client, deployment, owner);
+  const transaction = useTransaction(
+    client,
+    deployment,
+    owner,
+    location.pathname === '/portfolio/activity'
+      ? (new URLSearchParams(location.search).get('before') ?? undefined)
+      : undefined,
+  );
   const wallet = useWallet(owner);
   const [review, setReview] = useState<{ request: ActionRequest; value: Review }>();
   const [reviewError, setReviewError] = useState('');
@@ -237,11 +244,35 @@ export function App({ deployment }: { deployment: Deployment }) {
             />
             <Route
               path="/portfolio"
-              element={<PortfolioPage deployment={deployment} owner={owner} />}
+              element={
+                <PortfolioPage
+                  deployment={deployment}
+                  owner={owner}
+                  activity={transaction.activity}
+                />
+              }
             />
             <Route
               path="/portfolio/written"
-              element={<PortfolioPage deployment={deployment} owner={owner} written />}
+              element={
+                <PortfolioPage
+                  deployment={deployment}
+                  owner={owner}
+                  activity={transaction.activity}
+                  written
+                />
+              }
+            />
+            <Route
+              path="/portfolio/activity"
+              element={
+                <PortfolioPage
+                  deployment={deployment}
+                  owner={owner}
+                  activity={transaction.activity}
+                  history
+                />
+              }
             />
             <Route
               path="/agreements/:address"

@@ -49,7 +49,11 @@ impl Chain {
         Ok(Self { client, transport })
     }
 
-    async fn request(&self, request: RpcRequest, params: Value) -> Result<Value, AppError> {
+    pub(crate) async fn request(
+        &self,
+        request: RpcRequest,
+        params: Value,
+    ) -> Result<Value, AppError> {
         self.client
             .send(request, params)
             .await

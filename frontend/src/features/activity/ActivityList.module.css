@@ -1,0 +1,45 @@
+.history {
+  margin-block: 1.25rem;
+}
+.history h2 {
+  font-size: 1.1rem;
+}
+.history ol {
+  display: grid;
+  gap: 0.65rem;
+  list-style: none;
+  padding: 0;
+}
+.history li {
+  padding: 1rem;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 0.85rem;
+  background: linear-gradient(115deg, #9945ff10, #14f19508), var(--color-surface-raised);
+  min-width: 0;
+}
+.history p {
+  margin-block: 0.5rem;
+}
+.heading,
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+.status {
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+}
+.status[data-pending='true'] {
+  color: var(--color-accent-hover);
+}
+.meta,
+.identity {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+}
+.identity code {
+  overflow-wrap: anywhere;
+}
