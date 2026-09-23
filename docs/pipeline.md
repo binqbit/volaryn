@@ -63,7 +63,7 @@ Start from a clean checkout using the documented local entry point without manda
 
 Verify strict dependency and generated-client checks, supported interface versions, and explicit account resolution. Prove HTTP-only submission/confirmation and lossless financial values through the RPC proxy. Check the rendered test configuration for inherited host ports and live resources, and execute wallet signing from the test browser's secure origin.
 
-**Acceptance gate:** the primitive works end to end without manually editing the database or configuring separate frontend and backend deployments. Cancellation and expiry remain executable through the scenario runner even before their full interface exists. Existing agreements survive an ordinary restart. A database/index outage leaves verified chain transport and direct agreement reads usable; index readiness identifies degraded discovery.
+**Acceptance gate:** the primitive works end to end without manually editing the database or configuring separate frontend and backend deployments. Cancellation and expiry remain executable through the scenario runner even before their full interface exists. Existing agreements survive an ordinary restart. A database/index outage leaves verified read-only chain transport and direct agreement reads usable; durable operation recording gates tracked submissions; index readiness identifies degraded discovery.
 
 ## 3. Complete local product
 
@@ -71,7 +71,8 @@ Verify strict dependency and generated-client checks, supported interface versio
 
 **Scope**
 
-- Complete position discovery, exact-quantity offer selection, offer review, active protection, and writer commitments.
+- Complete position discovery, searchable token selection by name/ticker/mint, exact-quantity offer selection, offer review, active protection, and writer commitments. Use the selected mint and its precision throughout creation, filters, signing, recovery, and per-asset balances.
+- Separate product introduction from application workflows: Home explains the agreement; Explore offers lists comparable cards; Create offer owns funding; My portfolio separates purchased protection and written commitments. Full terms and financial actions belong on agreement detail pages. Keep navigation, connection prompts, empty states, and mobile layouts explicit.
 - Let writers set terms, fund offers, cancel unaccepted offers, inspect committed capital, reclaim expired reserves, and locate delivered tokens.
 - Match existing funded inventory against the selected asset, quantity, holder restrictions, and acceptable terms. Preserve each offer's fixed terms; distinguish no matching offer from an unavailable lookup.
 - Show premium, payout, deadlines, gross delivery, estimated net receipt, transaction costs, and issuer restrictions before signing. Exercise remains an explicit holder action.
@@ -79,7 +80,7 @@ Verify strict dependency and generated-client checks, supported interface versio
 
 **Verification**
 
-Run complete holder and writer journeys with separate wallets. Exercise after the writer disconnects; separately allow protection to expire and reclaim the reserve. Verify cancellation races, designated-holder restrictions, no-match behavior, full-quantity requirements, and the inability to withdraw an active reserve. Check that a falling displayed price cannot trigger exercise and that the UI explains costs and deadlines correctly. Validate basic keyboard access and usable layouts for the core journeys.
+Run complete holder and writer journeys with separate wallets and at least two underlying assets. Verify name/ticker/mint search, keyboard selection, exact decimal conversion, per-mint filtering, identity in signature reviews, and rejection of the wrong delivery mint. Exercise after the writer disconnects; separately allow protection to expire and reclaim the reserve. Verify cancellation races, designated-holder restrictions, no-match behavior, full-quantity requirements, and the inability to withdraw an active reserve. Check that a falling displayed price cannot trigger exercise and that the UI explains costs and deadlines correctly. Validate basic keyboard access and usable layouts for the core journeys.
 
 Repeat clicks, switch wallets during preparation, and exercise component remounts. These must not duplicate submission, reuse another account's request results, or present retained stale data as a fresh observation.
 
@@ -92,6 +93,7 @@ Repeat clicks, switch wallets during preparation, and exercise component remount
 **Scope**
 
 - Add official asset and market-context adapters behind the existing boundaries. Validate response shape, provenance, freshness, and missing values.
+- Map clearly labelled local PreStocks replicas to reviewed official identities. Preserve separate local and mainnet mints, expose issuer links, and keep fixture startup independent of external sources.
 - Bind supported assets to exact network and token identities. Apply admission rules for issuer extensions, transfer behavior, and lifecycle deadlines.
 - Present market values separately from contractual payouts. Enable derived valuations only when price units and display units are verified.
 - Extend compatibility fixtures for each newly admitted token configuration. Keep policy evidence and critical on-chain admission limits consistent.
@@ -110,6 +112,7 @@ Test captured provider responses, missing or changed fields, unit mismatches, ti
 **Scope**
 
 - Complete bounded reconciliation of agreements, reserves, and token accounts. Treat local storage as a recoverable projection, with explicit observation freshness.
+- Retain signed operation receipts before relay, restore authorized wallet connections, and show unsigned interruptions, pending operations, and terminal results in wallet activity. Keep application history separate from rebuildable agreement projections.
 - Resolve uncertain transaction outcomes before offering a retry. Keep confirmed feedback separate from finalized records and avoid duplicate financial actions.
 - Support compatible schema changes, repeated initialization, and clear failure on incompatible deployment state. Never repair incompatibility by silently resetting balances.
 - Add actionable health and readiness signals, request correlation, dependency failures, and reconciliation lag without exposing secrets.
