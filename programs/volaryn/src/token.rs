@@ -2,7 +2,8 @@ use anchor_lang::{prelude::*, solana_program::program::invoke_signed, system_pro
 use anchor_spl::token_2022::spl_token_2022;
 use spl_token_2022::{
     extension::{
-        pausable::PausableConfig, BaseStateWithExtensions, ExtensionType, StateWithExtensions,
+        default_account_state::DefaultAccountState, pausable::PausableConfig,
+        transfer_hook::TransferHook, BaseStateWithExtensions, ExtensionType, StateWithExtensions,
     },
     instruction::{self, AuthorityType},
     state::{Account as TokenAccount, Mint},
@@ -15,6 +16,11 @@ pub fn validate_mint(mint: &AccountInfo, require_unpaused: bool) -> Result<()> {
     require_keys_eq!(*mint.owner, spl_token_2022::ID);
     let data = mint.try_borrow_data()?;
     let state = StateWithExtensions::<Mint>::unpack(&data)?;
+    validate_mint_state(&state, require_unpaused)
+}
+
+/// Shared with read-only admission checks. Confidential balances and active hooks are not used.
+pub fn validate_mint_state(state: &StateWithExtensions<Mint>, new_commitment: bool) -> Result<()> {
     for extension in state.get_extension_types()? {
         require!(
             matches!(
@@ -23,11 +29,29 @@ pub fn validate_mint(mint: &AccountInfo, require_unpaused: bool) -> Result<()> {
                     | ExtensionType::ScaledUiAmount
                     | ExtensionType::Pausable
                     | ExtensionType::PermanentDelegate
+                    | ExtensionType::DefaultAccountState
+                    | ExtensionType::ConfidentialTransferMint
+                    | ExtensionType::ConfidentialTransferFeeConfig
+                    | ExtensionType::TransferHook
+                    | ExtensionType::MetadataPointer
+                    | ExtensionType::TokenMetadata
             ),
             VolarynError::UnsupportedMint
         );
     }
-    if require_unpaused {
+    if let Ok(hook) = state.get_extension::<TransferHook>() {
+        require!(
+            Option::<Pubkey>::from(hook.program_id).is_none(),
+            VolarynError::UnsupportedMint
+        );
+    }
+    if new_commitment {
+        if let Ok(default) = state.get_extension::<DefaultAccountState>() {
+            require!(
+                default.state == spl_token_2022::state::AccountState::Initialized as u8,
+                VolarynError::UnsupportedMint
+            );
+        }
         if let Ok(pause) = state.get_extension::<PausableConfig>() {
             require!(!bool::from(pause.paused), VolarynError::UnsupportedMint);
         }
@@ -59,7 +83,9 @@ pub fn validate_settlement(account: &AccountInfo, authority: &Pubkey, mint: &Pub
         require!(
             matches!(
                 extension,
-                ExtensionType::TransferFeeAmount | ExtensionType::PausableAccount
+                ExtensionType::TransferFeeAmount
+                    | ExtensionType::PausableAccount
+                    | ExtensionType::TransferHookAccount
             ),
             VolarynError::InvalidSettlementAccount
         );

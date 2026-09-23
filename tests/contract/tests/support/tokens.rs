@@ -19,6 +19,8 @@ pub enum AssetFixture {
     Extended,
     Subset(u8),
     UnsupportedHook,
+    /// Official issuer configuration, exercised with ordinary transparent balances.
+    PreStocks,
 }
 
 pub(super) fn create_mint(
@@ -36,7 +38,7 @@ pub(super) fn create_mint(
         anchor_spl::token::ID
     };
     let mask = match kind {
-        Some(AssetFixture::Extended) => 15,
+        Some(AssetFixture::Extended | AssetFixture::PreStocks) => 15,
         Some(AssetFixture::Subset(mask)) => mask,
         _ => 0,
     };
@@ -51,6 +53,16 @@ pub(super) fn create_mint(
     .filter(|(bit, _)| mask & (1 << bit) != 0)
     .map(|(_, extension)| extension)
     .collect();
+    let prestocks = matches!(kind, Some(AssetFixture::PreStocks));
+    if prestocks {
+        extensions.extend([
+            ExtensionType::DefaultAccountState,
+            ExtensionType::ConfidentialTransferMint,
+            ExtensionType::ConfidentialTransferFeeConfig,
+            ExtensionType::TransferHook,
+            ExtensionType::MetadataPointer,
+        ]);
+    }
     if matches!(kind, Some(AssetFixture::UnsupportedHook)) {
         extensions.push(ExtensionType::TransferHook);
     }
@@ -60,7 +72,7 @@ pub(super) fn create_mint(
         system_interface::instruction::create_account(
             &auth,
             &mint_pk,
-            svm.minimum_balance_for_rent_exemption(size),
+            svm.minimum_balance_for_rent_exemption(size + if prestocks { 512 } else { 0 }),
             size as u64,
             &program,
         ),
@@ -110,10 +122,45 @@ pub(super) fn create_mint(
             .unwrap(),
         ));
     }
+    if prestocks {
+        ixs.extend([
+            to_vm_instruction(token::extension::default_account_state::instruction::initialize_default_account_state(&program, &mint_pk, &token::state::AccountState::Initialized).unwrap()),
+            to_vm_instruction(token::extension::confidential_transfer::instruction::initialize_mint(&program, &mint_pk, Some(auth), false, None).unwrap()),
+            to_vm_instruction(token::extension::confidential_transfer_fee::instruction::initialize_confidential_transfer_fee_config(&program, &mint_pk, Some(auth), &Default::default()).unwrap()),
+            to_vm_instruction(token::extension::transfer_hook::instruction::initialize(&program, &mint_pk, Some(auth), None).unwrap()),
+            to_vm_instruction(token::extension::metadata_pointer::instruction::initialize(&program, &mint_pk, Some(auth), Some(mint_pk)).unwrap()),
+        ]);
+    }
     ixs.push(to_vm_instruction(
-        token::instruction::initialize_mint2(&program, &mint_pk, &auth, Some(&auth), 6).unwrap(),
+        token::instruction::initialize_mint2(
+            &program,
+            &mint_pk,
+            &auth,
+            Some(&auth),
+            if prestocks { 9 } else { 6 },
+        )
+        .unwrap(),
     ));
     send(svm, &ixs, &[authority, &mint]).unwrap();
+    if prestocks {
+        send(
+            svm,
+            &[to_vm_instruction(
+                spl_token_metadata_interface::instruction::initialize(
+                    &program,
+                    &mint_pk,
+                    &auth,
+                    &mint_pk,
+                    &auth,
+                    "Issuer compatibility fixture".into(),
+                    "TEST".into(),
+                    "https://example.invalid/fixture.json".into(),
+                ),
+            )],
+            &[authority],
+        )
+        .unwrap();
+    }
     mint_pk
 }
 
@@ -157,7 +204,7 @@ pub fn create_token(
                 &signer_pubkey(authority),
                 &[],
                 amount,
-                6,
+                state.base.decimals,
             )
             .unwrap(),
         ),

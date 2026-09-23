@@ -6731,6 +6731,7 @@ dependencies = [
  "solana-system-interface 2.0.0",
  "solana-transaction",
  "solana-transaction-error",
+ "spl-token-metadata-interface 0.8.0",
  "volaryn",
 ]
 

@@ -21,5 +21,6 @@ solana-message = "4.2.4"
 solana-signer = "3.0.1"
 solana-transaction = { version = "4.1.5", features = ["serde"] }
 solana-transaction-error = "3"
+spl-token-metadata-interface = "=0.8.0"
 system-interface = { package = "solana-system-interface", version = "2", features = ["bincode"] }
 volaryn = { path = "../../programs/volaryn", features = ["no-entrypoint"] }
