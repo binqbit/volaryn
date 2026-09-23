@@ -73,7 +73,15 @@ async fn readiness_proxy_and_static_routes_keep_their_boundaries() {
     app.reconcile().await.unwrap();
     for (path, expected) in [
         ("/health/ready", 200),
+        ("/", 200),
+        ("/offers", 200),
+        ("/offers/new", 200),
+        ("/offers?after=example", 200),
+        ("/portfolio", 200),
+        ("/portfolio/written", 200),
         ("/agreements/example", 200),
+        ("/offers/missing", 404),
+        ("/portfolio/missing", 404),
         ("/api/missing", 404),
         ("/assets/missing.js", 404),
     ] {

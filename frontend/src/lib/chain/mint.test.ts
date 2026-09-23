@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { address, none, some } from '@solana/kit';
-import { type Mint } from '@solana-program/token-2022';
+import { address, getBase64Encoder, none, some } from '@solana/kit';
+import { AccountState, getMintDecoder, type Mint } from '@solana-program/token-2022';
+import captured from '../../../../tests/fixtures/prestocks/accounts.json';
 import { mintTerms, transferFee } from './mint';
 
 const owner = address('11111111111111111111111111111111');
@@ -14,6 +15,36 @@ const mint: Mint = {
 };
 
 describe('issuer delivery terms', () => {
+  it('reviews every captured official extension combination without changing gross units', () => {
+    for (const account of captured.result.value) {
+      const mint = getMintDecoder().decode(getBase64Encoder().encode(account.data[0]!));
+      const review = mintTerms(mint, 1000000000n, 1039n);
+      expect(review.decimals).toBe(9);
+      expect(review.issuerFee).toBe(10000000n);
+      expect(review.netReceipt).toBe(990000000n);
+      expect(review.accountSize).toBeGreaterThan(165);
+      expect(review.restrictions.join(' ')).toContain('transparent');
+    }
+  });
+  it('rejects an active hook and frozen defaults while preserving existing delivery', () => {
+    const frozen: Mint = {
+      ...mint,
+      extensions: some([{ __kind: 'DefaultAccountState', state: AccountState.Frozen }]),
+    };
+    expect(() => mintTerms(frozen, 1n, 1n)).toThrow('frozen');
+    expect(mintTerms(frozen, 1n, 1n, false).netReceipt).toBe(1n);
+    const active: Mint = {
+      ...mint,
+      extensions: some([
+        {
+          __kind: 'TransferHook',
+          authority: owner,
+          programId: address('TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb'),
+        },
+      ]),
+    };
+    expect(() => mintTerms(active, 1n, 1n)).toThrow('Active transfer hooks');
+  });
   it('uses integer ceiling, caps and exact u64 quantities for transfer fees', () => {
     expect(transferFee(1n, 75, 1000000n)).toBe(1n);
     expect(transferFee(1000000n, 75, 1000000n)).toBe(7500n);

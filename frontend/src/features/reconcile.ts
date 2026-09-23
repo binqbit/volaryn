@@ -45,6 +45,7 @@ export async function observeAction(rpc: Rpc<SolanaRpcApi>, pending: PendingTran
       const terms = pending.createdTerms;
       if (!terms) return 'unresolved';
       const matches = [
+        'underlyingMint',
         'nonce',
         'quantityRaw',
         'payout',

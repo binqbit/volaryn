@@ -139,6 +139,8 @@ export interface components {
             reserveAmount: string;
             settlement: string;
             status: string;
+            /** Format: int32 */
+            underlyingDecimals: number;
             underlyingMint: string;
             underlyingProgram: string;
             usdcMint: string;
@@ -151,16 +153,17 @@ export interface components {
             decimals: number;
             mint: string;
             name: string;
-            provenance: string;
+            referenceMint: string;
+            source: string;
             symbol: string;
         };
         Deployment: {
+            assets: components["schemas"]["AssetView"][];
             authority: string;
             /** Format: int32 */
             fixtureVersion: number;
             genesisHash: string;
             holder: string;
-            holderUnderlying: string;
             holderUsdc: string;
             mode: string;
             programId: string;
@@ -168,7 +171,6 @@ export interface components {
             programSha256: string;
             /** Format: int32 */
             schemaVersion: number;
-            underlyingMint: string;
             usdcMint: string;
             writer: string;
             writerUsdc: string;

@@ -32,6 +32,8 @@
   --color-error-border: #a75b70;
   --shadow-panel: 0 16px 48px #00000040;
   --shadow-accent: 0 4px 24px #9945ff30;
+  --space-card: 16px;
+  --space-card-compact: 12px;
   font-family:
     Inter,
     ui-sans-serif,
@@ -97,7 +99,7 @@ code {
 .startup {
   max-width: 640px;
   margin: 15vh max(20px, calc((100% - 640px) / 2));
-  padding: 32px;
+  padding: var(--space-card);
   border: 1px solid var(--color-border);
   border-radius: 14px;
   background: var(--color-surface);

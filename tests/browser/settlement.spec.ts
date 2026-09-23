@@ -1,4 +1,5 @@
-import { confirmReview } from './support/actions';
+import { demoBalances, fixtureAssets } from '../../tools/localnet/assets';
+import { approveTestSignature, confirmReview, selectAsset } from './support/actions';
 import { expect, test } from '@playwright/test';
 import { address, createSolanaRpc } from '@solana/kit';
 import { fetchToken } from '@solana-program/token';
@@ -16,12 +17,9 @@ test('holder rejects, isolates tabs, restores after closing a tab, and exercises
   const config = (await (
     await request.get('/api/config')
   ).json()) as components['schemas']['Deployment'];
+  const localAsset = (await fixtureAssets()).find((item) => item.asset.symbol === 'OPENAI')!;
   const rpc = createSolanaRpc(`${baseURL}/rpc`);
-  const accounts = await protocolAddresses(
-    address(config.underlyingMint),
-    address(config.writer),
-    1n,
-  );
+  const accounts = await protocolAddresses(localAsset.mint.address, address(config.writer), 1n);
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('websocket', () => errors.push('Unexpected WebSocket connection'));
@@ -30,16 +28,23 @@ test('holder rejects, isolates tabs, restores after closing a tab, and exercises
     if (req.url().endsWith('/rpc') && req.postDataJSON()?.method === 'sendTransaction')
       submissions++;
   });
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Connect Local test wallet' }).click();
+  await page.goto('/offers');
+  await page.getByRole('button', { name: 'Connect Test Wallet 1' }).click();
+  await selectAsset(page, 'OPENAI');
+  await page.getByRole('link', { name: 'View offer', exact: true }).click();
   const activate = page.getByRole('button', { name: 'Activate protection' });
   await expect(activate).toBeEnabled();
 
   // The wallet can reject; the contract stays funded and no transaction is sent.
-  page.once('dialog', (dialog) => dialog.dismiss());
   await activate.click();
   await confirmReview(page);
-  await expect(page.getByRole('alert')).toContainText('Signature rejected');
+  await page
+    .getByRole('dialog', { name: 'Approve test transaction', exact: true })
+    .getByRole('button', { name: 'Cancel signing' })
+    .click();
+  await expect(page.getByRole('alert')).toContainText(
+    'Signing cancelled. No transaction was sent.',
+  );
   expect(submissions).toBe(0);
   expect((await fetchAgreement(rpc, accounts.agreement)).data.status).toBe(AgreementStatus.Funded);
 
@@ -99,20 +104,28 @@ test('holder rejects, isolates tabs, restores after closing a tab, and exercises
       response.url().endsWith('/rpc') &&
       response.request().postDataJSON()?.method === 'sendTransaction',
   );
-  page.once('dialog', (dialog) => dialog.accept());
   await activate.click();
   await confirmReview(page);
+  await approveTestSignature(page);
   await submitted;
   const agreementUrl = page.url();
+  await page
+    .getByRole('navigation', { name: 'Main navigation' })
+    .getByRole('link', { name: 'Home', exact: true })
+    .click();
+  await expect(page.getByRole('heading', { level: 1 })).toContainText('Set a price floor');
+  await expect(page.getByRole('status', { name: 'Transaction status' })).toContainText(
+    'confirmation pending',
+  );
+  await page.goBack();
+  await expect(page.getByRole('heading', { name: 'Agreement details' })).toBeVisible();
   await page.close();
   page = await context.newPage();
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('websocket', () => errors.push('Unexpected WebSocket connection'));
   await page.goto(agreementUrl);
-  await expect(
-    page.getByText('No wallet holdings are loaded before you connect.', { exact: false }),
-  ).toBeVisible();
-  await page.getByRole('button', { name: 'Connect Local test wallet' }).click();
+  await expect(page.getByRole('region', { name: 'Your wallet' })).toContainText(config.holder);
+  await expect(page.getByRole('group', { name: 'USDC balance', exact: true })).toBeVisible();
   await expect(page.getByRole('status', { name: 'Transaction status' })).toContainText(
     'Transaction finalized',
   );
@@ -123,15 +136,15 @@ test('holder rejects, isolates tabs, restores after closing a tab, and exercises
   expect(active.status).toBe(AgreementStatus.Active);
   expect(
     (await fetchToken(rpc, address(config.holderUsdc), { commitment: 'finalized' })).data.amount,
-  ).toBe(BigInt(recipe.holderUsdc) - BigInt(recipe.premium));
+  ).toBe(demoBalances.usdc - BigInt(recipe.premium));
   expect(
-    (await fetchToken2022(rpc, address(config.holderUnderlying), { commitment: 'finalized' })).data
+    (await fetchToken2022(rpc, localAsset.holderAccount.address, { commitment: 'finalized' })).data
       .amount,
-  ).toBe(BigInt(recipe.holderUnderlying));
+  ).toBe(demoBalances.tokenUnits * 10n ** BigInt(localAsset.asset.decimals));
 
-  page.once('dialog', (dialog) => dialog.accept());
   await exercise.click();
   await confirmReview(page);
+  await approveTestSignature(page);
   await expect(page.getByText('SETTLEMENT COMPLETE', { exact: true })).toBeVisible();
   await expect(page.getByRole('status', { name: 'Transaction status' })).toContainText(
     'Transaction finalized',
@@ -142,13 +155,13 @@ test('holder rejects, isolates tabs, restores after closing a tab, and exercises
   expect(settled.status).toBe(AgreementStatus.Exercised);
   expect(delivered.data.owner).toBe(config.writer);
   expect(delivered.data.amount).toBe(settled.netReceived);
-  expect(settled.netReceived).toBe(992500n);
+  expect(settled.netReceived).toBe(992500000n);
   expect(
     (await fetchToken(rpc, address(config.holderUsdc), { commitment: 'finalized' })).data.amount,
-  ).toBe(BigInt(recipe.holderUsdc) - BigInt(recipe.premium) + BigInt(recipe.payout));
+  ).toBe(demoBalances.usdc - BigInt(recipe.premium) + BigInt(recipe.payout));
   expect(
     (await fetchToken(rpc, address(config.writerUsdc), { commitment: 'finalized' })).data.amount,
-  ).toBe(BigInt(recipe.writerBalance) - BigInt(recipe.payout) + BigInt(recipe.premium));
+  ).toBe(demoBalances.usdc - 2n * BigInt(recipe.payout) + BigInt(recipe.premium));
   expect((await fetchToken(rpc, accounts.reserve, { commitment: 'finalized' })).data.amount).toBe(
     0n,
   );
@@ -170,9 +183,18 @@ test('same-origin transport preserves RPC errors and static-route boundaries', a
   expect((await denied.json()).error.code).toBe(-32601);
   expect((await request.get('/api/missing')).status()).toBe(404);
   expect((await request.get('/assets/missing.js')).status()).toBe(404);
-  expect((await request.get('/agreements/example')).headers()['content-type']).toContain(
-    'text/html',
-  );
+  for (const path of [
+    '/offers',
+    '/offers/new',
+    '/portfolio',
+    '/portfolio/written',
+    '/agreements/example',
+  ]) {
+    const response = await request.get(path);
+    expect(response.status()).toBe(200);
+    expect(response.headers()['content-type']).toContain('text/html');
+    expect(response.headers()['cache-control']).toBe('no-cache');
+  }
   expect((await request.get('/api/config')).headers()['cache-control']).toBe('no-store');
 });
 

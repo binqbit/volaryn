@@ -163,6 +163,7 @@ describe('writer action reconciliation', () => {
     expect(await observeAction(rpc, pending)).toBe('unresolved');
     pending.createdTerms = {
       nonce: '1',
+      underlyingMint: owner,
       quantityRaw: '10',
       payout: '20',
       premium: '1',
@@ -171,6 +172,9 @@ describe('writer action reconciliation', () => {
       designatedHolder: null,
     };
     expect(await observeAction(rpc, pending)).toBe('reconciled');
+    pending.createdTerms.underlyingMint = other;
+    expect(await observeAction(rpc, pending)).toBe('unresolved');
+    pending.createdTerms.underlyingMint = owner;
     pending.createdTerms.payout = '21';
     expect(await observeAction(rpc, pending)).toBe('unresolved');
   });

@@ -3,12 +3,13 @@ import { address, createSolanaRpc } from '@solana/kit';
 import { fetchToken } from '@solana-program/token';
 import { fetchToken as fetchAsset } from '@solana-program/token-2022';
 import { AgreementStatus, fetchAgreement, protocolAddresses } from '@volaryn/protocol';
-import type { Deployment } from '../../frontend/src/lib/api/client';
-import { confirmReview, signAction, switchWallet } from './support/actions';
+import type { Deployment, Wallet } from '../../frontend/src/lib/api/client';
+import { confirmReview, signAction, switchWallet, selectAsset } from './support/actions';
 
 async function fillOffer(page: Page, expiry?: bigint) {
-  await page.goto('/writer');
+  await page.goto('/offers/new');
   await switchWallet(page, 'writer');
+  await selectAsset(page, 'SPACEX');
   await page.getByLabel('Gross quantity (raw-token units)', { exact: true }).fill('0.2');
   await page.getByLabel('Payout (USDC)', { exact: true }).fill('5');
   await page.getByLabel('Premium (USDC)', { exact: true }).fill('0.1');
@@ -25,6 +26,10 @@ test('writer funds and cancels offers, holder matches and exercises, writer rece
   baseURL,
 }, info) => {
   test.setTimeout(240_000);
+  // Browser suppression of native confirmation popups must not reject an explicit approval.
+  await page.addInitScript(() => {
+    window.confirm = () => false;
+  });
   const config = (await (await request.get('/api/config')).json()) as Deployment;
   const rpc = createSolanaRpc(`${baseURL}/rpc`);
   const balance = async () =>
@@ -37,16 +42,11 @@ test('writer funds and cancels offers, holder matches and exercises, writer rece
   await expect(page.getByRole('button', { name: 'Review funded offer' })).toBeFocused();
   expect(await balance()).toBe(start);
   let submissions = 0;
-  let approvals = 0;
   page.on('request', (request) => {
     if (request.url().endsWith('/rpc') && request.postDataJSON()?.method === 'sendTransaction')
       submissions++;
   });
   await page.getByRole('button', { name: 'Review funded offer' }).click();
-  page.once('dialog', (dialog) => {
-    approvals++;
-    void dialog.accept();
-  });
   await page
     .getByRole('dialog')
     .getByRole('button', { name: 'Confirm and sign' })
@@ -54,10 +54,18 @@ test('writer funds and cancels offers, holder matches and exercises, writer rece
       (button as HTMLButtonElement).click();
       (button as HTMLButtonElement).click();
     });
+  const approval = page.getByRole('dialog', { name: 'Approve test transaction', exact: true });
+  await expect(approval).toHaveCount(1);
+  await approval
+    .getByRole('button', { name: 'Sign transaction', exact: true })
+    .evaluate((button) => {
+      (button as HTMLButtonElement).click();
+      (button as HTMLButtonElement).click();
+    });
+  await expect(approval).toHaveCount(0);
   await expect(page.getByRole('status', { name: 'Transaction status' })).toContainText(
     'Transaction finalized',
   );
-  expect(approvals).toBe(1);
   expect(submissions).toBe(1);
   const cancelledAddress = address(page.url().split('/').at(-1)!);
   expect(await balance()).toBe(start - 5_000_000n);
@@ -67,12 +75,15 @@ test('writer funds and cancels offers, holder matches and exercises, writer rece
   await signAction(page, 'Recover residual funds');
 
   await fillOffer(page);
+  await page.getByText('Restrict to a wallet', { exact: true }).click();
   await page.getByLabel('Designated holder (optional)').fill(config.holder);
   await signAction(page, 'Review funded offer');
   const agreementAddress = address(page.url().split('/').at(-1)!);
   await switchWallet(page, 'holder');
-  await page.goto('/protection');
+  await page.goto('/offers');
   await switchWallet(page, 'holder');
+  await selectAsset(page, 'SPACEX');
+  await page.getByText('More filters', { exact: true }).click();
   await page.getByLabel('Exact quantity (raw-token units)').fill('0.3');
   await page.getByRole('button', { name: 'Find matching offers' }).click();
   await expect(
@@ -82,23 +93,55 @@ test('writer funds and cancels offers, holder matches and exercises, writer rece
   await page.getByLabel('Minimum payout (USDC)').fill('5');
   await page.getByLabel('Maximum premium (USDC)').fill('0.1');
   await page.getByRole('button', { name: 'Find matching offers' }).click();
-  await expect(page.getByRole('article')).toHaveCount(1);
+  await expect(page.getByRole('article', { name: /^Agreement / })).toHaveCount(1);
+  await page.getByRole('link', { name: 'View offer', exact: true }).click();
   await signAction(page, 'Activate protection');
   await switchWallet(page, 'writer');
   await expect(page.getByRole('button', { name: 'Cancel offer', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Reclaim expired reserve' })).toBeDisabled();
+  // A stale or dishonest projection cannot substitute another mint's delivery account.
+  await page.route('**/api/wallet?**', async (route) => {
+    const response = await route.fetch();
+    const wallet = (await response.json()) as Wallet;
+    const wrongSource = wallet.accounts.find(
+      (account) => account.mint === config.assets.find((asset) => asset.symbol === 'OPENAI')!.mint,
+    );
+    const selectedMint = config.assets.find((asset) => asset.symbol === 'SPACEX')!.mint;
+    await route.fulfill({
+      response,
+      json: {
+        ...wallet,
+        accounts: wallet.accounts.map((account) =>
+          account.mint === selectedMint && wrongSource
+            ? { ...account, address: wrongSource.address }
+            : account,
+        ),
+      },
+    });
+  });
+  await switchWallet(page, 'holder');
+  const submittedBefore = submissions;
+  await page.getByRole('button', { name: 'Exercise protection' }).click();
+  await expect(page.getByRole('alert')).toContainText(
+    'The underlying account is unavailable or frozen',
+  );
+  expect(submissions).toBe(submittedBefore);
+  await page.unroute('**/api/wallet?**');
   await switchWallet(page, 'holder');
   await signAction(page, 'Exercise protection');
   const settled = (await fetchAgreement(rpc, agreementAddress)).data;
+  expect(settled.underlyingMint).toBe(
+    config.assets.find((asset) => asset.symbol === 'SPACEX')!.mint,
+  );
+  expect(settled.underlyingDecimals).toBe(9);
   expect(settled.status).toBe(AgreementStatus.Exercised);
-  expect(settled.netReceived).toBe(198500n);
+  expect(settled.netReceived).toBe(198500000n);
   const accounts = await protocolAddresses(settled.underlyingMint, settled.writer, settled.nonce);
   const receipt = (await fetchAsset(rpc, accounts.settlement)).data;
   expect(receipt.owner).toBe(config.writer);
   expect(receipt.amount).toBe(settled.netReceived);
   expect(await balance()).toBe(start - 5_000_000n + 100_000n);
   await switchWallet(page, 'writer');
-  await page.getByText('Token accounts and balances', { exact: true }).click();
   await expect(page.getByRole('region', { name: 'Your wallet' })).toContainText(
     accounts.settlement,
   );
@@ -134,7 +177,7 @@ test('expired protection disables delivery and returns the reserve only to its w
   expect((await fetchToken(rpc, address(config.writerUsdc))).data.amount).toBe(before + 5_000_000n);
 });
 
-test('writer rejection submits nothing and the next wallet starts without a review', async ({
+test('cancelling test signing by button or Escape submits nothing and permits another review', async ({
   page,
 }) => {
   await fillOffer(page);
@@ -146,9 +189,32 @@ test('writer rejection submits nothing and the next wallet starts without a revi
     if (request.url().endsWith('/rpc') && request.postDataJSON()?.method === 'sendTransaction')
       submissions++;
   });
-  page.once('dialog', (dialog) => dialog.dismiss());
+  const browserDialogs: string[] = [];
+  page.on('dialog', async (dialog) => {
+    browserDialogs.push(dialog.message());
+    await dialog.dismiss();
+  });
   await confirmReview(page);
-  await expect(page.getByRole('alert')).toContainText('Signature rejected');
+  const approval = page.getByRole('dialog', { name: 'Approve test transaction', exact: true });
+  await expect(approval).toContainText('Test Wallet 2');
+  await approval.getByRole('button', { name: 'Cancel signing' }).click();
+  await expect(page.getByRole('alert')).toContainText(
+    'Signing cancelled. No transaction was sent.',
+  );
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Review funded offer' })).toBeFocused();
+  expect(submissions).toBe(0);
+
+  // Escape is also an explicit cancellation, never an approval.
+  await page.getByRole('button', { name: 'Review funded offer' }).click();
+  await confirmReview(page);
+  await expect(approval).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('alert')).toContainText(
+    'Signing cancelled. No transaction was sent.',
+  );
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect(browserDialogs).toEqual([]);
   await switchWallet(page, 'holder');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   expect(submissions).toBe(0);

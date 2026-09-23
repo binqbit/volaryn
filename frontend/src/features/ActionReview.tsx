@@ -1,6 +1,8 @@
 import { useEffect, useRef } from 'react';
-import { formatUnits } from '../lib/api/client';
+import { formatUnits, shortAddress, type Asset } from '../lib/api/client';
 import { actionLabels, type ActionReview as Review } from '../lib/chain/actionTypes';
+import { AssetIdentity } from './AssetIdentity';
+import { Details } from './Details';
 import styles from '../App.module.css';
 
 export const date = (seconds: string) =>
@@ -11,11 +13,13 @@ export const date = (seconds: string) =>
   }).format(new Date(Number(seconds) * 1000)) + ' UTC';
 
 export function ActionReview({
+  assets,
   review,
   busy,
   onConfirm,
   onCancel,
 }: {
+  assets: Asset[];
   review: Review;
   busy: boolean;
   onConfirm: () => void;
@@ -51,10 +55,11 @@ export function ActionReview({
                 ? 'Recover any residual USDC and hand off an unused settlement account. This does not close the agreement record.'
                 : 'Return the reserved payout to your selected USDC account. This is allowed only by the current agreement state.'}
       </p>
+      <AssetIdentity assets={assets} mint={review.underlyingMint} />
       <dl className={styles.terms}>
         <div>
           <dt>Gross delivery</dt>
-          <dd>{formatUnits(review.quantityRaw)} raw-token units</dd>
+          <dd>{formatUnits(review.quantityRaw, review.underlyingDecimals)} raw-token units</dd>
         </div>
         <div>
           <dt>Contractual USDC payout</dt>
@@ -83,11 +88,13 @@ export function ActionReview({
           <>
             <div>
               <dt>Estimated issuer fee at exercise</dt>
-              <dd>{formatUnits(review.issuerFee)} raw-token units</dd>
+              <dd>{formatUnits(review.issuerFee, review.underlyingDecimals)} raw-token units</dd>
             </div>
             <div>
               <dt>Estimated net writer receipt</dt>
-              <dd>{formatUnits(review.estimatedNetReceipt)} raw-token units</dd>
+              <dd>
+                {formatUnits(review.estimatedNetReceipt, review.underlyingDecimals)} raw-token units
+              </dd>
             </div>
           </>
         )}
@@ -108,22 +115,24 @@ export function ActionReview({
           <dd>{formatUnits(review.accountRent, 9)} SOL</dd>
         </div>
       </dl>
-      <p className={styles.note}>
-        Signing wallet <code>{review.owner}</code>
-      </p>
-      <p className={styles.note}>
-        USDC account <code>{review.usdcAccount}</code>
-      </p>
-      {review.underlyingAccount && (
-        <p className={styles.note}>
-          Delivery source <code>{review.underlyingAccount}</code>
-        </p>
-      )}
       {review.operation === 'create' && (
         <p className={styles.note}>
           Eligible holder: <code>{review.designatedHolder ?? 'Any eligible wallet'}</code>
         </p>
       )}
+      <Details title="Transaction accounts" hint={`Wallet ${shortAddress(review.owner)}`}>
+        <p className={styles.note}>
+          Signing wallet <code>{review.owner}</code>
+        </p>
+        <p className={styles.note}>
+          USDC account <code>{review.usdcAccount}</code>
+        </p>
+        {review.underlyingAccount && (
+          <p className={styles.note}>
+            Delivery source <code>{review.underlyingAccount}</code>
+          </p>
+        )}
+      </Details>
       {transfers && (
         <ul className={styles.restrictions}>
           {review.restrictions.map((text) => (

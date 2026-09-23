@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
-import { Link } from 'react-router';
-import { formatUnits, type Deployment, type Wallet } from '../lib/api/client';
+import type { Deployment, Wallet } from '../lib/api/client';
+import { HoldingCard } from './HoldingCard';
+import { UsdcBalance } from './UsdcBalance';
 import styles from '../App.module.css';
 
 export function PositionPanel({
@@ -18,12 +19,12 @@ export function PositionPanel({
   status: string;
   children: ReactNode;
 }) {
-  const demo = owner === deployment.holder || owner === deployment.writer;
-  const underlying =
-    wallet?.accounts.filter((account) => account.mint === deployment.underlyingMint) ?? [];
-  const usdc = wallet?.accounts.filter((account) => account.mint === deployment.usdcMint) ?? [];
-  const total = (accounts: typeof underlying) =>
-    accounts.reduce((sum, account) => sum + BigInt(account.amountRaw), 0n).toString();
+  const demo =
+    import.meta.env.MODE === 'localnet' &&
+    (owner === deployment.holder || owner === deployment.writer);
+  const holdings = deployment.assets.filter((asset) =>
+    wallet?.accounts.some((account) => account.mint === asset.mint),
+  );
   return (
     <section id="wallet" className={styles.position} aria-labelledby="position-title">
       <div className={styles.cardHeading}>
@@ -32,97 +33,54 @@ export function PositionPanel({
       </div>
       {!owner ? (
         <>
-          <h3 className={styles.welcomeTitle}>Start with your wallet</h3>
-          <p className={styles.note}>
-            Connect to view balances for your address and check which protection belongs to you. No
-            wallet holdings are loaded before you connect.
-          </p>
-          <div className={styles.demoWalletNote}>
-            <strong>Try a local test wallet</strong>
-            <p>
-              The holder starts with test assets and USDC. The writer starts with USDC to fund
-              offers. Both are disposable demo wallets.
+          <p className={styles.note}>Connect to see your balances and manage your protection.</p>
+          {import.meta.env.MODE === 'localnet' && (
+            <p className={styles.note}>
+              Use two test wallets to try both sides: buy protection with Test Wallet 1 and fund
+              offers with Test Wallet 2, or swap roles. Disconnect to switch.
             </p>
-          </div>
+          )}
           {children}
           <p className={styles.note}>
-            Connecting does not move funds or activate protection. Each action needs your approval.
+            Connecting is free. Funds move only after you approve a transaction.
           </p>
         </>
       ) : (
         <>
           <div className={styles.connectedIdentity}>
             <strong>{walletName}</strong>
-            <code>{owner}</code>
+            <code aria-label="Connected wallet address">{owner}</code>
           </div>
-          <p className={styles.note}>
-            {demo
-              ? 'This is a provided test wallet. Its starting balances were preloaded for the local demo; the balances below reflect its activity on this ledger.'
-              : 'Balances are read for this address on the connected network.'}
-          </p>
           {wallet ? (
             <>
-              <div className={styles.assetRow}>
-                <div className={styles.assetIcon} aria-hidden="true">
-                  P<span>↗</span>
-                </div>
-                <div>
-                  <h3>Demo asset balance</h3>
-                  <p>TEST ASSET · Token-2022</p>
-                </div>
+              <UsdcBalance wallet={wallet} mint={deployment.usdcMint} status={status} />
+              <div className={styles.holdingsHeading}>
+                <h3>
+                  {import.meta.env.MODE === 'localnet'
+                    ? 'PreStocks demo balances'
+                    : 'Your PreStocks'}
+                </h3>
+                <span>
+                  {holdings.length} {holdings.length === 1 ? 'token' : 'tokens'}
+                </span>
               </div>
-              <p className={styles.balance}>
-                {formatUnits(total(underlying))}
-                <span>raw-token units across {underlying.length} accounts</span>
-              </p>
-              <div className={styles.positionDivider} />
-              <dl>
-                <div>
-                  <dt>Available test USDC</dt>
-                  <dd>{formatUnits(total(usdc.filter((account) => !account.frozen)))}</dd>
-                </div>
-                <div>
-                  <dt>Observation</dt>
-                  <dd>
-                    {status === 'error'
-                      ? 'Unavailable · last known'
-                      : status === 'fetching'
-                        ? 'Refreshing'
-                        : 'Finalized'}
-                  </dd>
-                </div>
-              </dl>
-              {!wallet.accounts.length && (
-                <p role="status" className={styles.note}>
-                  No supported token accounts were found for this wallet on the local network.
+              {holdings.length === 0 && (
+                <p className={styles.note}>
+                  {import.meta.env.MODE === 'localnet'
+                    ? 'No PreStocks demo tokens in this wallet.'
+                    : 'No supported PreStocks in this wallet.'}
                 </p>
               )}
+              <div className={styles.holdingsGrid}>
+                {holdings.map((asset) => {
+                  const accounts = wallet.accounts.filter((account) => account.mint === asset.mint);
+                  return <HoldingCard key={asset.mint} asset={asset} accounts={accounts} />;
+                })}
+              </div>
               <p className={styles.note}>
-                Holding this asset does not mean protection is active. Each action uses one selected
-                account; balances are not automatically combined. Frozen holdings cannot be
+                Token holdings are separate from purchased protection. Frozen holdings cannot be
                 delivered.
               </p>
-              <details>
-                <summary>Token accounts and balances</summary>
-                {wallet.accounts.map((account) => (
-                  <div key={account.address} className={styles.accountRow}>
-                    <strong>
-                      {account.mint === deployment.usdcMint ? 'USDC' : 'Demo asset'} ·{' '}
-                      {formatUnits(account.amountRaw)}
-                      {account.frozen ? ' · frozen' : ''}
-                    </strong>
-                    <code>{account.address}</code>
-                  </div>
-                ))}
-              </details>
-              <div className={styles.actions}>
-                <Link className={styles.outlineButton} to="/protection">
-                  Choose protection
-                </Link>
-                <Link className={styles.outlineButton} to="/writer">
-                  Write an offer
-                </Link>
-              </div>
             </>
           ) : (
             <p role="status" className={styles.note}>
@@ -131,6 +89,11 @@ export function PositionPanel({
                 : "Loading this wallet's balances…"}
             </p>
           )}
+          <p className={styles.note}>
+            {import.meta.env.MODE === 'localnet' && demo
+              ? 'This is a provided test wallet. Balances reflect its activity on this local ledger.'
+              : 'Balances are read for this address on the connected network.'}
+          </p>
         </>
       )}
     </section>

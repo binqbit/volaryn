@@ -69,7 +69,14 @@ export async function buildAction(
   if ((await rpc.getGenesisHash().send()) !== deployment.genesisHash)
     throw new Error('Wrong network: the ledger identity changed');
   const now = await chainTime(client);
-  const mintAddress = address(deployment.underlyingMint);
+  const mintAddress = address(
+    request.operation === 'create'
+      ? request.terms.underlyingMint
+      : request.agreement.underlyingMint,
+  );
+  const asset = deployment.assets.find((item) => item.mint === mintAddress);
+  if (request.operation === 'create' && !asset)
+    throw new Error('Choose a supported PreStocks token');
   const usdcMint = address(deployment.usdcMint);
   const usdcAddress = address(request.usdcAccount);
   const { data: usdc, programAddress: usdcProgram } = await fetchToken(rpc, usdcAddress, {
@@ -91,7 +98,14 @@ export async function buildAction(
   const expiresAt = amount(terms.expiresAt);
   const transferRequired = ['create', 'activate', 'exercise'].includes(request.operation);
   // Refunds depend only on USDC and agreement state, never on issuer mint availability.
-  let mint = { netReceipt: 0n, issuerFee: 0n, accountSize: 0, restrictions: [] as string[] };
+  let mint = {
+    decimals:
+      request.operation === 'create' ? asset!.decimals : request.agreement.underlyingDecimals,
+    netReceipt: 0n,
+    issuerFee: 0n,
+    accountSize: 0,
+    restrictions: [] as string[],
+  };
   if (transferRequired) {
     const [mintAccount, epoch] = await Promise.all([
       fetchMint(rpc, mintAddress, { commitment: 'confirmed' }),
@@ -99,7 +113,9 @@ export async function buildAction(
     ]);
     if (mintAccount.programAddress !== TOKEN_2022_PROGRAM_ADDRESS)
       throw new Error('Unsupported underlying token program');
-    mint = mintTerms(mintAccount.data, quantity, epoch.epoch);
+    if (mintAccount.data.decimals !== mint.decimals)
+      throw new Error('Token precision differs from the reviewed terms');
+    mint = mintTerms(mintAccount.data, quantity, epoch.epoch, request.operation !== 'exercise');
   }
   let addresses;
   let instruction;
@@ -129,7 +145,7 @@ export async function buildAction(
       policy.programAddress !== VOLARYN_PROGRAM_ADDRESS ||
       policy.data.mint !== mintAddress ||
       policy.data.tokenProgram !== TOKEN_2022_PROGRAM_ADDRESS ||
-      policy.data.decimals !== 6 ||
+      policy.data.decimals !== mint.decimals ||
       !policy.data.enabled ||
       now >= policy.data.reviewedUntil ||
       expiresAt > policy.data.maxExpiry
@@ -159,7 +175,7 @@ export async function buildAction(
       holder: some(signer.address),
       underlyingMint: mintAddress,
       underlyingProgram: TOKEN_2022_PROGRAM_ADDRESS,
-      underlyingDecimals: 6,
+      underlyingDecimals: mint.decimals,
       usdcMint,
       usdcProgram: TOKEN_PROGRAM_ADDRESS,
       quantityRaw: quantity,
@@ -197,6 +213,7 @@ export async function buildAction(
     )
       throw new Error('Agreement identity is not supported');
     if (
+      agreement.underlyingDecimals !== request.agreement.underlyingDecimals ||
       agreement.quantityRaw !== quantity ||
       agreement.payout !== payout ||
       agreement.premium !== premium ||
@@ -232,7 +249,7 @@ export async function buildAction(
         policyProgram !== VOLARYN_PROGRAM_ADDRESS ||
         policy.mint !== mintAddress ||
         policy.tokenProgram !== TOKEN_2022_PROGRAM_ADDRESS ||
-        policy.decimals !== 6 ||
+        policy.decimals !== mint.decimals ||
         agreement.status !== AgreementStatus.Funded ||
         now >= acceptBefore ||
         !policy.enabled ||
@@ -313,6 +330,8 @@ export async function buildAction(
   return {
     instructions,
     review: {
+      underlyingMint: mintAddress,
+      underlyingDecimals: mint.decimals,
       owner: signer.address,
       agreement: addresses.agreement,
       operation: request.operation,

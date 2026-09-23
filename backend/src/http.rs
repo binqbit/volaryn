@@ -103,7 +103,17 @@ pub fn router(application: Arc<Application>, frontend: PathBuf) -> Router {
 
 async fn serve_frontend(uri: Uri, directory: PathBuf) -> Response {
     let path = uri.path();
-    if matches!(path, "/" | "/writer" | "/protection") || path.starts_with("/agreements/") {
+    if matches!(
+        path,
+        "/" | "/offers"
+            | "/offers/new"
+            | "/portfolio"
+            | "/portfolio/written"
+            | "/writer"
+            | "/protection"
+            | "/issuer-assets"
+    ) || path.starts_with("/agreements/")
+    {
         match tokio::fs::read(directory.join("index.html")).await {
             Ok(bytes) => (
                 [
@@ -160,13 +170,7 @@ async fn config(State(app): State<Arc<Application>>) -> Result<Json<Deployment>,
 #[utoipa::path(get, path = "/api/assets", responses((status = 200, body = [AssetView])))]
 async fn assets(State(app): State<Arc<Application>>) -> Result<Json<Vec<AssetView>>, AppError> {
     app.ensure_chain().await?;
-    Ok(Json(vec![AssetView {
-        mint: app.deployment.underlying_mint.clone(),
-        symbol: "DEMO".into(),
-        name: "Private-market test position".into(),
-        decimals: 6,
-        provenance: "Disposable local fixture; not an official PreStocks asset".into(),
-    }]))
+    Ok(Json(app.deployment.assets.clone()))
 }
 
 #[derive(Deserialize)]

@@ -12,7 +12,7 @@ if (!element) throw new Error('Application root is missing');
 const root = createRoot(element);
 root.render(
   <main className="startup" role="status">
-    Connecting to your local deployment…
+    Connecting to Volaryn…
   </main>,
 );
 
@@ -20,15 +20,14 @@ async function start() {
   try {
     const result = await api.GET('/api/config');
     if (!result.data)
-      throw new Error('The application is not ready. Check the local services and try again.');
-    const deployment = validateDeployment(result.data);
-    const client = createAppClient();
-    if ((await client.rpc.getGenesisHash().send()) !== deployment.genesisHash)
-      throw new Error('Network identity mismatch');
+      throw new Error('The application is not ready. Check the services and try again.');
+    const deployment = validateDeployment(result.data, import.meta.env.MODE);
     if (import.meta.env.MODE === 'localnet') {
       const { registerDemoWallet } = await import('./localnet/wallet');
       await registerDemoWallet(deployment);
     }
+    const client = await createAppClient(deployment);
+    await client.wallet.whenReady();
     root.render(
       <StrictMode>
         <ClientProvider client={client}>

@@ -7,14 +7,17 @@ export const api = createClient<paths>({
   baseUrl: '',
   fetch: (input) => fetch(input, { cache: 'no-store' }),
 });
+export type Asset = components['schemas']['AssetView'];
 export type Deployment = components['schemas']['Deployment'];
 export type Agreement = components['schemas']['AgreementView'];
 export type Wallet = components['schemas']['WalletView'];
 export type TokenAccount = components['schemas']['WalletTokenAccount'];
 
-export function validateDeployment(value: Deployment): Deployment {
+export function validateDeployment(value: Deployment, buildMode: string): Deployment {
+  if (value.mode === 'localnet' && buildMode !== 'localnet')
+    throw new Error('This application build cannot open a localnet deployment.');
   if (
-    value.schemaVersion !== 1 ||
+    value.schemaVersion !== 2 ||
     value.mode !== 'localnet' ||
     value.fixtureVersion !== 1 ||
     value.programId !== VOLARYN_PROGRAM_ADDRESS
@@ -23,16 +26,31 @@ export function validateDeployment(value: Deployment): Deployment {
   for (const key of [
     value.genesisHash,
     value.programId,
-    value.underlyingMint,
     value.usdcMint,
     value.holder,
     value.writer,
     value.writerUsdc,
     value.authority,
     value.holderUsdc,
-    value.holderUnderlying,
   ])
     address(key);
+  if (
+    !value.assets.length ||
+    new Set(value.assets.map((asset) => asset.mint)).size !== value.assets.length
+  )
+    throw new Error('Invalid deployment assets');
+  for (const asset of value.assets) {
+    address(asset.mint);
+    address(asset.referenceMint);
+    if (
+      asset.mint === value.usdcMint ||
+      asset.mint === asset.referenceMint ||
+      !Number.isInteger(asset.decimals) ||
+      asset.decimals < 0 ||
+      asset.decimals > 18
+    )
+      throw new Error('Invalid deployment asset identity');
+  }
   return value;
 }
 

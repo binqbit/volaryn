@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   useConnectedWallet,
   useConnect,
@@ -6,20 +6,32 @@ import {
   useWallets,
 } from '@solana/kit-plugin-wallet/react';
 import { useClient } from '@solana/react';
-import { Link, useMatch, useSearchParams, useNavigate, useLocation } from 'react-router';
-import { shortAddress, formatUnits, type Deployment } from './lib/api/client';
+import {
+  Link,
+  NavLink,
+  Navigate,
+  Outlet,
+  Route,
+  Routes,
+  useNavigate,
+  useLocation,
+} from 'react-router';
+import { shortAddress, type Deployment } from './lib/api/client';
 import type { AppClient } from './lib/chain/client';
-import { usePortfolio, type PortfolioQuery } from './features/usePortfolio';
+import type { PortfolioQuery } from './features/usePortfolio';
 import { useWallet } from './features/useWallet';
-import { useChainTime } from './features/useChainTime';
-import { OfferForm } from './features/OfferForm';
-import { OfferFilters } from './features/OfferFilters';
 import { ActionReview } from './features/ActionReview';
 import { TransactionStatus } from './features/TransactionStatus';
 import type { ActionRequest, ActionReview as Review } from './lib/chain/actionTypes';
 import { useTransaction } from './features/useTransaction';
 import { PositionPanel } from './features/PositionPanel';
-import { AgreementPanel } from './features/AgreementPanel';
+import { Details } from './features/Details';
+import { OfficialAssets } from './features/OfficialAssets';
+import { HomePage } from './pages/HomePage';
+import { OffersPage } from './pages/OffersPage';
+import { CreateOfferPage } from './pages/CreateOfferPage';
+import { PortfolioPage } from './pages/PortfolioPage';
+import { AgreementPage } from './pages/AgreementPage';
 import styles from './App.module.css';
 
 export function App({ deployment }: { deployment: Deployment }) {
@@ -28,35 +40,35 @@ export function App({ deployment }: { deployment: Deployment }) {
   const wallets = useWallets(client);
   const connect = useConnect(client);
   const disconnect = useDisconnect(client);
-  const selected = useMatch('/agreements/:address')?.params.address;
-  const [search] = useSearchParams();
   const navigate = useNavigate();
-  const owner = connected?.account.address;
   const location = useLocation();
-  const writerPage = location.pathname === '/writer';
-  const protectionPage = location.pathname === '/protection';
+  const owner = connected?.account.address;
   const [filters, setFilters] = useState<PortfolioQuery>({ mode: 'offers' });
-  const query: PortfolioQuery = writerPage
-    ? { mode: 'writer' }
-    : protectionPage
-      ? filters
-      : { mode: 'all' };
+  const [revision, setRevision] = useState(0);
+  // Keep transaction recovery mounted when the user moves between pages.
   const transaction = useTransaction(client, deployment, owner);
   const wallet = useWallet(owner);
-  const now = useChainTime(client);
-  const portfolio = usePortfolio(
-    deployment,
-    owner,
-    selected,
-    search.get('after') ?? undefined,
-    query,
-  );
   const [review, setReview] = useState<{ request: ActionRequest; value: Review }>();
   const [reviewError, setReviewError] = useState('');
   const [preparing, setPreparing] = useState(false);
   const previewLock = useRef(false);
   const reviewTrigger = useRef<HTMLElement | null>(null);
   const visibleReview = review?.value.owner === owner ? review : undefined;
+  const workspace =
+    location.pathname.startsWith('/offers') ||
+    location.pathname.startsWith('/portfolio') ||
+    location.pathname.startsWith('/agreements');
+
+  useEffect(() => {
+    const main = document.getElementById('main');
+    document.title = `${main?.querySelector('h1')?.textContent ?? 'Volaryn'} · Volaryn`;
+    if (location.hash === '#wallet') document.getElementById('wallet')?.scrollIntoView();
+    else {
+      window.scrollTo(0, 0);
+      main?.focus({ preventScroll: true });
+    }
+  }, [location.pathname, location.hash]);
+
   const onReview = async (request: ActionRequest) => {
     if (previewLock.current || transaction.busy) return;
     previewLock.current = true;
@@ -81,51 +93,64 @@ export function App({ deployment }: { deployment: Deployment }) {
       const agreement = await transaction.execute(visibleReview.request, visibleReview.value);
       setReview(undefined);
       if (agreement) await navigate(`/agreements/${agreement}`);
-      portfolio.refresh();
+      else requestAnimationFrame(() => reviewTrigger.current?.focus());
+      setRevision((value) => value + 1);
       wallet.refresh();
     } finally {
       previewLock.current = false;
     }
   };
-  const agreements = portfolio.data?.agreements ?? [];
-  const usable =
-    !!wallet.data &&
-    wallet.status !== 'error' &&
-    portfolio.status !== 'error' &&
-    !transaction.busy &&
-    !preparing;
   const busy = transaction.busy || preparing || wallet.status === 'error';
-  const unavailable = portfolio.status === 'error' || (!!owner && wallet.status === 'error');
-  const refresh = () => {
-    portfolio.refresh();
-    wallet.refresh();
-  };
-  const capital = agreements
-    .filter((item) => item.status === 'funded' || item.status === 'active')
-    .reduce((sum, item) => sum + BigInt(item.reserveAmount), 0n);
+  const usable = !!wallet.data && !busy;
+  const walletPanel = (
+    <PositionPanel
+      deployment={deployment}
+      owner={owner}
+      walletName={connected?.wallet.name}
+      wallet={wallet.data}
+      status={wallet.status}
+    >
+      {wallets.map((wallet) => (
+        <button
+          key={wallet.name}
+          className={styles.walletButton}
+          disabled={connect.isRunning}
+          onClick={() => connect.dispatch(wallet)}
+        >
+          Connect {wallet.name}
+        </button>
+      ))}
+      {wallets.length === 0 && <p className={styles.note}>No compatible wallet found.</p>}
+    </PositionPanel>
+  );
 
   return (
     <div className={styles.shell}>
+      <a className={styles.skipLink} href="#main">
+        Skip to content
+      </a>
       <header className={styles.header}>
-        <Link to="/" className={styles.brand}>
+        <Link to="/" className={styles.brand} aria-label="Volaryn home">
           <span className={styles.mark}>V</span>Volaryn<span className={styles.brandDot}>.</span>
         </Link>
         <nav aria-label="Main navigation">
-          <a href="#wallet">Your wallet</a>
-          <Link to="/protection">Protection</Link>
-          <Link to="/writer">Writer</Link>
+          <NavLink end to="/">
+            Home
+          </NavLink>
+          <NavLink end to="/offers">
+            Explore offers
+          </NavLink>
+          <NavLink to="/offers/new">Create offer</NavLink>
+          <NavLink to="/portfolio">My portfolio</NavLink>
+          <NavLink to="/issuer-assets">Official assets</NavLink>
         </nav>
         <div className={styles.wallet}>
-          <span className={styles.network}>
-            <i />
-            Localnet
-          </span>
           {connected ? (
             <>
-              <a href="#wallet" className={styles.walletIdentity}>
-                <strong>{connected.wallet.name}</strong>
-                <span>Connected · {shortAddress(connected.account.address)}</span>
-              </a>
+              <Link to="/portfolio#wallet" className={styles.walletIdentity}>
+                <strong>{shortAddress(owner!)}</strong>
+                <span>View wallet</span>
+              </Link>
               <button
                 className={styles.outlineButton}
                 onClick={() => {
@@ -138,218 +163,119 @@ export function App({ deployment }: { deployment: Deployment }) {
               </button>
             </>
           ) : (
-            <a className={styles.outlineButton} href="#wallet">
+            <Link
+              className={styles.outlineButton}
+              to={workspace ? `${location.pathname}${location.search}#wallet` : '/portfolio#wallet'}
+            >
               Connect wallet
-            </a>
+            </Link>
           )}
         </div>
       </header>
-
-      <main>
-        <div className={styles.demoNotice}>
-          <span>LOCAL DEMONSTRATION</span> Disposable assets and test wallets. No real funds or
-          official PreStocks holdings.
-        </div>
-        <section className={styles.hero}>
-          <div>
-            <p className={styles.eyebrow}>YOUR POSITION. YOUR DECISION.</p>
-            <h1>
-              Keep the upside.
-              <br />
-              <em>Define your exit.</em>
-            </h1>
-            <p className={styles.intro}>
-              Keep your asset while securing a funded right to exchange it for an agreed USDC
-              payout. You decide whether to exercise.
-            </p>
+      <main id="main" tabIndex={-1}>
+        {import.meta.env.MODE === 'localnet' && (
+          <div className={styles.demoNotice}>
+            <span>LOCALNET DEMO</span>
+            <Details title="Test tokens · no real funds">
+              <p>
+                Try the full workflow with disposable PreStocks replicas. Official PreStocks assets
+                are available for read-only browsing.
+              </p>
+            </Details>
           </div>
-          <div className={styles.heroAside}>
-            <span className={styles.circle}>↗</span>
-            <p>
-              Protection, with
-              <br />
-              <strong>capital already reserved.</strong>
-            </p>
-            <span className={styles.subtle}>Settlement enforced on Solana</span>
-          </div>
-        </section>
-        {(connect.error || transaction.error || reviewError || unavailable) && (
+        )}
+        {(connect.error ||
+          transaction.error ||
+          reviewError ||
+          (workspace && owner && wallet.status === 'error')) && (
           <div className={styles.error} role="alert">
             {reviewError ||
               transaction.error ||
-              (unavailable
+              (workspace && owner && wallet.status === 'error'
                 ? 'Chain data is unavailable. Displayed observations may be stale; actions are paused.'
                 : 'Wallet connection failed.')}
-            <button onClick={refresh}>Refresh observations</button>
+            <button onClick={() => wallet.refresh()}>Refresh observations</button>
           </div>
         )}
-        <div className={styles.layout}>
-          <PositionPanel
-            deployment={deployment}
-            owner={connected?.account.address}
-            walletName={connected?.wallet.name}
-            wallet={wallet.data}
-            status={wallet.status}
+        {preparing && <p role="status">Checking balances, terms and network fees…</p>}
+        <TransactionStatus transaction={transaction} />
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route
+            element={
+              <div className={styles.workspace}>
+                <div className={styles.workspaceMain}>
+                  <Outlet />
+                </div>
+                <aside className={styles.walletAside}>{walletPanel}</aside>
+              </div>
+            }
           >
-            {wallets.map((wallet) => (
-              <button
-                key={wallet.name}
-                className={styles.primaryButton}
-                disabled={connect.isRunning}
-                onClick={() => connect.dispatch(wallet)}
-              >
-                Connect {wallet.name}
-              </button>
-            ))}
-            {wallets.length === 0 && <p className={styles.note}>No compatible wallet found.</p>}
-          </PositionPanel>
-          <section id="protection" className={styles.protection} aria-label="Protection">
-            <div className={styles.cardHeading}>
-              <h2>
-                {selected
-                  ? 'Agreement details'
-                  : writerPage
-                    ? 'Writer workspace'
-                    : protectionPage
-                      ? 'Choose protection'
-                      : 'Public agreements'}
-              </h2>
-            </div>
-            <p className={styles.note}>
-              {selected
-                ? 'Public agreement terms and the actions available to your connected wallet.'
-                : writerPage
-                  ? 'Fund offers, follow commitments, and manage returned capital and delivered assets.'
-                  : protectionPage
-                    ? 'Match fixed terms to the quantity you intend to protect. Activation does not lock your underlying tokens.'
-                    : 'Offers and agreements on this local network. Browsing them does not add protection to your wallet.'}
-            </p>
-            {selected && (
-              <Link className={styles.backLink} to="/">
-                ← All public agreements
-              </Link>
-            )}
-            {writerPage &&
-              (wallet.data ? (
-                <OfferForm
-                  key={owner}
-                  wallet={wallet.data}
+            <Route
+              path="/offers"
+              element={
+                <OffersPage
                   deployment={deployment}
+                  owner={owner}
+                  filters={filters}
+                  onFilters={setFilters}
+                />
+              }
+            />
+            <Route
+              path="/offers/new"
+              element={
+                <CreateOfferPage
+                  deployment={deployment}
+                  owner={owner}
+                  wallet={wallet.data}
+                  status={wallet.status}
                   busy={busy}
                   onReview={onReview}
                 />
-              ) : (
-                <p className={styles.note}>
-                  Connect a wallet with USDC to create and manage offers.
-                </p>
-              ))}
-            {writerPage && owner && (
-              <>
-                <h3>Your commitments</h3>
-                <p className={styles.note}>
-                  Reserved across funded and active agreements on this page:{' '}
-                  {formatUnits(capital.toString())} USDC. Available balances and received token
-                  accounts appear in Your wallet.
-                </p>
-              </>
-            )}
-            {protectionPage && (
-              <>
-                <div className={styles.actions}>
-                  <button
-                    className={styles.outlineButton}
-                    aria-pressed={filters.mode === 'offers'}
-                    onClick={() => {
-                      setFilters({ ...filters, mode: 'offers' });
-                      void navigate('/protection');
-                    }}
-                  >
-                    Available offers
-                  </button>
-                  <button
-                    className={styles.outlineButton}
-                    aria-pressed={filters.mode === 'holder'}
-                    disabled={!owner}
-                    onClick={() => {
-                      setFilters({ mode: 'holder' });
-                      void navigate('/protection');
-                    }}
-                  >
-                    My protection
-                  </button>
-                </div>
-                {filters.mode === 'offers' && (
-                  <OfferFilters
-                    value={filters}
-                    onChange={(value) => {
-                      setFilters(value);
-                      void navigate('/protection');
-                    }}
-                  />
-                )}
-              </>
-            )}
-            {preparing && <p role="status">Checking balances, terms and network fees…</p>}
-            {agreements.map((agreement) => (
-              <AgreementPanel
-                key={agreement.address}
-                agreement={agreement}
-                owner={owner}
-                wallet={wallet.data}
-                usable={usable}
-                now={now}
-                onReview={onReview}
-              />
-            ))}
-            {portfolio.status === 'fetching' && !portfolio.data && (
-              <p role="status">Loading agreements…</p>
-            )}
-            {portfolio.status === 'success' && agreements.length === 0 && (
-              <p>
-                {writerPage
-                  ? 'No agreements written by this wallet on this page.'
-                  : protectionPage
-                    ? filters.mode === 'holder'
-                      ? 'No active protection for this wallet.'
-                      : 'No funded offers match these terms. Try changing the filters.'
-                    : 'No public agreements to show on this page.'}
-              </p>
-            )}
-            {!selected && (
-              <nav className={styles.agreementPages} aria-label="Agreement pages">
-                {search.has('after') && <Link to={location.pathname}>First page</Link>}
-                {portfolio.data?.next && (
-                  <Link
-                    to={`${location.pathname}?after=${encodeURIComponent(portfolio.data.next)}`}
-                  >
-                    Next agreements
-                  </Link>
-                )}
-              </nav>
-            )}
-            <TransactionStatus transaction={transaction} connected={!!connected} />
-          </section>
-        </div>
-        <section className={styles.steps} aria-label="How protection works">
-          <div>
-            <b>01</b>
-            <h3>Keep your position</h3>
-            <p>Your underlying asset stays in your wallet after activation.</p>
-          </div>
-          <div>
-            <b>02</b>
-            <h3>Pay a known premium</h3>
-            <p>The writer reserves the entire payout before you activate.</p>
-          </div>
-          <div>
-            <b>03</b>
-            <h3>Choose your exit</h3>
-            <p>Deliver the agreed quantity before expiry, or let protection end.</p>
-          </div>
-        </section>
+              }
+            />
+            <Route
+              path="/portfolio"
+              element={<PortfolioPage deployment={deployment} owner={owner} />}
+            />
+            <Route
+              path="/portfolio/written"
+              element={<PortfolioPage deployment={deployment} owner={owner} written />}
+            />
+            <Route
+              path="/agreements/:address"
+              element={
+                <AgreementPage
+                  deployment={deployment}
+                  owner={owner}
+                  wallet={wallet.data}
+                  walletStatus={wallet.status}
+                  usable={usable}
+                  revision={revision}
+                  onReview={onReview}
+                />
+              }
+            />
+          </Route>
+          <Route path="/issuer-assets" element={<OfficialAssets />} />
+          <Route path="/protection" element={<Navigate replace to="/offers" />} />
+          <Route path="/writer" element={<Navigate replace to="/offers/new" />} />
+          <Route
+            path="*"
+            element={
+              <div className={styles.emptyState}>
+                <h1>Page not found</h1>
+                <p>Find an offer, create one, or return to your portfolio.</p>
+                <Link to="/offers">Explore offers →</Link>
+              </div>
+            }
+          />
+        </Routes>
       </main>
       {visibleReview && (
         <ActionReview
+          assets={deployment.assets}
           review={visibleReview.value}
           busy={transaction.busy}
           onConfirm={() => {
@@ -363,8 +289,8 @@ export function App({ deployment }: { deployment: Deployment }) {
       )}
       <footer>
         <span>Volaryn.</span>
-        <p>Explicit terms. Fully funded obligations. Your choice to exercise.</p>
-        <span>Built on Solana ↗</span>
+        <p>Fully funded exit rights. Your choice to exercise.</p>
+        <Link to="/offers">Explore offers ↗</Link>
       </footer>
     </div>
   );

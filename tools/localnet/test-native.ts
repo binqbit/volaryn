@@ -1,3 +1,4 @@
+import { fixtureAssets } from './assets';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -69,7 +70,14 @@ async function fixtureState() {
       id: 1,
       method: 'getMultipleAccounts',
       params: [
-        [config.writerUsdc, config.holderUsdc, config.holderUnderlying],
+        [
+          config.writerUsdc,
+          config.holderUsdc,
+          ...(await fixtureAssets()).flatMap((item) => [
+            item.holderAccount.address,
+            item.writerAccount.address,
+          ]),
+        ],
         { encoding: 'base64', commitment: 'finalized' },
       ],
     }),
@@ -118,7 +126,7 @@ try {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'getGenesisHash', params: [] }),
   });
-  assert.equal(rpcResponse.status, 200, 'Transaction transport survives index failure');
+  assert.equal(rpcResponse.status, 200, 'Read-only chain transport survives index failure');
   await finish(
     start(
       'pg_ctl',

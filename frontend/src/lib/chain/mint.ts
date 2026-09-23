@@ -1,5 +1,11 @@
 import { isSome, unwrapOption } from '@solana/kit';
-import { extension, getTokenSize, type ExtensionArgs, type Mint } from '@solana-program/token-2022';
+import {
+  AccountState,
+  extension,
+  getTokenSize,
+  type ExtensionArgs,
+  type Mint,
+} from '@solana-program/token-2022';
 
 export function transferFee(amount: bigint, basisPoints: number, maximum: bigint) {
   const fee = (amount * BigInt(basisPoints) + 9999n) / 10000n;
@@ -7,18 +13,29 @@ export function transferFee(amount: bigint, basisPoints: number, maximum: bigint
 }
 
 /** Mirror the contract's admitted extensions; settlement remains authoritative on chain. */
-export function mintTerms(mint: Mint, quantity: bigint, epoch: bigint) {
+export function mintTerms(mint: Mint, quantity: bigint, epoch: bigint, newCommitment = true) {
   const extensions = unwrapOption(mint.extensions) ?? [];
-  const allowed = [
+  const allowed: readonly ExtensionArgs['__kind'][] = [
     'TransferFeeConfig',
     'ScaledUiAmountConfig',
     'PausableConfig',
     'PermanentDelegate',
+    'DefaultAccountState',
+    'ConfidentialTransferMint',
+    'ConfidentialTransferFee',
+    'TransferHook',
+    'MetadataPointer',
+    'TokenMetadata',
   ];
   if (extensions.some((item) => !allowed.includes(item.__kind)))
     throw new Error('This mint has unsupported transfer extensions');
-  if (!mint.isInitialized || mint.decimals !== 6)
-    throw new Error('Unsupported asset precision or mint state');
+  if (!mint.isInitialized) throw new Error('Unsupported asset precision or mint state');
+  const hook = extensions.find((item) => item.__kind === 'TransferHook');
+  if (hook && hook.programId !== '11111111111111111111111111111111')
+    throw new Error('Active transfer hooks are unsupported');
+  const defaultState = extensions.find((item) => item.__kind === 'DefaultAccountState');
+  if (newCommitment && defaultState && defaultState.state !== AccountState.Initialized)
+    throw new Error('New token accounts would be frozen');
   const restrictions: string[] = [];
   if (isSome(mint.freezeAuthority))
     restrictions.push('The issuer can freeze token accounts and block delivery.');
@@ -31,6 +48,9 @@ export function mintTerms(mint: Mint, quantity: bigint, epoch: bigint) {
     restrictions.push('The issuer has a permanent delegate that can transfer or burn holdings.');
   if (extensions.some((item) => item.__kind === 'ScaledUiAmountConfig'))
     restrictions.push('Display scaling does not change the raw-token quantity owed.');
+  if (hook) restrictions.push('The issuer can enable a transfer hook and block delivery.');
+  if (extensions.some((item) => item.__kind === 'ConfidentialTransferMint'))
+    restrictions.push('Only ordinary transparent balances can be delivered.');
   const config = extensions.find((item) => item.__kind === 'TransferFeeConfig');
   const fee =
     config &&
@@ -44,7 +64,9 @@ export function mintTerms(mint: Mint, quantity: bigint, epoch: bigint) {
     );
   }
   if (pause) required.push(extension('PausableAccount', {}));
+  if (hook) required.push(extension('TransferHookAccount', { transferring: false }));
   return {
+    decimals: mint.decimals,
     issuerFee: withheld,
     netReceipt: quantity - withheld,
     accountSize: getTokenSize(required),

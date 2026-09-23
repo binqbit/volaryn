@@ -11,6 +11,7 @@ export const operations = [
 ] as const;
 export type Operation = (typeof operations)[number];
 export interface OfferTerms {
+  underlyingMint: string;
   nonce: string;
   quantityRaw: string;
   payout: string;
@@ -29,6 +30,8 @@ export type ActionRequest =
     };
 
 export interface ActionReview {
+  underlyingMint: string;
+  underlyingDecimals: number;
   owner: string;
   agreement: string;
   operation: Operation;

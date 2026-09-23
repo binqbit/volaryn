@@ -14,27 +14,20 @@ import {
 import type { SolanaSignTransactionFeature } from '@solana/wallet-standard-features';
 import type { Deployment } from '../lib/api/client';
 import recipe from '../../../tests/fixtures/recipe.json' with { type: 'json' };
+import { requestDemoSignature } from './approval';
 
-export async function registerDemoWallet(deployment: Deployment) {
+export async function registerDemoWallet(
+  deployment: Pick<Deployment, 'mode' | 'fixtureVersion' | 'holder' | 'writer'>,
+) {
   if (deployment.mode !== 'localnet' || deployment.fixtureVersion !== recipe.version)
     throw new Error('Demo wallet requires the local fixture deployment');
   await Promise.all([
-    registerParticipant(
-      deployment.holder,
-      recipe.seeds.holder,
-      'Local test wallet',
-      'Local test holder',
-    ),
-    registerParticipant(
-      deployment.writer,
-      recipe.seeds.writer,
-      'Local test writer',
-      'Local test writer',
-    ),
+    registerParticipant(deployment.holder, recipe.seeds.holder, 'Test Wallet 1'),
+    registerParticipant(deployment.writer, recipe.seeds.writer, 'Test Wallet 2'),
   ]);
 }
 
-async function registerParticipant(expected: string, seed: number, name: string, label: string) {
+async function registerParticipant(expected: string, seed: number, name: string) {
   const signer = await createKeyPairSignerFromPrivateKeyBytes(new Uint8Array(32).fill(seed));
   if (signer.address !== expected) throw new Error('Demo identity does not match the ledger');
   const account: WalletAccount = {
@@ -42,9 +35,10 @@ async function registerParticipant(expected: string, seed: number, name: string,
     publicKey: new Uint8Array(getAddressEncoder().encode(signer.address)),
     chains: ['solana:localnet'],
     features: ['solana:signTransaction'],
-    label,
+    label: name,
   };
   let accounts: readonly WalletAccount[] = [];
+  let signingRequest: AbortController | undefined;
   const listeners = new Set<StandardEventsListeners['change']>();
   const emit = () => {
     for (const listener of listeners) listener({ accounts });
@@ -54,23 +48,27 @@ async function registerParticipant(expected: string, seed: number, name: string,
     supportedTransactionVersions: ['legacy'],
     signTransaction: async (...inputs) => {
       if (!accounts.length) throw new Error('Wallet disconnected');
-      const output = [];
-      for (const input of inputs) {
-        if (input.account.address !== signer.address || input.chain !== 'solana:localnet')
-          throw new Error('Wallet/network mismatch');
-        if (
-          !window.confirm(
-            'Sign this local test transaction? Only disposable test assets are involved.',
-          )
-        )
-          throw new Error('Signature rejected by wallet');
-        const signed = await signTransaction(
-          [signer.keyPair],
-          getTransactionDecoder().decode(input.transaction),
-        );
-        output.push({ signedTransaction: new Uint8Array(getTransactionEncoder().encode(signed)) });
+      if (signingRequest) throw new Error('A signature request is already open for this wallet');
+      const controller = new AbortController();
+      signingRequest = controller;
+      try {
+        const output = [];
+        for (const input of inputs) {
+          if (input.account.address !== signer.address || input.chain !== 'solana:localnet')
+            throw new Error('Wallet/network mismatch');
+          const transaction = getTransactionDecoder().decode(new Uint8Array(input.transaction));
+          await requestDemoSignature(name, signer.address, controller.signal);
+          controller.signal.throwIfAborted();
+          const signed = await signTransaction([signer.keyPair], transaction);
+          controller.signal.throwIfAborted();
+          output.push({
+            signedTransaction: new Uint8Array(getTransactionEncoder().encode(signed)),
+          });
+        }
+        return output;
+      } finally {
+        signingRequest = undefined;
       }
-      return output;
     },
   };
   const wallet: Wallet = {
@@ -94,6 +92,7 @@ async function registerParticipant(expected: string, seed: number, name: string,
         version: '1.0.0',
         disconnect: async () => {
           accounts = [];
+          signingRequest?.abort(new Error('Wallet disconnected before signing completed'));
           emit();
         },
       },

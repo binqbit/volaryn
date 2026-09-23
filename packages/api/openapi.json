@@ -360,6 +360,7 @@
           "writer",
           "underlyingMint",
           "underlyingProgram",
+          "underlyingDecimals",
           "usdcMint",
           "quantityRaw",
           "payout",
@@ -433,6 +434,11 @@
           "status": {
             "type": "string"
           },
+          "underlyingDecimals": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
           "underlyingMint": {
             "type": "string"
           },
@@ -459,7 +465,8 @@
           "symbol",
           "name",
           "decimals",
-          "provenance"
+          "referenceMint",
+          "source"
         ],
         "properties": {
           "decimals": {
@@ -473,13 +480,17 @@
           "name": {
             "type": "string"
           },
-          "provenance": {
+          "referenceMint": {
+            "type": "string"
+          },
+          "source": {
             "type": "string"
           },
           "symbol": {
             "type": "string"
           }
-        }
+        },
+        "additionalProperties": false
       },
       "Deployment": {
         "type": "object",
@@ -495,12 +506,17 @@
           "holder",
           "writer",
           "usdcMint",
-          "underlyingMint",
+          "assets",
           "writerUsdc",
-          "holderUsdc",
-          "holderUnderlying"
+          "holderUsdc"
         ],
         "properties": {
+          "assets": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AssetView"
+            }
+          },
           "authority": {
             "type": "string"
           },
@@ -513,9 +529,6 @@
             "type": "string"
           },
           "holder": {
-            "type": "string"
-          },
-          "holderUnderlying": {
             "type": "string"
           },
           "holderUsdc": {
@@ -538,9 +551,6 @@
             "type": "integer",
             "format": "int32",
             "minimum": 0
-          },
-          "underlyingMint": {
-            "type": "string"
           },
           "usdcMint": {
             "type": "string"

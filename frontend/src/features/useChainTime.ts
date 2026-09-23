@@ -2,6 +2,7 @@ import { useCallback, useEffect } from 'react';
 import { useRequest } from '@solana/react';
 import { chainTime } from '../lib/chain/buildAction';
 import type { AppClient } from '../lib/chain/client';
+import { observationStatus } from '../lib/api/observation';
 
 export function useChainTime(client: AppClient) {
   const source = useCallback(() => chainTime(client), [client]);
@@ -12,5 +13,5 @@ export function useChainTime(client: AppClient) {
     const timer = setTimeout(refresh, 3000);
     return () => clearTimeout(timer);
   }, [refresh, status]);
-  return request.status === 'error' ? undefined : request.data;
+  return observationStatus(request) === 'error' ? undefined : request.data;
 }

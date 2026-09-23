@@ -1,0 +1,79 @@
+.holdings {
+  margin: 0 0 12px;
+  padding: var(--space-card-compact);
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: linear-gradient(115deg, #9945ff0c, #14f19507);
+}
+.heading {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6px 12px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+.heading small {
+  color: var(--color-text-muted);
+  font-size: 10px;
+}
+.holdings > strong {
+  display: block;
+  font-size: 20px;
+  font-weight: 550;
+  margin: 6px 0;
+  overflow-wrap: anywhere;
+  font-variant-numeric: tabular-nums;
+}
+.holdings p,
+.account p {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  line-height: 1.7;
+  margin: 6px 0 0;
+}
+.accountField {
+  min-width: 0;
+}
+.account {
+  margin-top: 10px;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.account dl {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+}
+.account dl > div {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+.account dt {
+  color: var(--color-text-muted);
+}
+.account dd {
+  margin: 0;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.account .shortfall {
+  color: var(--color-accent-secondary);
+}
+.max {
+  border: 1px solid var(--color-border);
+  border-radius: 5px;
+  background: transparent;
+  color: var(--color-accent);
+  margin-top: 10px;
+  padding: 10px 12px;
+  min-height: 44px;
+  font: inherit;
+}
+.max:disabled {
+  opacity: 0.45;
+}

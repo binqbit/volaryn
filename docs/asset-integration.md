@@ -1,6 +1,16 @@
 # Official asset integration
 
-The official catalog API (`/api/assets/official`) reads PreStocks context and verifies mint accounts on Solana mainnet. It is independent of the local demo's assets, balances, ledger, and signing flow. A compatible observation is evidence for admission review, not an executable offer or permission to transact. Live use requires a released deployment with a matching on-chain `AssetPolicy`.
+The **Official assets** page (`/issuer-assets`) reads PreStocks context and verifies mint accounts on Solana mainnet. It is independent of the local demo's assets, balances, ledger, and signing flow. A compatible observation is evidence for admission review, not an executable offer or permission to transact. Live use requires a released deployment with a matching on-chain `AssetPolicy`.
+
+## Local PreStocks experience
+
+The local demo uses disposable replicas of the reviewed ANDURIL, ANTHROPIC, FIGUREAI, KALSHI, NEURALINK, OPENAI, POLYMARKET, and SPACEX identities. `tools/localnet/assets.ts` maps stable local fixture seeds to `config/assets.json`; bootstrap derives the public metadata from that registry. Deployment schema 2 carries the local mint, reference mainnet mint, name, ticker, precision, and issuer page. The backend rejects unknown references, duplicate identities, altered metadata, and mainnet mints passed as local replicas.
+
+`GET /api/assets` and `/api/config` expose the supported local assets without calling an external provider. Explore offers and Create offer share a searchable selector for name, ticker, local mint, or reference mint. Selection resolves to the **local mint** for filtering and signing. Exact-quantity filters require a selected asset and clear when it changes. Cards, agreement details, signature reviews, and per-asset wallet balances retain that identity. The official catalog also supports name, ticker, and mainnet-mint search.
+
+Replicas use nine decimals and the shared transfer-fee/scaled-display fixture behavior; they do not claim to reproduce every live issuer setting or price. The separate contract compatibility fixture covers the full reviewed extension profile. USDC remains six decimals. Agreement observations expose the precision stored on chain, and preparation checks it against the selected mint. Creation recovery compares the mint as well as numeric terms. Each transfer still requires one account with the full quantity of the specified mint.
+
+Every replica is labelled **Local demo**, with distinct settlement and reference mint addresses and a link to its issuer page. These tokens are not issued by PreStocks and carry no private-market exposure. A local reference establishes product context, not mainnet ownership or permission to trade. Local startup and settlement remain independent of official-source availability.
 
 ## Sources and boundaries
 
@@ -31,7 +41,7 @@ Missing or null numbers remain unavailable. Numeric strings, negative values, ch
 
 The reviewed issuer profile uses nine-decimal Token-2022 mints with transfer fees, scaled UI amounts, pausing, a permanent delegate, initialized default accounts, confidential-transfer and confidential-fee configuration, an inactive transfer hook, metadata pointer, and token metadata. Exact identities and reviewed limits live in the registry rather than being inferred from these shared characteristics.
 
-The program and backend support **ordinary transparent balances** for this profile. Confidential configuration on a mint does not enable delivery from confidential balances. The custom settlement account includes the required fee, pause, and hook account extensions; successful atomic settlement hands its ownership to the writer. Tests initialize the profile through real token instructions and exercise the compiled settlement program.
+The program, backend, and browser support **ordinary transparent balances** for this profile. Confidential configuration on a mint does not enable delivery from confidential balances. The custom settlement account includes the required fee, pause, and hook account extensions; successful atomic settlement hands its ownership to the writer. Tests initialize the profile through real token instructions and exercise the compiled settlement program.
 
 An active hook, unknown extension, paused transfer, changed authority, or unsupported precision blocks new admission. Frozen default accounts block new commitments; changing that default after activation does not veto delivery between already initialized accounts. Issuer changes that prevent the actual transfer still cause atomic failure, preserving the USDC reserve. Fees can change the writer's net receipt, never the gross obligation or full USDC payout. The [Token-2022 interfaces](https://docs.rs/spl-token-2022-interface/2.1.0/spl_token_2022_interface/extension/index.html) define the decoded extension semantics.
 
@@ -56,4 +66,4 @@ Captured public responses and raw mint bytes live in `tests/fixtures/prestocks/`
 
 The inspector prints the same typed catalog as the API and exits unsuccessfully if a source cannot be refreshed. It does not deploy a program, fund an account, update a policy, or submit transactions. A fresh response can still contain unsupported, expired, or unreviewed assets; inspect each eligibility reason.
 
-The tests cover missing and changed fields, exact numbers, unverified units, unsupported accounts, issuer-authority drift, lifecycle boundaries, epoch fee selection, display scaling, timeouts, rate limits, bounded retries, cache recovery, and coalesced reads.
+The tests cover missing and changed fields, exact numbers, unverified units, unsupported accounts, issuer-authority drift, lifecycle boundaries, epoch fee selection, display scaling, timeouts, rate limits, bounded retries, cache recovery, and coalesced reads. Browser tests use controlled responses to verify explicit mainnet context, missing/stale values, mobile layout, and the absence of financial actions. Local holder and writer journeys continue to use disposable fixtures.

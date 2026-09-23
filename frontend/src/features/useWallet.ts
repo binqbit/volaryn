@@ -2,6 +2,7 @@ import { useCallback, useEffect } from 'react';
 import { useRequest } from '@solana/react';
 import { address } from '@solana/kit';
 import { api, amount } from '../lib/api/client';
+import { observationStatus } from '../lib/api/observation';
 
 export function useWallet(owner: string | undefined) {
   const source = useCallback(
@@ -28,5 +29,6 @@ export function useWallet(owner: string | undefined) {
     const timer = setTimeout(refresh, 3000);
     return () => clearTimeout(timer);
   }, [owner, refresh, status]);
-  return { ...request, data: request.data?.owner === owner ? request.data : undefined };
+  const data = request.data?.owner === owner ? request.data : undefined;
+  return { ...request, data, status: observationStatus({ ...request, data }) };
 }

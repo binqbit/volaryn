@@ -32,7 +32,7 @@ pub fn read_deployment(path: &std::path::Path) -> Result<Deployment, Box<dyn std
 }
 
 pub fn validate_deployment(deployment: &Deployment) -> Result<(), AppError> {
-    if deployment.schema_version != 1
+    if deployment.schema_version != 2
         || deployment.fixture_version != 1
         || deployment.mode != "localnet"
         || !cfg!(feature = "localnet")
@@ -53,12 +53,35 @@ pub fn validate_deployment(deployment: &Deployment) -> Result<(), AppError> {
         &deployment.holder,
         &deployment.writer,
         &deployment.usdc_mint,
-        &deployment.underlying_mint,
         &deployment.writer_usdc,
         &deployment.holder_usdc,
-        &deployment.holder_underlying,
     ] {
         Pubkey::from_str(address).map_err(|_| AppError::Identity)?;
+    }
+    let registry = crate::assets::Registry::embedded();
+    let mut mints = std::collections::BTreeSet::new();
+    let mut references = std::collections::BTreeSet::new();
+    if deployment.assets.is_empty() || deployment.assets.len() > registry.assets.len() {
+        return Err(AppError::Identity);
+    }
+    for asset in &deployment.assets {
+        Pubkey::from_str(&asset.mint).map_err(|_| AppError::Identity)?;
+        let reviewed = registry
+            .assets
+            .iter()
+            .find(|item| item.mint == asset.reference_mint)
+            .ok_or(AppError::Identity)?;
+        if !mints.insert(&asset.mint)
+            || !references.insert(&asset.reference_mint)
+            || asset.mint == deployment.usdc_mint
+            || registry.assets.iter().any(|item| item.mint == asset.mint)
+            || asset.symbol != reviewed.symbol
+            || asset.name != reviewed.name
+            || asset.decimals != reviewed.decimals
+            || asset.source != reviewed.source
+        {
+            return Err(AppError::Identity);
+        }
     }
     Ok(())
 }

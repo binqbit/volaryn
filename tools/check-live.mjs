@@ -9,14 +9,33 @@ assert(
 for (const name of files) {
   const content = await readFile(`frontend/dist-live/assets/${name}`, 'utf8');
   for (const marker of [
-    'Local test wallet',
-    'Local test writer',
+    'Test Wallet 1',
+    'Test Wallet 2',
     'Disposable localnet wallet',
-    'Sign this local test transaction',
+    'Approve test transaction',
+    'Only disposable test assets are involved.',
     'createKeyPairSignerFromPrivateKeyBytes',
+    'LOCALNET DEMO',
+    'PRESTOCKS · LOCAL DEMO',
+    'Test tokens · no real funds',
+    'Use two test wallets',
+    'local demo replicas',
+    'Local replicas of reviewed PreStocks',
+    'PreStocks demo balances',
+    'PreStocks demo tokens',
+    'test USDC',
+    'Local demo',
+    'Local mint',
+    'Local settlement mint',
+    'provided test wallet',
+    'disposable replica demonstrates',
+    'separate from your local test wallet',
   ]) {
-    assert(!content.includes(marker), `Local signer leaked into live bundle: ${name}`);
+    assert(
+      !content.includes(marker),
+      `Local-only content leaked into live bundle: ${name}: ${marker}`,
+    );
   }
   assert(!/^wallet-/.test(name), 'A disposable wallet chunk exists in the live build');
 }
-console.log('Live frontend excludes the disposable wallet implementation.');
+console.log('Live frontend excludes disposable wallets and demo UI content.');

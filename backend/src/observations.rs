@@ -17,10 +17,9 @@ pub struct Deployment {
     pub holder: String,
     pub writer: String,
     pub usdc_mint: String,
-    pub underlying_mint: String,
+    pub assets: Vec<AssetView>,
     pub writer_usdc: String,
     pub holder_usdc: String,
-    pub holder_underlying: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -33,6 +32,7 @@ pub struct AgreementView {
     pub designated_holder: Option<String>,
     pub underlying_mint: String,
     pub underlying_program: String,
+    pub underlying_decimals: u8,
     pub usdc_mint: String,
     pub quantity_raw: String,
     pub payout: String,
@@ -49,14 +49,15 @@ pub struct AgreementView {
     pub observed_at: i64,
 }
 
-#[derive(Debug, Serialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct AssetView {
     pub mint: String,
     pub symbol: String,
     pub name: String,
     pub decimals: u8,
-    pub provenance: String,
+    pub reference_mint: String,
+    pub source: String,
 }
 
 #[derive(Debug, Serialize, ToSchema)]

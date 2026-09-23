@@ -1,11 +1,14 @@
+import { selectAsset } from './support/actions';
 import { expect, test } from '@playwright/test';
 import type { Agreement, Deployment } from '../../frontend/src/lib/api/client';
 
-test('holdings load only after connection and disappear on disconnect or reload', async ({
+test('wallet restores after reload; explicit disconnect clears the saved connection', async ({
   page,
   request,
 }, info) => {
   const config = (await (await request.get('/api/config')).json()) as Deployment;
+  const [original] = (await (await request.get('/api/agreements')).json()) as Agreement[];
+  if (!original) throw new Error('Missing fixture agreement');
   const owners: string[] = [];
   let submissions = 0;
   page.on('request', (request) => {
@@ -14,20 +17,20 @@ test('holdings load only after connection and disappear on disconnect or reload'
     if (url.pathname === '/rpc' && request.postDataJSON()?.method === 'sendTransaction')
       submissions++;
   });
-  await page.goto('/');
+  await page.goto(`/agreements/${original.address}`);
   const wallet = page.getByRole('region', { name: 'Your wallet' });
-  const connect = wallet.getByRole('button', { name: 'Connect Local test wallet' });
+  const connect = wallet.getByRole('button', { name: 'Connect Test Wallet 1' });
   await expect(connect).toBeVisible();
-  await expect(wallet).toContainText('No wallet holdings are loaded before you connect.');
+  await expect(wallet).toContainText('Connect to see your balances and manage your protection.');
   await expect(wallet.getByText('Available test USDC', { exact: true })).toHaveCount(0);
-  await expect(page.getByRole('heading', { name: 'Public agreements' })).toBeVisible();
-  await expect(page.getByRole('link', { name: /Agreement .* ↗/ })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Agreement details' })).toBeVisible();
+  await expect(page.getByText('On-chain details', { exact: true })).toBeVisible();
   expect(owners).toEqual([]);
   await page.screenshot({ path: info.outputPath('disconnected.png'), fullPage: true });
 
   await connect.click();
   await expect(wallet).toContainText(config.holder);
-  await expect(wallet).toContainText('starting balances were preloaded for the local demo');
+  await expect(wallet).toContainText('Balances reflect its activity on this local ledger.');
   await expect(wallet.getByText('Available test USDC', { exact: true })).toBeVisible();
   expect(owners.length).toBeGreaterThan(0);
   expect(owners.every((owner) => owner === config.holder)).toBe(true);
@@ -38,26 +41,29 @@ test('holdings load only after connection and disappear on disconnect or reload'
   await expect(wallet.getByText(config.holder, { exact: true })).toHaveCount(0);
   await expect(wallet.getByText('Available test USDC', { exact: true })).toHaveCount(0);
   const countAfterDisconnect = owners.length;
+  await page.reload();
+  await expect(connect).toBeVisible();
   // An agreement refresh must not fetch disconnected wallet holdings.
-  await page.getByRole('link', { name: /Agreement .* ↗/ }).click();
+  await page.waitForResponse('**/api/agreements/*');
   await expect(page.getByRole('heading', { name: 'Agreement details' })).toBeVisible();
-  await expect(page.getByRole('link', { name: /Agreement .* ↗/ })).toBeVisible();
+  await expect(page.getByText('On-chain details', { exact: true })).toBeVisible();
   expect(owners).toHaveLength(countAfterDisconnect);
 
   await connect.click();
   await expect(wallet.getByText('Available test USDC', { exact: true })).toBeVisible();
   const countBeforeReload = owners.length;
   await page.reload();
-  await expect(connect).toBeVisible();
-  await expect(wallet.getByText('Available test USDC', { exact: true })).toHaveCount(0);
-  await expect(page.getByRole('link', { name: /Agreement .* ↗/ })).toBeVisible();
-  expect(owners).toHaveLength(countBeforeReload);
+  await expect(wallet).toContainText(config.holder);
+  await expect(wallet.getByText('Available test USDC', { exact: true })).toBeVisible();
+  await expect(connect).toHaveCount(0);
+  await expect(page.getByText('On-chain details', { exact: true })).toBeVisible();
+  expect(owners.length).toBeGreaterThan(countBeforeReload);
   expect(submissions).toBe(0);
   await page.setViewportSize({ width: 320, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   );
-  await page.screenshot({ path: info.outputPath('mobile-disconnected.png'), fullPage: true });
+  await page.screenshot({ path: info.outputPath('mobile-restored.png'), fullPage: true });
 });
 
 test('public agreement ownership and reserved offers never imply personal protection', async ({
@@ -74,31 +80,36 @@ test('public agreement ownership and reserved offers never imply personal protec
       json: new URL(route.request().url()).pathname === '/api/agreements' ? [agreement] : agreement,
     }),
   );
-  await page.goto('/');
+  await page.goto(`/agreements/${original.address}`);
   await expect(page.getByText('ACTIVE AGREEMENT', { exact: true })).toBeVisible();
   await expect(page.getByText('YOUR PROTECTION', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Exercise protection' })).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Connect Local test wallet' }).click();
+  await page.getByRole('button', { name: 'Connect Test Wallet 1' }).click();
   await expect(
     page.getByText('Only the holder can exercise this agreement.', { exact: false }),
   ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Exercise protection' })).toHaveCount(0);
 
   agreement = { ...agreement, holder: config.holder };
-  await page.getByRole('link', { name: /Agreement .* ↗/ }).click();
+  await page.waitForResponse('**/api/agreements/*');
   await expect(page.getByText('YOUR PROTECTION', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Exercise protection' })).toBeEnabled();
 
   agreement = { ...agreement, status: 'funded', holder: null, designatedHolder: config.writer };
-  await page.getByRole('link', { name: '← All public agreements' }).click();
+  await page.waitForResponse('**/api/agreements/*');
   await expect(
     page.getByText('This offer is reserved for another wallet.', { exact: true }),
   ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Activate protection' })).toHaveCount(0);
 });
 
-test('wallet loading, empty and unavailable states do not invent holdings', async ({ page }) => {
+test('wallet loading, empty and unavailable states do not invent holdings', async ({
+  page,
+  request,
+}) => {
+  const [original] = (await (await request.get('/api/agreements')).json()) as Agreement[];
+  if (!original) throw new Error('Missing fixture agreement');
   let release: () => void = () => {};
   const pending = new Promise<void>((resolve) => {
     release = resolve;
@@ -114,16 +125,16 @@ test('wallet loading, empty and unavailable states do not invent holdings', asyn
           },
     );
   });
-  await page.goto('/');
+  await page.goto(`/agreements/${original.address}`);
   const wallet = page.getByRole('region', { name: 'Your wallet' });
-  await wallet.getByRole('button', { name: 'Connect Local test wallet' }).click();
+  await wallet.getByRole('button', { name: 'Connect Test Wallet 1' }).click();
   await expect(wallet).toContainText("Loading this wallet's balances…");
   await expect(wallet.getByText('Available test USDC', { exact: true })).toHaveCount(0);
   release();
-  await expect(wallet).toContainText('No supported token accounts were found');
+  await expect(wallet).toContainText('No PreStocks demo tokens in this wallet.');
 
   unavailable = true;
-  await page.getByRole('link', { name: /Agreement .* ↗/ }).click();
+  await page.waitForResponse('**/api/agreements/*');
   await expect(page.getByRole('alert')).toContainText('Chain data is unavailable.');
   await expect(wallet).toContainText('Unavailable · last known');
 });
@@ -139,7 +150,9 @@ test('split and frozen accounts never authorize delivery from a combined balance
     ...original,
     status: 'active',
     holder: config.holder,
-    quantityRaw: '1000000',
+    underlyingMint: config.assets[0]!.mint,
+    underlyingDecimals: 9,
+    quantityRaw: '1000000000',
     expiresAt: '4102444800',
   };
   await page.route('**/api/agreements**', (route) => route.fulfill({ json: [agreement] }));
@@ -158,38 +171,38 @@ test('split and frozen accounts never authorize delivery from a combined balance
             finalizedSlot: '100',
           },
           {
-            address: config.holderUnderlying,
-            mint: config.underlyingMint,
+            address: config.holder,
+            mint: config.assets[0]!.mint,
             tokenProgram: 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',
-            amountRaw: '600000',
+            amountRaw: '600000000',
             frozen: false,
-            decimals: 6,
+            decimals: 9,
             finalizedSlot: '100',
           },
           {
             address: config.writer,
-            mint: config.underlyingMint,
+            mint: config.assets[0]!.mint,
             tokenProgram: 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',
-            amountRaw: '600000',
+            amountRaw: '600000000',
             frozen: false,
-            decimals: 6,
+            decimals: 9,
             finalizedSlot: '100',
           },
           {
             address: config.authority,
-            mint: config.underlyingMint,
+            mint: config.assets[0]!.mint,
             tokenProgram: 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',
-            amountRaw: '2000000',
+            amountRaw: '2000000000',
             frozen: true,
-            decimals: 6,
+            decimals: 9,
             finalizedSlot: '100',
           },
         ],
       },
     }),
   );
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Connect Local test wallet' }).click();
+  await page.goto(`/agreements/${original.address}`);
+  await page.getByRole('button', { name: 'Connect Test Wallet 1' }).click();
   await expect(page.getByRole('region', { name: 'Your wallet' })).toContainText('3.2');
   await expect(page.getByRole('button', { name: 'Exercise protection' })).toBeDisabled();
   await expect(
@@ -205,21 +218,29 @@ test('split and frozen accounts never authorize delivery from a combined balance
 test('returning to protection shows the same criteria used by the offer query', async ({
   page,
 }) => {
-  await page.goto('/protection');
+  await page.goto('/offers');
+  await selectAsset(page, 'OPENAI');
+  await page.getByText('More filters', { exact: true }).click();
   await page.getByLabel('Exact quantity (raw-token units)').fill('0.2');
   await page.getByLabel('Minimum payout (USDC)').fill('5');
   await page.getByLabel('Maximum premium (USDC)').fill('0.1');
   const query = page.waitForRequest(
     (request) =>
       request.url().includes('/api/offers?') &&
-      new URL(request.url()).searchParams.get('quantity_raw') === '200000',
+      new URL(request.url()).searchParams.get('quantity_raw') === '200000000',
   );
   await page.getByRole('button', { name: 'Find matching offers' }).click();
   const url = new URL((await query).url());
   expect(url.searchParams.get('min_payout')).toBe('5000000');
   expect(url.searchParams.get('max_premium')).toBe('100000');
-  await page.getByRole('link', { name: 'Writer', exact: true }).click();
-  await page.getByRole('link', { name: 'Protection', exact: true }).click();
+  await page
+    .getByRole('navigation', { name: 'Main navigation' })
+    .getByRole('link', { name: 'Create offer', exact: true })
+    .click();
+  await page
+    .getByRole('navigation', { name: 'Main navigation' })
+    .getByRole('link', { name: 'Explore offers', exact: true })
+    .click();
   await expect(page.getByLabel('Exact quantity (raw-token units)')).toHaveValue('0.2');
   await expect(page.getByLabel('Minimum payout (USDC)')).toHaveValue('5');
   await expect(page.getByLabel('Maximum premium (USDC)')).toHaveValue('0.1');

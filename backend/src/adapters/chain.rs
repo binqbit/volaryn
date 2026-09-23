@@ -192,6 +192,7 @@ impl Chain {
                     designated_holder: agreement.designated_holder.map(|key| key.to_string()),
                     underlying_mint: agreement.underlying_mint.to_string(),
                     underlying_program: agreement.underlying_program.to_string(),
+                    underlying_decimals: agreement.underlying_decimals,
                     usdc_mint: agreement.usdc_mint.to_string(),
                     quantity_raw: agreement.quantity_raw.to_string(),
                     payout: agreement.payout.to_string(),
@@ -227,24 +228,33 @@ impl Chain {
     ) -> Result<WalletView, AppError> {
         Pubkey::from_str(owner).map_err(|_| AppError::Invalid)?;
         let mut accounts = Vec::new();
-        for (mint, program) in [
-            (&deployment.underlying_mint, anchor_spl::token_2022::ID),
-            (&deployment.usdc_mint, anchor_spl::token::ID),
-        ] {
+        for program in [anchor_spl::token_2022::ID, anchor_spl::token::ID] {
             let result = self
                 .request(
                     RpcRequest::GetTokenAccountsByOwner,
-                    json!([owner, {"mint":mint}, {"encoding":"base64", "commitment":"finalized"}]),
+                    json!([owner, {"programId":program.to_string()}, {"encoding":"base64", "commitment":"finalized"}]),
                 )
                 .await?;
             let slot = result["context"]["slot"].as_u64().ok_or(AppError::Chain)?;
             for entry in result["value"].as_array().ok_or(AppError::Chain)? {
                 let address = entry["pubkey"].as_str().ok_or(AppError::Chain)?;
                 Pubkey::from_str(address).map_err(|_| AppError::Chain)?;
-                let amount = token_amount(&entry["account"], mint, owner, &program.to_string())?;
                 let bytes = data(&entry["account"])?;
                 let token = StateWithExtensions::<TokenAccount>::unpack(&bytes)
                     .map_err(|_| AppError::Chain)?;
+                let mint = token.base.mint.to_string();
+                let decimals = if program == anchor_spl::token::ID && mint == deployment.usdc_mint {
+                    6
+                } else if program == anchor_spl::token_2022::ID {
+                    let Some(asset) = deployment.assets.iter().find(|asset| asset.mint == mint)
+                    else {
+                        continue;
+                    };
+                    asset.decimals
+                } else {
+                    continue;
+                };
+                let amount = token_amount(&entry["account"], &mint, owner, &program.to_string())?;
                 accounts.push(WalletTokenAccount {
                     address: address.into(),
                     mint: mint.clone(),
@@ -252,7 +262,7 @@ impl Chain {
                     amount_raw: amount.to_string(),
                     frozen: token.base.state
                         == anchor_spl::token_2022::spl_token_2022::state::AccountState::Frozen,
-                    decimals: 6,
+                    decimals,
                     finalized_slot: slot.to_string(),
                 });
             }

@@ -3,22 +3,18 @@ import styles from '../App.module.css';
 
 export function TransactionStatus({
   transaction,
-  connected,
 }: {
   transaction: ReturnType<typeof useTransaction>;
-  connected: boolean;
 }) {
+  if (transaction.phase === 'idle') return null;
   const text = {
-    idle: connected
-      ? 'Your wallet signs. The contract settles.'
-      : 'Browsing only · no wallet connected',
     'awaiting-signature': 'Waiting for wallet approval…',
     provisional: 'Confirmed on chain · waiting for finality',
     finalized: 'Transaction finalized',
     reconciled: 'Action verified from finalized agreement state',
     expired: 'Signature expired · action not completed',
     unresolved: 'Outcome unresolved · reconciling signature',
-    pending: 'Transaction submitted · confirmation pending',
+    pending: 'Signed transaction · confirmation pending',
     failed: 'Transaction was not completed',
   };
   return (

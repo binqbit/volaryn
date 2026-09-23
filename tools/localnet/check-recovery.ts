@@ -1,3 +1,4 @@
+import { fixtureAssets } from './assets';
 import assert from 'node:assert/strict';
 import { readFile, writeFile } from 'node:fs/promises';
 import { createSolanaRpc, address } from '@solana/kit';
@@ -16,7 +17,14 @@ const agreements = ((await response.json()) as components['schemas']['AgreementV
 const rpc = createSolanaRpc('http://app:8080/rpc');
 const accounts = await rpc
   .getMultipleAccounts(
-    [config.writerUsdc, config.holderUsdc, config.holderUnderlying].map(address),
+    [
+      config.writerUsdc,
+      config.holderUsdc,
+      ...(await fixtureAssets()).flatMap((item) => [
+        item.holderAccount.address,
+        item.writerAccount.address,
+      ]),
+    ].map(address),
     { encoding: 'base64', commitment: 'finalized' },
   )
   .send();

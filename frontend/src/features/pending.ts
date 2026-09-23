@@ -33,39 +33,10 @@ export function parsePending(raw: string): PendingTransaction {
   address(value.owner);
   address(value.agreement);
   amount(value.lastValidBlockHeight);
-  let createdTerms: OfferTerms | undefined;
-  if (value.operation === 'create') {
-    const terms = 'createdTerms' in value ? value.createdTerms : null;
-    if (!terms || typeof terms !== 'object') throw new Error('Missing saved offer terms');
-    for (const key of [
-      'nonce',
-      'quantityRaw',
-      'payout',
-      'premium',
-      'acceptBefore',
-      'expiresAt',
-    ] as const) {
-      if (!(key in terms) || typeof (terms as Record<string, unknown>)[key] !== 'string')
-        throw new Error('Invalid saved offer terms');
-      amount((terms as Record<string, string>)[key]!);
-    }
-    if (
-      !('designatedHolder' in terms) ||
-      (terms.designatedHolder !== null && typeof terms.designatedHolder !== 'string')
-    )
-      throw new Error('Invalid designated holder');
-    if (terms.designatedHolder) address(terms.designatedHolder);
-    const checked = terms as OfferTerms;
-    createdTerms = {
-      nonce: checked.nonce,
-      quantityRaw: checked.quantityRaw,
-      payout: checked.payout,
-      premium: checked.premium,
-      acceptBefore: checked.acceptBefore,
-      expiresAt: checked.expiresAt,
-      designatedHolder: checked.designatedHolder,
-    };
-  }
+  const createdTerms =
+    value.operation === 'create'
+      ? parseOfferTerms('createdTerms' in value ? value.createdTerms : null)
+      : undefined;
   return {
     signature: value.signature,
     lastValidBlockHeight: value.lastValidBlockHeight,
@@ -73,5 +44,41 @@ export function parsePending(raw: string): PendingTransaction {
     agreement: value.agreement,
     operation: value.operation as Operation,
     ...(createdTerms ? { createdTerms } : {}),
+  };
+}
+
+export function parseOfferTerms(terms: unknown): OfferTerms {
+  if (!terms || typeof terms !== 'object') throw new Error('Missing saved offer terms');
+  for (const key of [
+    'nonce',
+    'quantityRaw',
+    'payout',
+    'premium',
+    'acceptBefore',
+    'expiresAt',
+  ] as const) {
+    if (!(key in terms) || typeof (terms as Record<string, unknown>)[key] !== 'string')
+      throw new Error('Invalid saved offer terms');
+    amount((terms as Record<string, string>)[key]!);
+  }
+  if (
+    !('designatedHolder' in terms) ||
+    (terms.designatedHolder !== null && typeof terms.designatedHolder !== 'string')
+  )
+    throw new Error('Invalid designated holder');
+  if (terms.designatedHolder) address(terms.designatedHolder);
+  if (!('underlyingMint' in terms) || typeof terms.underlyingMint !== 'string')
+    throw new Error('Missing saved token identity');
+  address(terms.underlyingMint);
+  const checked = terms as OfferTerms;
+  return {
+    underlyingMint: checked.underlyingMint,
+    nonce: checked.nonce,
+    quantityRaw: checked.quantityRaw,
+    payout: checked.payout,
+    premium: checked.premium,
+    acceptBefore: checked.acceptBefore,
+    expiresAt: checked.expiresAt,
+    designatedHolder: checked.designatedHolder,
   };
 }

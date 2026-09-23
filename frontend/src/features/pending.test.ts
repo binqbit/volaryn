@@ -29,6 +29,7 @@ describe('pending transaction recovery', () => {
 it('requires complete public creation terms and discards unrelated saved values', () => {
   const createdTerms = {
     nonce: '1',
+    underlyingMint: saved.owner,
     quantityRaw: '10',
     payout: '20',
     premium: '1',
@@ -36,6 +37,17 @@ it('requires complete public creation terms and discards unrelated saved values'
     expiresAt: '2000',
     designatedHolder: null,
   };
+  for (const underlyingMint of [undefined, 'bad', 123]) {
+    expect(() =>
+      parsePending(
+        JSON.stringify({
+          ...saved,
+          operation: 'create',
+          createdTerms: { ...createdTerms, underlyingMint },
+        }),
+      ),
+    ).toThrow();
+  }
   const record = { ...saved, operation: 'create', createdTerms };
   expect(parsePending(JSON.stringify(record))).toEqual(record);
   expect(() => parsePending(JSON.stringify({ ...record, createdTerms: null }))).toThrow();

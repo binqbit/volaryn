@@ -53,7 +53,7 @@ async fn wallet_preserves_separate_balances_and_supports_usdc_only_writers() {
             let values = values.clone();
             async move {
                 assert_eq!(request["params"][2]["commitment"], "finalized");
-                let selected = request["params"][1]["mint"] == mint.to_string();
+                let selected = request["params"][1]["programId"] == anchor_spl::token::ID.to_string();
                 Json(json!({"jsonrpc":"2.0","id":request["id"],"result":{"context":{"slot":42},"value":if selected {values} else {vec![]}}}))
             }
         }))).await.unwrap();
@@ -83,5 +83,59 @@ async fn wallet_preserves_separate_balances_and_supports_usdc_only_writers() {
         rpc.wallet(&deployment, "invalid").await,
         Err(AppError::Invalid)
     ));
+    server.abort();
+}
+
+#[tokio::test]
+async fn wallet_filters_unlisted_mints_and_retains_each_assets_precision() {
+    let mut deployment = support::deployment();
+    let first = Pubkey::new_unique();
+    let second = Pubkey::new_unique();
+    deployment.assets[0].mint = first.to_string();
+    let mut additional = deployment.assets[0].clone();
+    additional.mint = second.to_string();
+    additional.decimals = 7;
+    deployment.assets.push(additional);
+    let owner = Pubkey::new_unique();
+    let values: Vec<_> = [
+        (first, 1_000_000_001),
+        (second, 10_000_001),
+        (Pubkey::new_unique(), 42),
+    ]
+    .into_iter()
+    .map(|(mint, amount)| {
+        let mut value = token(mint, owner, amount, false);
+        value["account"]["owner"] = json!(anchor_spl::token_2022::ID.to_string());
+        value
+    })
+    .collect();
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let rpc = Chain::new(format!("http://{}", listener.local_addr().unwrap())).unwrap();
+    let server = tokio::spawn(async move {
+        axum::serve(listener, Router::new().route("/", post(move |Json(request): Json<Value>| {
+            let values = values.clone();
+            async move {
+                assert_eq!(request["params"][2]["commitment"], "finalized");
+                let selected = request["params"][1]["programId"] == anchor_spl::token_2022::ID.to_string();
+                Json(json!({"jsonrpc":"2.0","id":request["id"],"result":{"context":{"slot":42},"value":if selected {values} else {vec![]}}}))
+            }
+        }))).await.unwrap();
+    });
+    let wallet = rpc.wallet(&deployment, &owner.to_string()).await.unwrap();
+    assert_eq!(wallet.accounts.len(), 2);
+    let first_balance = wallet
+        .accounts
+        .iter()
+        .find(|account| account.mint == first.to_string())
+        .unwrap();
+    assert_eq!(first_balance.amount_raw, "1000000001");
+    assert_eq!(first_balance.decimals, 9);
+    let second_balance = wallet
+        .accounts
+        .iter()
+        .find(|account| account.mint == second.to_string())
+        .unwrap();
+    assert_eq!(second_balance.amount_raw, "10000001");
+    assert_eq!(second_balance.decimals, 7);
     server.abort();
 }
