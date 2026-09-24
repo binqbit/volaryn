@@ -84,7 +84,7 @@ pub struct ActivityPage {
 }
 
 impl Application {
-    /// Called before relaying a supported signed operation. Storage failure prevents sending.
+    /// Preflight a first-seen signed operation before persisting its receipt and relaying it.
     pub async fn record_submission(&self, params: &Value) -> Result<(), AppError> {
         let Some(intent) = decode::decode(params)? else {
             return Ok(());
@@ -139,6 +139,45 @@ impl Application {
         let height = lifetime["value"]["lastValidBlockHeight"]
             .as_u64()
             .ok_or(AppError::Chain)?;
+        // Signature possession alone must not admit unexecutable operations into durable work.
+        // Existing receipts return above so a landed transaction can still be retried/recovered.
+        let simulation = self
+            .chain
+            .request(
+                RpcRequest::SimulateTransaction,
+                json!([params[0], {
+                    "encoding":"base64", "commitment":"confirmed",
+                    "sigVerify":true, "replaceRecentBlockhash":false,
+                    "minContextSlot":minimum_slot
+                }]),
+            )
+            .await
+            .and_then(|simulation| {
+                if simulation["context"]["slot"]
+                    .as_u64()
+                    .ok_or(AppError::Chain)?
+                    < minimum_slot
+                {
+                    return Err(AppError::Chain);
+                }
+                if !simulation["value"]
+                    .get("err")
+                    .ok_or(AppError::Chain)?
+                    .is_null()
+                {
+                    return Err(AppError::Invalid);
+                }
+                Ok(())
+            });
+        if let Err(error) = simulation {
+            // Another request may have persisted and relayed this exact signature while
+            // simulation was running. Keep concurrent retries as idempotent as saved ones.
+            return if store::find(&self.pool, &intent.signature).await?.is_some() {
+                Ok(())
+            } else {
+                Err(error)
+            };
+        }
         let timestamp = now();
         store::insert(
             &self.pool,

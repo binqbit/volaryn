@@ -4,7 +4,7 @@ mod database;
 mod fixtures;
 mod support;
 
-use anchor_lang::prelude::Pubkey;
+use anchor_lang::{prelude::Pubkey, InstructionData};
 use axum::{body::Body, extract::State, http::Request, routing::post, Json, Router};
 use base64::{engine::general_purpose::STANDARD, Engine};
 use fixtures::SignedAction;
@@ -13,7 +13,7 @@ use serde_json::{json, Value};
 use std::{
     collections::BTreeMap,
     sync::{
-        atomic::{AtomicU64, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         Arc, Mutex,
     },
 };
@@ -29,6 +29,12 @@ struct Network {
     pool: sqlx::PgPool,
     height: AtomicU64,
     sent: AtomicU64,
+    reject_submissions: AtomicBool,
+    simulated: AtomicU64,
+    simulation: Mutex<Option<Value>>,
+    pause_simulation: AtomicBool,
+    simulation_started: tokio::sync::Notify,
+    resume_simulation: tokio::sync::Notify,
     statuses: Mutex<BTreeMap<String, Value>>,
 }
 async fn upstream(State(state): State<Arc<Network>>, Json(request): Json<Value>) -> Json<Value> {
@@ -49,6 +55,30 @@ async fn upstream(State(state): State<Arc<Network>>, Json(request): Json<Value>)
             let statuses = state.statuses.lock().unwrap();
             json!({"value":request["params"][0].as_array().unwrap().iter().map(|signature| statuses.get(signature.as_str().unwrap()).cloned().unwrap_or(Value::Null)).collect::<Vec<_>>()})
         }
+        "simulateTransaction" => {
+            assert_eq!(request["params"][1]["encoding"], "base64");
+            assert_eq!(request["params"][1]["commitment"], "confirmed");
+            assert_eq!(request["params"][1]["sigVerify"], true);
+            assert_eq!(request["params"][1]["replaceRecentBlockhash"], false);
+            assert_eq!(request["params"][1]["minContextSlot"], 10);
+            let bytes = STANDARD
+                .decode(request["params"][0].as_str().unwrap())
+                .unwrap();
+            let transaction: solana_transaction::Transaction =
+                bincode::deserialize(&bytes).unwrap();
+            transaction.verify().unwrap();
+            state.simulated.fetch_add(1, Ordering::Relaxed);
+            if state.pause_simulation.load(Ordering::Relaxed) {
+                state.simulation_started.notify_one();
+                state.resume_simulation.notified().await;
+            }
+            let Some(result) = state.simulation.lock().unwrap().clone() else {
+                return Json(json!({"jsonrpc":"2.0", "id":request["id"], "error": {
+                    "code": -32005, "message": "Node is unavailable"
+                }}));
+            };
+            result
+        }
         "sendTransaction" => {
             let bytes = STANDARD
                 .decode(request["params"][0].as_str().unwrap())
@@ -64,6 +94,11 @@ async fn upstream(State(state): State<Arc<Network>>, Json(request): Json<Value>)
                 "receipt must be durable before broadcast"
             );
             state.sent.fetch_add(1, Ordering::Relaxed);
+            if state.reject_submissions.load(Ordering::Relaxed) {
+                return Json(json!({"jsonrpc":"2.0", "id":request["id"], "error": {
+                    "code": -32002, "message": "Transaction simulation failed: account not found"
+                }}));
+            }
             json!(signature)
         }
         method => panic!("Unexpected RPC: {method}"),
@@ -82,6 +117,12 @@ async fn authenticated_receipts_survive_relay_duplicates_and_reconcile_without_a
         pool: pool.clone(),
         height: AtomicU64::new(10),
         sent: AtomicU64::new(0),
+        reject_submissions: AtomicBool::new(false),
+        simulated: AtomicU64::new(0),
+        simulation: Mutex::new(Some(json!({"context":{"slot":10},"value":{"err":null}}))),
+        pause_simulation: AtomicBool::new(false),
+        simulation_started: tokio::sync::Notify::new(),
+        resume_simulation: tokio::sync::Notify::new(),
         statuses: Mutex::default(),
     });
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -121,6 +162,15 @@ async fn authenticated_receipts_survive_relay_duplicates_and_reconcile_without_a
             .unwrap();
         assert_eq!(response.status(), 200);
     }
+    assert_eq!(
+        network.simulated.load(Ordering::Relaxed),
+        1,
+        "A saved signature does not need another simulation"
+    );
+    *network.simulation.lock().unwrap() = None;
+    app.record_submission(&action.params()).await.unwrap();
+    assert_eq!(network.simulated.load(Ordering::Relaxed), 1);
+    *network.simulation.lock().unwrap() = Some(json!({"context":{"slot":10},"value":{"err":null}}));
     let page = app
         .activity(&ActivityQuery {
             owner: action.owner.clone(),
@@ -286,6 +336,139 @@ async fn authenticated_receipts_survive_relay_duplicates_and_reconcile_without_a
 }
 
 use std::future::IntoFuture;
+
+#[tokio::test]
+async fn server_preflight_blocks_invalid_receipts_and_preserves_relay_ambiguity() {
+    let database = database::Database::new().await;
+    let deployment = support::deployment();
+    let pool = store::open(database.options.clone(), &deployment)
+        .await
+        .unwrap();
+    let network = Arc::new(Network {
+        pool: pool.clone(),
+        height: AtomicU64::new(10),
+        sent: AtomicU64::new(0),
+        reject_submissions: AtomicBool::new(true),
+        simulated: AtomicU64::new(0),
+        simulation: Mutex::new(None),
+        pause_simulation: AtomicBool::new(false),
+        simulation_started: tokio::sync::Notify::new(),
+        resume_simulation: tokio::sync::Notify::new(),
+        statuses: Mutex::default(),
+    });
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let endpoint = format!("http://{}", listener.local_addr().unwrap());
+    let server = tokio::spawn(
+        axum::serve(
+            listener,
+            Router::new()
+                .route("/", post(upstream))
+                .with_state(network.clone()),
+        )
+        .into_future(),
+    );
+    let app = Application::new(
+        deployment,
+        Chain::new(endpoint.clone()).unwrap(),
+        pool.clone(),
+        volaryn_backend::catalog::Catalog::new(endpoint).unwrap(),
+    );
+    let mut action = SignedAction::create(901);
+    action.transaction.message.instructions[0].data = volaryn::instruction::CancelOffer {}.data();
+    action.transaction.message.instructions[0].accounts = vec![0, 1, 2, 2, 2, 2];
+    action.resign();
+    let router = http::router(app.clone(), "missing-test-frontend".into());
+    let request = || {
+        Request::post("/rpc")
+            .header("content-type", "application/json")
+            .body(Body::from(
+                json!({"jsonrpc":"2.0", "id":1, "method":"sendTransaction", "params":action.params()})
+                    .to_string(),
+            ))
+            .unwrap()
+    };
+    for (simulation, status) in [
+        (
+            Some(json!({"context":{"slot":10},"value":{"err":"AccountNotFound"}})),
+            400,
+        ),
+        (None, 503),
+        (
+            Some(json!({"context":{"slot":9},"value":{"err":null}})),
+            503,
+        ),
+        (Some(json!({"context":{"slot":10},"value":{}})), 503),
+    ] {
+        *network.simulation.lock().unwrap() = simulation;
+        let response = router.clone().oneshot(request()).await.unwrap();
+        assert_eq!(response.status(), status);
+        assert_eq!(network.sent.load(Ordering::Relaxed), 0);
+        assert!(receipts::find(&pool, &action.signature())
+            .await
+            .unwrap()
+            .is_none());
+        assert!(receipts::pending(&pool).await.unwrap().is_empty());
+    }
+    // A successful simulation cannot predict a later relay failure; keep recovery evidence.
+    *network.simulation.lock().unwrap() = Some(json!({"context":{"slot":10},"value":{"err":null}}));
+    let response = router.oneshot(request()).await.unwrap();
+    assert_eq!(response.status(), 200);
+    let body: Value =
+        serde_json::from_slice(&response.into_body().collect().await.unwrap().to_bytes()).unwrap();
+    assert_eq!(body["error"]["code"], -32002);
+    assert_eq!(network.sent.load(Ordering::Relaxed), 1);
+    assert_eq!(
+        receipts::find(&pool, &action.signature())
+            .await
+            .unwrap()
+            .unwrap()
+            .status,
+        Status::Pending,
+    );
+    network.height.store(201, Ordering::Relaxed);
+    for _ in 0..2 {
+        app.reconcile_activity().await.unwrap();
+        let queued = receipts::pending(&pool).await.unwrap();
+        assert_eq!(queued.len(), 1);
+        assert_eq!(queued[0].signature, action.signature());
+        assert_eq!(queued[0].status, Status::Unresolved);
+    }
+    // Pause a first-seen request after its lookup; another request can save the same
+    // signature before its simulation fails. Only that exact receipt permits recovery.
+    let concurrent = SignedAction::create(902);
+    for matching_receipt in [false, true] {
+        network.pause_simulation.store(true, Ordering::Relaxed);
+        let pending_app = app.clone();
+        let pending_params = concurrent.params();
+        let pending =
+            tokio::spawn(async move { pending_app.record_submission(&pending_params).await });
+        network.simulation_started.notified().await;
+        network.pause_simulation.store(false, Ordering::Relaxed);
+        *network.simulation.lock().unwrap() =
+            Some(json!({"context":{"slot":10},"value":{"err":null}}));
+        app.record_submission(&if matching_receipt {
+            concurrent.params()
+        } else {
+            action.params()
+        })
+        .await
+        .unwrap();
+        *network.simulation.lock().unwrap() =
+            Some(json!({"context":{"slot":10},"value":{"err":"AlreadyProcessed"}}));
+        network.resume_simulation.notify_one();
+        assert_eq!(pending.await.unwrap().is_ok(), matching_receipt);
+        assert_eq!(
+            receipts::find(&pool, &concurrent.signature())
+                .await
+                .unwrap()
+                .is_some(),
+            matching_receipt,
+        );
+    }
+    app.pool.close().await;
+    database.close().await;
+    server.abort();
+}
 
 #[tokio::test]
 async fn history_pagination_keeps_old_pending_receipts_recoverable() {
