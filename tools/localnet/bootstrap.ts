@@ -7,7 +7,6 @@ import {
   VOLARYN_PROGRAM_ADDRESS,
   OfferSide,
   getCreateAssetPolicyInstruction,
-  getUpdateAssetPolicyInstruction,
   getCreateOfferInstruction,
   getInitializeInstruction,
   fetchMaybeAgreement,
@@ -21,7 +20,7 @@ import { demoBalances, fixtureAssets, fixtureUnits } from './assets';
 import { fixtureTokens } from './tokens';
 import { withProgress } from './progress';
 import { checkLocalManifest } from './manifest';
-import { localPolicyTerms, needsFixturePolicyUpgrade } from './policy';
+import { localPolicyTerms } from './policy';
 import type { components } from '../../frontend/src/lib/api/schema';
 
 const { values } = parseArgs({
@@ -57,7 +56,7 @@ if (
     .digest('hex') !== programSha256
 )
   throw new Error(
-    'The ledger contains a different program build; it will not be reset automatically',
+    'The ledger contains a different program build. See docs/development.md#local-development-reset to start a fresh local environment. Existing data was not reset.',
   );
 
 const manifest: components['schemas']['Deployment'] = {
@@ -87,11 +86,9 @@ async function readExisting(path: string) {
     throw error;
   }
 }
-let upgradeManifest = false;
 for (const path of [values.manifest, `${values.manifest}.pending`]) {
   const existing = await readExisting(path);
-  if (existing !== undefined)
-    upgradeManifest = checkLocalManifest(existing, manifest) || upgradeManifest;
+  if (existing !== undefined) checkLocalManifest(existing, manifest);
 }
 await mkdir(dirname(values.manifest), { recursive: true });
 await writeFile(`${values.manifest}.pending`, JSON.stringify(manifest, null, 2) + '\n');
@@ -201,16 +198,6 @@ await Promise.all(
       ]);
     else if (policy.data.mint !== mint.address || policy.data.decimals !== asset.decimals)
       throw new Error('Asset policy differs from the fixture');
-    else if (needsFixturePolicyUpgrade(policy.data))
-      await execute(`Removing the one-day admission cutoff for ${asset.symbol} local replica`, [
-        getUpdateAssetPolicyInstruction({
-          authority: keys.authority,
-          config: addresses.config,
-          policy: addresses.policy,
-          mint: mint.address,
-          terms: localPolicyTerms,
-        }),
-      ]);
   }),
 );
 
@@ -243,7 +230,6 @@ for (const [index, { mint, asset }] of assets.slice(0, 2).entries()) {
   }
 }
 await rename(`${values.manifest}.pending`, values.manifest);
-if (upgradeManifest) console.log('[bootstrap] Updated the local deployment manifest to schema 3');
 console.log(
   `[bootstrap] Local fixture ready in ${((Date.now() - started) / 1000).toFixed(1)}s: ${accounts.agreement}`,
 );

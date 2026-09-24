@@ -185,16 +185,11 @@ try {
   await stop(app);
   await stop(validator);
   await bootValidator('validator-restart.log');
-  // Rehearse the previous metadata layout against the used ledger and retained database.
-  const {
-    localnet,
-    schemaVersion: _schema,
-    upgradeAuthority: _upgrade,
-    ...network
-  } = JSON.parse(identity) as import('../../frontend/src/lib/api/client').Deployment;
-  await writeFile(manifest, JSON.stringify({ ...network, schemaVersion: 2, ...localnet }) + '\n');
+  // Resume an interrupted bootstrap using the same deployment identity.
+  await writeFile(`${manifest}.pending`, identity);
   await bootstrap('bootstrap-restart.log');
   assert.equal(await readFile(manifest, 'utf8'), identity, 'Bootstrap must retain ledger identity');
+  await assert.rejects(readFile(`${manifest}.pending`), { code: 'ENOENT' });
   assert.deepEqual(await fixtureState(), balances, 'Bootstrap must not reset used token balances');
   await bootApp('app-restart.log');
   assert.deepEqual(
@@ -246,7 +241,7 @@ try {
         independentExercise: true,
         backupRestore: true,
         deploymentCheck: true,
-        manifestUpgrade: true,
+        manifestResume: true,
       },
       null,
       2,
