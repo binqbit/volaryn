@@ -76,9 +76,10 @@ test('offer cards lead to full terms and portfolio lists remain wallet scoped', 
     if (url.pathname === '/api/agreements') {
       portfolioQueries.push(url);
       return route.fulfill({
-        json: url.searchParams.has('holder')
-          ? [{ ...offer, status: 'exercised', holder: config.localnet!.holder }]
-          : [],
+        json:
+          url.searchParams.has('holder') || url.searchParams.has('owner')
+            ? [{ ...offer, status: 'exercised', holder: config.localnet!.holder }]
+            : [],
       });
     }
     return route.fulfill({ json: offer });
@@ -109,7 +110,7 @@ test('offer cards lead to full terms and portfolio lists remain wallet scoped', 
   await navigation.getByRole('link', { name: 'My portfolio', exact: true }).click();
   await expect(page.getByRole('article', { name: /^Agreement / })).toHaveCount(1);
   await expect(page.getByRole('article', { name: /^Agreement / })).toContainText('Exercised');
-  expect(portfolioQueries.at(-1)?.searchParams.get('holder')).toBe(config.localnet!.holder);
+  expect(portfolioQueries.at(-1)?.searchParams.get('owner')).toBe(config.localnet!.holder);
   expect(portfolioQueries.at(-1)?.searchParams.has('status')).toBe(false);
   await page
     .getByRole('navigation', { name: 'Portfolio views' })

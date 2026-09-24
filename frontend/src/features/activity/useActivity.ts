@@ -1,16 +1,20 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRequest } from '@solana/react';
 import { api } from '../../lib/api/client';
 import { observationStatus } from '../../lib/api/observation';
 import { activityChanged, activityKey, readActivity } from './storage';
-import { mergeActivity, type ActivityItem } from './model';
+import { discoveryAttempts, mergeActivity, type ActivityItem } from './model';
 
 export function useActivity(key: string, owner: string | undefined, before?: string) {
   const [, setRevision] = useState(0);
+  const [discovery, setDiscovery] = useState<{ key: string; attempts: string[] }>({
+    key,
+    attempts: [],
+  });
   const identity = `${key}:${before ?? ''}`;
   const source = useCallback(
     async (signal: AbortSignal) => {
-      if (!owner) return { identity, items: [], pending: [], next: null };
+      if (!owner) return { identity, items: [], pending: [], indexedAgreements: [], next: null };
       const result = await api.GET('/api/activity', {
         params: { query: { owner, before } },
         signal,
@@ -29,6 +33,7 @@ export function useActivity(key: string, owner: string | undefined, before?: str
         identity,
         items: result.data.items.map(convert),
         pending: result.data.pending.map(convert),
+        indexedAgreements: result.data.indexedAgreements,
         next: result.data.next,
       };
     },
@@ -65,9 +70,24 @@ export function useActivity(key: string, owner: string | undefined, before?: str
   // Read on every notified render, without treating localStorage as authoritative chain state.
   const items = mergeActivity(before ? [] : local, data?.items ?? []);
   const pending = mergeActivity(local, data?.pending ?? []);
+  const indexedAgreements = useMemo(() => data?.indexedAgreements ?? [], [data]);
+  useEffect(() => {
+    setDiscovery((current) => {
+      const attempts = discoveryAttempts(
+        current.key === key ? current.attempts : [],
+        [...items, ...pending],
+        indexedAgreements,
+      );
+      return current.key === key && JSON.stringify(current.attempts) === JSON.stringify(attempts)
+        ? current
+        : { key, attempts };
+    });
+  }, [key, items, pending, indexedAgreements]);
   return {
     items,
     pending,
+    indexedAgreements,
+    awaitingDiscovery: discovery.key === key ? discovery.attempts : [],
     next: data?.next,
     refresh,
     storageError,

@@ -2,6 +2,7 @@ import { useCallback, useEffect } from 'react';
 import { useRequest } from '@solana/react';
 import { api, amount, type Deployment } from '../lib/api/client';
 import { observationStatus } from '../lib/api/observation';
+import type { components } from '../lib/api/schema';
 
 export interface PortfolioQuery {
   mode: 'all' | 'offers' | 'writer' | 'holder';
@@ -9,6 +10,7 @@ export interface PortfolioQuery {
   quantityRaw?: string;
   minPayout?: string;
   maxPremium?: string;
+  lifecycle?: components['schemas']['AgreementLifecycle'];
 }
 
 export function usePortfolio(
@@ -18,7 +20,7 @@ export function usePortfolio(
   after?: string,
   query: PortfolioQuery = { mode: 'all' },
 ) {
-  const { mode, mint, quantityRaw, minPayout, maxPremium } = query;
+  const { mode, mint, quantityRaw, minPayout, maxPremium, lifecycle } = query;
   const identity = JSON.stringify([
     deployment.genesisHash,
     owner,
@@ -29,6 +31,7 @@ export function usePortfolio(
     quantityRaw,
     minPayout,
     maxPremium,
+    lifecycle,
   ]);
   const source = useCallback(
     async (signal: AbortSignal) => {
@@ -37,13 +40,14 @@ export function usePortfolio(
         mint,
         writer: mode === 'writer' ? owner : undefined,
         holder: mode === 'holder' ? owner : undefined,
+        owner: mode === 'all' ? owner : undefined,
+        lifecycle,
         eligible_holder: mode === 'offers' ? owner : undefined,
         quantity_raw: quantityRaw,
         min_payout: minPayout,
         max_premium: maxPremium,
       };
-      if ((mode === 'writer' || mode === 'holder') && !owner && !selected)
-        return { identity, agreements: [], next: null };
+      if (mode !== 'offers' && !owner && !selected) return { identity, agreements: [], next: null };
       const result = selected
         ? await api.GET('/api/agreements/{address}', {
             params: { path: { address: selected } },
@@ -77,7 +81,7 @@ export function usePortfolio(
       }
       return { identity, agreements, next: result.response.headers.get('X-Next-Cursor') };
     },
-    [mint, owner, selected, after, mode, quantityRaw, minPayout, maxPremium, identity],
+    [mint, owner, selected, after, mode, quantityRaw, minPayout, maxPremium, lifecycle, identity],
   );
   const request = useRequest(source, { getAbortSignal: () => AbortSignal.timeout(8000) });
   const { refresh, status } = request;

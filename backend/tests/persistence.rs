@@ -34,7 +34,7 @@ async fn pages_filters_and_targeted_updates_work_beyond_one_thousand_agreements(
     };
     let mut found = Vec::new();
     loop {
-        let page = store::agreements(&pool, &query, false).await.unwrap();
+        let page = store::agreements(&pool, &query, false, None).await.unwrap();
         assert!(page.items.len() <= 200);
         found.extend(page.items.iter().map(|row| row.address.clone()));
         query.after = page.next;
@@ -89,6 +89,7 @@ async fn pages_filters_and_targeted_updates_work_beyond_one_thousand_agreements(
             ..Default::default()
         },
         false,
+        None,
     )
     .await
     .unwrap();
@@ -97,7 +98,7 @@ async fn pages_filters_and_targeted_updates_work_beyond_one_thousand_agreements(
         .items
         .iter()
         .all(|row| row.holder.as_ref() == Some(&holder) && row.status == "active"));
-    let offers = store::agreements(&pool, &Default::default(), true)
+    let offers = store::agreements(&pool, &Default::default(), true, None)
         .await
         .unwrap();
     assert!(offers.items.iter().all(|row| row.status == "funded"));
@@ -107,7 +108,8 @@ async fn pages_filters_and_targeted_updates_work_beyond_one_thousand_agreements(
             limit: Some(201),
             ..Default::default()
         },
-        false
+        false,
+        None
     )
     .await
     .is_err());
@@ -117,7 +119,8 @@ async fn pages_filters_and_targeted_updates_work_beyond_one_thousand_agreements(
             after: Some("bad cursor".into()),
             ..Default::default()
         },
-        false
+        false,
+        None
     )
     .await
     .is_err());
@@ -170,7 +173,7 @@ async fn offer_matching_uses_exact_amounts_and_designated_holder_eligibility() {
         eligible_holder: Some(holder.clone()),
         ..Default::default()
     };
-    let page = store::agreements(&pool, &query, true).await.unwrap();
+    let page = store::agreements(&pool, &query, true, None).await.unwrap();
     assert_eq!(page.items.len(), 2);
     assert!(page
         .items
@@ -182,7 +185,9 @@ async fn offer_matching_uses_exact_amounts_and_designated_holder_eligibility() {
     };
     let mut found = Vec::new();
     loop {
-        let page = store::agreements(&pool, &paged_query, true).await.unwrap();
+        let page = store::agreements(&pool, &paged_query, true, None)
+            .await
+            .unwrap();
         found.extend(page.items.into_iter().map(|row| row.address));
         paged_query.after = page.next;
         if paged_query.after.is_none() {
@@ -201,6 +206,7 @@ async fn offer_matching_uses_exact_amounts_and_designated_holder_eligibility() {
             ..Default::default()
         },
         false,
+        None,
     )
     .await
     .unwrap();

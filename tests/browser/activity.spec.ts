@@ -10,6 +10,7 @@ test('pending offers restore from the server, survive reload, and become complet
   const d = state.deployment;
   const signature = '1'.repeat(64);
   let finalized = false;
+  let indexed = false;
   const receipt = () => ({
     id: '1',
     signature,
@@ -38,11 +39,12 @@ test('pending offers restore from the server, survive reload, and become complet
         items: mine ? [receipt()] : [],
         pending: mine && !finalized ? [receipt()] : [],
         next: null,
+        indexedAgreements: indexed ? [state.agreement.address] : [],
       },
     });
   });
   await page.route('**/api/agreements?*', (route) =>
-    route.fulfill({ json: finalized ? [state.agreement] : [] }),
+    route.fulfill({ json: indexed ? [state.agreement] : [] }),
   );
   await page.route('**/rpc', async (route) => {
     const { id, method } = route.request().postDataJSON();
@@ -65,7 +67,7 @@ test('pending offers restore from the server, survive reload, and become complet
       return route.fulfill({ json: { jsonrpc: '2.0', id, result: 42 } });
     await route.fallback();
   });
-  await page.goto('/portfolio/written');
+  await page.goto('/portfolio');
   await page.getByRole('button', { name: 'Connect Test Wallet 2', exact: true }).click();
   const progress = page.getByRole('region', { name: 'Operations in progress' });
   await expect(progress).toContainText('Create funded offer');
@@ -76,11 +78,23 @@ test('pending offers restore from the server, survive reload, and become complet
   await page.reload();
   await expect(page.getByRole('region', { name: 'Your wallet' })).toContainText(d.localnet!.writer);
   await expect(progress).toBeVisible();
+  await page.getByRole('link', { name: 'My protection', exact: true }).click();
+  await expect(progress).toHaveCount(0);
+  await page.getByRole('link', { name: 'My offers', exact: true }).click();
+  await expect(progress).toBeVisible();
+  await page.getByRole('link', { name: 'All', exact: true }).click();
+  await expect(progress).toBeVisible();
+  await page.getByRole('combobox', { name: 'Agreement status' }).selectOption('available');
   finalized = true;
+  const recent = page.getByRole('region', { name: 'Recent operations' });
+  await expect(recent).toContainText('Finalized');
+  await expect(page.getByRole('article', { name: /^Agreement / })).toHaveCount(0);
+  indexed = true;
   await expect(
     page.getByRole('article', { name: `Agreement ${state.agreement.address}` }),
   ).toBeVisible();
   await expect(progress).toHaveCount(0);
+  await expect(recent).toHaveCount(0);
   await page.getByRole('link', { name: 'Activity', exact: true }).click();
   const history = page.getByRole('region', { name: 'Operation history' });
   await expect(history.getByRole('listitem')).toHaveCount(1);

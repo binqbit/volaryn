@@ -112,6 +112,15 @@
             }
           },
           {
+            "name": "owner",
+            "in": "query",
+            "description": "Agreements written or held by this wallet. Applied before pagination.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "mint",
             "in": "query",
             "required": false,
@@ -125,6 +134,15 @@
             "required": false,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "lifecycle",
+            "in": "query",
+            "description": "Display lifecycle evaluated against chain time; status remains the stored contract state.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/AgreementLifecycle"
             }
           },
           {
@@ -309,6 +327,15 @@
             }
           },
           {
+            "name": "owner",
+            "in": "query",
+            "description": "Agreements written or held by this wallet. Applied before pagination.",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "mint",
             "in": "query",
             "required": false,
@@ -322,6 +349,15 @@
             "required": false,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "name": "lifecycle",
+            "in": "query",
+            "description": "Display lifecycle evaluated against chain time; status remains the stored contract state.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/AgreementLifecycle"
             }
           },
           {
@@ -490,9 +526,17 @@
         "type": "object",
         "required": [
           "items",
+          "indexedAgreements",
           "pending"
         ],
         "properties": {
+          "indexedAgreements": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Referenced agreements already written or held by this wallet in discovery, independent of portfolio pagination."
+          },
           "items": {
             "type": "array",
             "items": {
@@ -532,6 +576,18 @@
             "type": "string"
           }
         }
+      },
+      "AgreementLifecycle": {
+        "type": "string",
+        "description": "Display lifecycle, including deadlines that do not mutate the stored contract state.",
+        "enum": [
+          "available",
+          "acceptance_ended",
+          "active",
+          "exercised",
+          "cancelled",
+          "expired"
+        ]
       },
       "AgreementView": {
         "type": "object",

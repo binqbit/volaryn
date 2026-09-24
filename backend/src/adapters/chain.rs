@@ -59,6 +59,19 @@ impl Chain {
             .map_err(|_| AppError::Chain)
     }
 
+    /// Use the same confirmed block-time observation as the frontend's deadline display.
+    pub async fn time(&self) -> Result<i64, AppError> {
+        let slot = self
+            .request(RpcRequest::GetSlot, json!([{"commitment":"confirmed"}]))
+            .await?
+            .as_u64()
+            .ok_or(AppError::Chain)?;
+        self.request(RpcRequest::GetBlockTime, json!([slot]))
+            .await?
+            .as_i64()
+            .ok_or(AppError::Chain)
+    }
+
     /// Discover identities without downloading every agreement's data.
     pub async fn discover(&self, deployment: &Deployment) -> Result<(u64, Vec<String>), AppError> {
         let body = serde_json::to_vec(&json!({

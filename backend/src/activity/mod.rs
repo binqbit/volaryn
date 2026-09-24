@@ -77,6 +77,8 @@ pub struct ActivityQuery {
 pub struct ActivityPage {
     pub items: Vec<Activity>,
     pub next: Option<String>,
+    /// Referenced agreements already written or held by this wallet in discovery, independent of portfolio pagination.
+    pub indexed_agreements: Vec<String>,
     /// Independent of pagination, so older unresolved operations remain recoverable.
     pub pending: Vec<Activity>,
 }

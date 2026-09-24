@@ -65,10 +65,26 @@ pub async fn page(
         .push_bind(owner)
         .push(" ORDER BY id LIMIT 50");
     let rows: Vec<(Json<Activity>,)> = sql.build_query_as().fetch_all(pool).await?;
+    let pending: Vec<_> = rows.into_iter().map(|(Json(item),)| item).collect();
+    let addresses: Vec<_> = items
+        .iter()
+        .chain(&pending)
+        .map(|item| &item.agreement)
+        .collect();
+    let indexed_agreements = sqlx::query_scalar(
+        "SELECT address FROM agreements
+         WHERE address = ANY($1) AND (writer = $2 OR holder = $2)
+         ORDER BY address",
+    )
+    .bind(addresses)
+    .bind(owner)
+    .fetch_all(pool)
+    .await?;
     Ok(ActivityPage {
         items,
         next,
-        pending: rows.into_iter().map(|(Json(item),)| item).collect(),
+        pending,
+        indexed_agreements,
     })
 }
 

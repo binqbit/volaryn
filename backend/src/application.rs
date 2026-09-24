@@ -80,8 +80,18 @@ impl Application {
         query: &AgreementQuery,
         offers_only: bool,
     ) -> Result<store::AgreementPage, AppError> {
+        query.page_size()?;
         self.ready()?;
-        store::agreements(&self.pool, query, offers_only).await
+        let chain_time = if query
+            .lifecycle
+            .is_some_and(|lifecycle| lifecycle.needs_time())
+        {
+            self.ensure_chain().await?;
+            Some(self.chain.time().await?)
+        } else {
+            None
+        };
+        store::agreements(&self.pool, query, offers_only, chain_time).await
     }
 
     pub async fn agreement(&self, address: &str) -> Result<AgreementView, AppError> {

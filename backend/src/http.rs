@@ -56,7 +56,7 @@ impl IntoResponse for AppError {
 #[derive(OpenApi)]
 #[openapi(
     info(title = "Volaryn API", version = "1.0.0"),
-    components(schemas(ErrorBody))
+    components(schemas(ErrorBody, crate::queries::AgreementLifecycle))
 )]
 struct Api;
 
@@ -147,6 +147,7 @@ async fn serve_frontend(uri: Uri, directory: PathBuf) -> Response {
         "/" | "/offers"
             | "/offers/new"
             | "/portfolio"
+            | "/portfolio/protection"
             | "/portfolio/written"
             | "/portfolio/activity"
             | "/writer"

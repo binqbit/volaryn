@@ -80,7 +80,7 @@ async fn migrations_preserve_identity_and_exact_amounts_across_restart() {
     let pool = store::open(database.options.clone(), &deployment)
         .await
         .unwrap();
-    let rows = store::agreements(&pool, &Default::default(), false)
+    let rows = store::agreements(&pool, &Default::default(), false, None)
         .await
         .unwrap()
         .items;
@@ -107,7 +107,7 @@ async fn migrations_preserve_identity_and_exact_amounts_across_restart() {
         .await
         .unwrap();
     assert_eq!(
-        store::agreements(&pool, &Default::default(), false)
+        store::agreements(&pool, &Default::default(), false, None)
             .await
             .unwrap()
             .items[0]
@@ -140,7 +140,7 @@ async fn failed_batch_keeps_the_last_complete_projection() {
     let mut replacement = agreement::agreement(18, 101);
     replacement.address = "replacement".into();
     assert!(store::upsert(&pool, &[replacement], 18, 101).await.is_err());
-    let rows = store::agreements(&pool, &Default::default(), false)
+    let rows = store::agreements(&pool, &Default::default(), false, None)
         .await
         .unwrap()
         .items;
@@ -181,7 +181,7 @@ async fn concurrent_startup_and_out_of_order_snapshots_preserve_the_newest_check
             .await
             .unwrap();
     assert_eq!((slot.as_str(), observed_at), ("22", 200));
-    let rows = store::agreements(&first, &Default::default(), false)
+    let rows = store::agreements(&first, &Default::default(), false, None)
         .await
         .unwrap()
         .items;

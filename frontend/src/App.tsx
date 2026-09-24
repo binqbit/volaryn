@@ -248,13 +248,24 @@ export function App({ deployment }: { deployment: Deployment }) {
               }
             />
             <Route
+              path="/portfolio/protection"
+              element={
+                <PortfolioPage
+                  deployment={deployment}
+                  owner={owner}
+                  activity={transaction.activity}
+                  view="holder"
+                />
+              }
+            />
+            <Route
               path="/portfolio/written"
               element={
                 <PortfolioPage
                   deployment={deployment}
                   owner={owner}
                   activity={transaction.activity}
-                  written
+                  view="writer"
                 />
               }
             />
@@ -265,7 +276,7 @@ export function App({ deployment }: { deployment: Deployment }) {
                   deployment={deployment}
                   owner={owner}
                   activity={transaction.activity}
-                  history
+                  view="activity"
                 />
               }
             />

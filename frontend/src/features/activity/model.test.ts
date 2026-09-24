@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   asPending,
+  discoveryAttempts,
   inFlight,
   mergeActivity,
   portfolioOperations,
@@ -24,14 +25,53 @@ const signed: ActivityItem = {
   status: 'pending',
 };
 describe('operation lifecycle', () => {
-  it('shows unresolved work and only the latest successful creation awaiting discovery', () => {
-    const latest = { ...signed, operation: 'create' as const, status: 'finalized' as const };
+  it('retains a locally observed finalization through receipt lag without reviving old history', () => {
+    const awaiting = discoveryAttempts([], [signed], []);
+    expect(awaiting).toEqual([signed.signature]);
+    const finalized = { ...signed, status: 'finalized' as const };
+    expect(discoveryAttempts(awaiting, [finalized], [])).toEqual(awaiting);
+    expect(portfolioOperations([finalized], [], 'all', awaiting)).toEqual([finalized]);
+    expect(discoveryAttempts([], [finalized], [])).toEqual([]);
+    expect(portfolioOperations([finalized], [signed.agreement], 'all', awaiting)).toEqual([]);
+    expect(discoveryAttempts(awaiting, [finalized], [signed.agreement])).toEqual([]);
+    expect(discoveryAttempts(awaiting, [{ ...signed, status: 'failed' }], [])).toEqual([]);
+  });
+  it('combines both roles without presenting failed attempts as agreements', () => {
+    const creation = {
+      ...signed,
+      id: 'creation',
+      operation: 'create' as const,
+      agreement: 'created',
+      status: 'finalized' as const,
+      source: 'server' as const,
+    };
+    const activation = {
+      ...signed,
+      id: 'activation',
+      agreement: 'activated',
+      status: 'reconciled' as const,
+      source: 'server' as const,
+    };
+    const failed = { ...signed, id: 'failed', status: 'failed' as const };
+    const items = [creation, activation, signed, failed];
+    expect(portfolioOperations(items, [], 'all')).toEqual([creation, activation, signed]);
+    expect(portfolioOperations(items, ['created', 'activated'], 'all')).toEqual([signed]);
+    expect(portfolioOperations(items, [], 'writer')).toEqual([creation]);
+    expect(portfolioOperations(items, [], 'holder')).toEqual([activation, signed]);
+  });
+  it('keeps unindexed server receipts without mistaking older local history for undiscovered agreements', () => {
+    const latest = {
+      ...signed,
+      operation: 'create' as const,
+      status: 'finalized' as const,
+      source: 'server' as const,
+    };
     const older = { ...latest, id: 'older', agreement: 'older' };
-    expect(portfolioOperations([latest, older], [], true, true)).toEqual([latest]);
-    expect(portfolioOperations([latest, older], [], true, false)).toEqual([]);
-    expect(portfolioOperations([latest], [latest.agreement], true, true)).toEqual([]);
+    expect(portfolioOperations([latest, older], [], 'writer')).toEqual([latest, older]);
+    expect(portfolioOperations([{ ...latest, source: 'browser' }], [], 'writer')).toEqual([]);
+    expect(portfolioOperations([latest], [latest.agreement], 'writer')).toEqual([]);
     const cancel = { ...signed, operation: 'cancel' as const };
-    expect(portfolioOperations([cancel], [cancel.agreement], true, false)).toEqual([cancel]);
+    expect(portfolioOperations([cancel], [cancel.agreement], 'writer')).toEqual([cancel]);
   });
   it('distinguishes unsigned interruption from recoverable signed operations', () => {
     expect(inFlight(item)).toBe(true);

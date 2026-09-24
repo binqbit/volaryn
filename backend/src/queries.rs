@@ -4,7 +4,25 @@ use crate::domain::AppError;
 use anchor_lang::prelude::Pubkey;
 use serde::Deserialize;
 use std::str::FromStr;
-use utoipa::IntoParams;
+use utoipa::{IntoParams, ToSchema};
+
+/// Display lifecycle, including deadlines that do not mutate the stored contract state.
+#[derive(Clone, Copy, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum AgreementLifecycle {
+    Available,
+    AcceptanceEnded,
+    Active,
+    Exercised,
+    Cancelled,
+    Expired,
+}
+
+impl AgreementLifecycle {
+    pub fn needs_time(self) -> bool {
+        !matches!(self, Self::Exercised | Self::Cancelled)
+    }
+}
 
 #[derive(Default, Deserialize, IntoParams)]
 #[into_params(parameter_in = Query)]
@@ -15,8 +33,12 @@ pub struct AgreementQuery {
     pub limit: Option<u16>,
     pub holder: Option<String>,
     pub writer: Option<String>,
+    /// Agreements written or held by this wallet. Applied before pagination.
+    pub owner: Option<String>,
     pub mint: Option<String>,
     pub status: Option<String>,
+    /// Display lifecycle evaluated against chain time; status remains the stored contract state.
+    pub lifecycle: Option<AgreementLifecycle>,
     /// Exact underlying quantity in base units; offers are never resized.
     pub quantity_raw: Option<String>,
     pub min_payout: Option<String>,
@@ -35,6 +57,7 @@ impl AgreementQuery {
             &self.after,
             &self.holder,
             &self.writer,
+            &self.owner,
             &self.mint,
             &self.eligible_holder,
         ]

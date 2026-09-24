@@ -183,6 +183,8 @@ export interface components {
             updatedAt: number;
         };
         ActivityPage: {
+            /** @description Referenced agreements already written or held by this wallet in discovery, independent of portfolio pagination. */
+            indexedAgreements: string[];
             items: components["schemas"]["Activity"][];
             next?: string | null;
             /** @description Independent of pagination, so older unresolved operations remain recoverable. */
@@ -193,6 +195,11 @@ export interface components {
             newCommitments: boolean;
             reason: string;
         };
+        /**
+         * @description Display lifecycle, including deadlines that do not mutate the stored contract state.
+         * @enum {string}
+         */
+        AgreementLifecycle: "available" | "acceptance_ended" | "active" | "exercised" | "cancelled" | "expired";
         AgreementView: {
             acceptBefore: string;
             address: string;
@@ -435,8 +442,12 @@ export interface operations {
                 limit?: number;
                 holder?: string;
                 writer?: string;
+                /** @description Agreements written or held by this wallet. Applied before pagination. */
+                owner?: string;
                 mint?: string;
                 status?: string;
+                /** @description Display lifecycle evaluated against chain time; status remains the stored contract state. */
+                lifecycle?: components["schemas"]["AgreementLifecycle"];
                 /** @description Exact underlying quantity in base units; offers are never resized. */
                 quantity_raw?: string;
                 min_payout?: string;
@@ -549,8 +560,12 @@ export interface operations {
                 limit?: number;
                 holder?: string;
                 writer?: string;
+                /** @description Agreements written or held by this wallet. Applied before pagination. */
+                owner?: string;
                 mint?: string;
                 status?: string;
+                /** @description Display lifecycle evaluated against chain time; status remains the stored contract state. */
+                lifecycle?: components["schemas"]["AgreementLifecycle"];
                 /** @description Exact underlying quantity in base units; offers are never resized. */
                 quantity_raw?: string;
                 min_payout?: string;

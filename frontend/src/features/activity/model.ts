@@ -82,23 +82,44 @@ export function mergeActivity(local: ActivityItem[], remote: ActivityItem[]) {
 
 export function portfolioOperations(
   items: ActivityItem[],
-  visible: string[],
-  written: boolean,
-  firstPage: boolean,
+  indexed: string[],
+  role: 'all' | 'writer' | 'holder',
+  awaitingDiscovery: string[] = [],
 ) {
   const relevant = items.filter((item) =>
-    (written ? ['create', 'cancel', 'reclaim', 'cleanup'] : ['activate', 'exercise']).includes(
-      item.operation,
-    ),
+    (role === 'all'
+      ? ['create', 'cancel', 'reclaim', 'cleanup', 'activate', 'exercise']
+      : role === 'writer'
+        ? ['create', 'cancel', 'reclaim', 'cleanup']
+        : ['activate', 'exercise']
+    ).includes(item.operation),
   );
-  const pending = relevant.filter(inFlight);
-  const latest = relevant.find(
+  // Discovery presence comes from the activity API, independent of portfolio pages/filters.
+  // Include server receipts and attempts observed in flight, without reviving old local history.
+  return relevant.filter(
     (item) =>
-      ['create', 'activate'].includes(item.operation) &&
-      ['finalized', 'reconciled'].includes(item.status),
+      inFlight(item) ||
+      ((item.source === 'server' || awaitingDiscovery.includes(item.signature ?? item.id)) &&
+        ['create', 'activate'].includes(item.operation) &&
+        ['finalized', 'reconciled'].includes(item.status) &&
+        !indexed.includes(item.agreement)),
   );
-  // Keep the most recent successful creation visible while discovery catches up, without
-  // mistaking agreements on another cursor page for pending work.
-  if (firstPage && latest && !visible.includes(latest.agreement)) pending.push(latest);
-  return pending;
+}
+
+/** Keep attempts observed in flight until discovery catches up, even before receipt refresh. */
+export function discoveryAttempts(previous: string[], items: ActivityItem[], indexed: string[]) {
+  return [
+    ...new Set(
+      items
+        .filter(
+          (item) =>
+            ['create', 'activate'].includes(item.operation) &&
+            !indexed.includes(item.agreement) &&
+            (inFlight(item) ||
+              (previous.includes(item.signature ?? item.id) &&
+                ['finalized', 'reconciled'].includes(item.status))),
+        )
+        .map((item) => item.signature ?? item.id),
+    ),
+  ].sort();
 }

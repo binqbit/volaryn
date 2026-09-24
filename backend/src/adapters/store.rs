@@ -121,6 +121,7 @@ pub async fn agreements(
     pool: &PgPool,
     query: &crate::queries::AgreementQuery,
     offers_only: bool,
+    chain_time: Option<i64>,
 ) -> Result<AgreementPage, AppError> {
     let limit = query.page_size()?;
     let mut sql = sqlx::QueryBuilder::<sqlx::Postgres>::new(
@@ -130,6 +131,40 @@ pub async fn agreements(
     );
     if let Some(after) = &query.after {
         sql.push(" AND address > ").push_bind(after);
+    }
+    if let Some(owner) = &query.owner {
+        sql.push(" AND (writer = ")
+            .push_bind(owner)
+            .push(" OR holder = ")
+            .push_bind(owner)
+            .push(")");
+    }
+    if let Some(lifecycle) = query.lifecycle {
+        use crate::queries::AgreementLifecycle;
+        let time = || chain_time.ok_or(AppError::Chain);
+        match lifecycle {
+            AgreementLifecycle::Available => {
+                sql.push(" AND status = 'funded' AND accept_before > ")
+                    .push_bind(time()?);
+            }
+            AgreementLifecycle::AcceptanceEnded => {
+                sql.push(" AND status = 'funded' AND accept_before <= ")
+                    .push_bind(time()?);
+            }
+            AgreementLifecycle::Active => {
+                sql.push(" AND status = 'active' AND (projection ->> 'expiresAt')::BIGINT > ")
+                    .push_bind(time()?);
+            }
+            AgreementLifecycle::Expired => {
+                sql.push(" AND (status = 'expired' OR (status = 'active' AND (projection ->> 'expiresAt')::BIGINT <= ").push_bind(time()?).push("))");
+            }
+            AgreementLifecycle::Exercised => {
+                sql.push(" AND status = 'exercised'");
+            }
+            AgreementLifecycle::Cancelled => {
+                sql.push(" AND status = 'cancelled'");
+            }
+        }
     }
     for (column, value) in [
         ("holder", &query.holder),

@@ -7,7 +7,7 @@ use serde_json::{json, Value};
 use std::{
     collections::BTreeMap,
     sync::{
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicI64, AtomicUsize, Ordering},
         Arc,
     },
 };
@@ -18,6 +18,7 @@ pub struct Ledger {
     pub addresses: Vec<String>,
     pub discoveries: AtomicUsize,
     pub batches: AtomicUsize,
+    pub time: AtomicI64,
 }
 
 impl Ledger {
@@ -86,6 +87,7 @@ impl Ledger {
             addresses,
             discoveries: AtomicUsize::new(0),
             batches: AtomicUsize::new(0),
+            time: AtomicI64::new(1800000000),
         })
     }
 
@@ -107,6 +109,19 @@ impl Ledger {
 async fn respond(State(ledger): State<Arc<Ledger>>, Json(request): Json<Value>) -> Json<Value> {
     let result = match request["method"].as_str().unwrap() {
         "getGenesisHash" => json!("11111111111111111111111111111111"),
+        "getSlot" => {
+            assert_eq!(request["params"][0]["commitment"], "confirmed");
+            json!(11)
+        }
+        "getBlockTime" => {
+            assert_eq!(request["params"][0], 11);
+            let time = ledger.time.load(Ordering::Relaxed);
+            if time == 0 {
+                Value::Null
+            } else {
+                json!(time)
+            }
+        }
         "getMultipleAccounts"
             if crate::support::identity::response(&request, &crate::support::deployment())
                 .is_some() =>
