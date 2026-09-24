@@ -33,7 +33,7 @@ test('offer filters are optional, keyboard accessible, and retain applied criter
   await summary.press('Enter');
   await expect(filters.getByLabel('Minimum payout (USDC)')).toBeVisible();
   await selectAsset(page, 'OPENAI');
-  await filters.getByLabel('Exact quantity (raw-token units)').fill('0.25');
+  await filters.getByLabel('Exact quantity (unscaled tokens)').fill('0.25');
   await filters.getByLabel('Minimum payout (USDC)').fill('5');
   const query = page.waitForRequest((request) => {
     const url = new URL(request.url());
@@ -48,15 +48,14 @@ test('offer filters are optional, keyboard accessible, and retain applied criter
   await page.waitForResponse('**/api/offers?*');
   expect(await documentBox(filters)).toEqual(box);
   await summary.press('Enter');
-  await expect(filters.getByLabel('Exact quantity (raw-token units)')).toHaveValue('0.25');
+  await expect(filters.getByLabel('Exact quantity (unscaled tokens)')).toHaveValue('0.25');
   await page
     .getByRole('navigation', { name: 'Main navigation' })
     .getByRole('link', { name: 'Create offer', exact: true })
     .click();
-  await page
-    .getByRole('navigation', { name: 'Main navigation' })
-    .getByRole('link', { name: 'Explore offers', exact: true })
-    .click();
+  await expect(page).toHaveURL(/\/offers\/new$/);
+  // Browser history returns to the exact filtered URL; plain market navigation starts anew.
+  await page.goBack();
   await expect(summary).toContainText('2 applied');
   await summary.click();
   await expect(filters.getByLabel('Minimum payout (USDC)')).toHaveValue('5');

@@ -10,7 +10,7 @@ async function fillOffer(page: Page, expiry?: bigint) {
   await page.goto('/offers/new');
   await switchWallet(page, 'writer');
   await selectAsset(page, 'SPACEX');
-  await page.getByLabel('Gross quantity (raw-token units)', { exact: true }).fill('0.2');
+  await page.getByLabel('Gross quantity (unscaled tokens)', { exact: true }).fill('0.2');
   await page.getByLabel('Payout (USDC)', { exact: true }).fill('5');
   await page.getByLabel('Premium (USDC)', { exact: true }).fill('0.1');
   if (expiry) {
@@ -97,12 +97,12 @@ test('writer funds and cancels offers, holder matches and exercises, writer rece
   await switchWallet(page, 'holder');
   await selectAsset(page, 'SPACEX');
   await page.getByText('More filters', { exact: true }).click();
-  await page.getByLabel('Exact quantity (raw-token units)').fill('0.3');
+  await page.getByLabel('Exact quantity (unscaled tokens)').fill('0.3');
   await page.getByRole('button', { name: 'Find matching offers' }).click();
   await expect(
     page.getByText('No funded offers match these terms.', { exact: false }),
   ).toBeVisible();
-  await page.getByLabel('Exact quantity (raw-token units)').fill('0.2');
+  await page.getByLabel('Exact quantity (unscaled tokens)').fill('0.2');
   await page.getByLabel('Minimum payout (USDC)').fill('5');
   await page.getByLabel('Maximum premium (USDC)').fill('0.1');
   await page.getByRole('button', { name: 'Find matching offers' }).click();

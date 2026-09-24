@@ -1,3 +1,4 @@
+import { Link } from 'react-router';
 import { shortAddress, type Asset } from '../lib/api/client';
 import styles from '../App.module.css';
 import { Details } from './Details';
@@ -6,10 +7,12 @@ export function AssetIdentity({
   assets,
   mint,
   compact = false,
+  openContextInNewTab = false,
 }: {
   assets: Asset[];
   mint: string;
   compact?: boolean;
+  openContextInNewTab?: boolean;
 }) {
   const asset = assets.find((item) => item.mint === mint);
   const identityContent = (
@@ -28,6 +31,15 @@ export function AssetIdentity({
           <a href={asset.source} target="_blank" rel="noreferrer">
             View on PreStocks ↗
           </a>
+          <p>
+            <Link
+              to={`/issuer-assets?q=${asset.referenceMint}`}
+              target={openContextInNewTab ? '_blank' : undefined}
+              rel={openContextInNewTab ? 'noopener noreferrer' : undefined}
+            >
+              Verified issuer context ↗
+            </Link>
+          </p>
           {import.meta.env.MODE === 'localnet' && (
             <p>
               This disposable replica demonstrates the protection flow. It is not issued by

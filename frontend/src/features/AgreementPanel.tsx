@@ -158,7 +158,7 @@ export function AgreementPanel({
           <div>
             <dt>Writer's net receipt</dt>
             <dd>
-              {formatUnits(agreement.netReceived, agreement.underlyingDecimals)} raw-token units
+              {formatUnits(agreement.netReceived, agreement.underlyingDecimals)} unscaled tokens
             </dd>
           </div>
         )}
@@ -172,7 +172,7 @@ export function AgreementPanel({
         >
           {funded
             ? `Activation charges only the ${formatUnits(agreement.premium)} USDC premium. Your ${symbol} stays in your wallet until exercise.`
-            : `Exercise delivers ${formatUnits(agreement.quantityRaw, agreement.underlyingDecimals)} ${symbol} from one account and pays you ${formatUnits(agreement.payout)} USDC.`}
+            : `Exercise delivers ${formatUnits(agreement.quantityRaw, agreement.underlyingDecimals)} unscaled ${symbol} from one account and pays you ${formatUnits(agreement.payout)} USDC.`}
         </TokenBalance>
       )}
       {(holderCanReview || writerAction) && owner && !action?.complete && (
@@ -199,6 +199,7 @@ export function AgreementPanel({
               status={walletStatus}
               required={BigInt(agreement.quantityRaw)}
               requiredLabel="Quantity to deliver"
+              unscaled
             />
           )}
         </div>

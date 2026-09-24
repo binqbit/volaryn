@@ -33,7 +33,7 @@ export function ActivityList({
               {terms && (
                 <p>
                   {asset
-                    ? formatUnits(terms.quantityRaw, asset.decimals)
+                    ? `${formatUnits(terms.quantityRaw, asset.decimals)} unscaled`
                     : `${terms.quantityRaw} base units`}{' '}
                   {asset?.symbol ?? shortAddress(terms.underlyingMint)} ·{' '}
                   {formatUnits(terms.payout)} USDC payout · {formatUnits(terms.premium)} USDC

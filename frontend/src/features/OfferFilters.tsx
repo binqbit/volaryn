@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { parseUnits, formatUnits, type Asset } from '../lib/api/client';
 import type { PortfolioQuery } from './usePortfolio';
 import { AssetSelect } from './AssetSelect';
@@ -23,6 +23,12 @@ export function OfferFilters({
     value.maxPremium ? formatUnits(value.maxPremium) : '',
   );
   const [error, setError] = useState('');
+  useEffect(() => {
+    setQuantity(value.quantityRaw ? formatUnits(value.quantityRaw, asset?.decimals) : '');
+    setPayout(value.minPayout ? formatUnits(value.minPayout) : '');
+    setPremium(value.maxPremium ? formatUnits(value.maxPremium) : '');
+    setError('');
+  }, [value.mint, value.quantityRaw, value.minPayout, value.maxPremium, asset?.decimals]);
   const applied = [value.quantityRaw, value.minPayout, value.maxPremium].filter(Boolean).length;
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -57,10 +63,13 @@ export function OfferFilters({
         title="More filters"
         hint={applied ? `${applied} applied` : 'Quantity, payout & premium'}
       >
-        <p className={styles.note}>Offers have a fixed quantity and cannot be resized.</p>
+        <p className={styles.note}>
+          Quantities exclude the issuer's display multiplier. Offers have a fixed quantity and
+          cannot be resized.
+        </p>
         <div className={styles.formGrid}>
           <label className={styles.field}>
-            <span>Exact quantity (raw-token units)</span>
+            <span>Exact quantity (unscaled tokens)</span>
             <input
               inputMode="decimal"
               value={quantity}

@@ -40,7 +40,7 @@ export function AgreementCard({
       </div>
       <dl className={styles.cardTerms}>
         <div>
-          <dt>Token quantity</dt>
+          <dt>Quantity · unscaled tokens</dt>
           <dd>{formatUnits(agreement.quantityRaw, agreement.underlyingDecimals)}</dd>
         </div>
         <div>

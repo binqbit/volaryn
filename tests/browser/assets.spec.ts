@@ -18,7 +18,7 @@ test('PreStocks search selects actual mints, clears incompatible quantities and 
   await page.goto('/offers');
   const selector = page.getByRole('combobox', { name: 'PreStocks token' });
   await page.getByText('More filters', { exact: true }).click();
-  await expect(page.getByLabel('Exact quantity (raw-token units)')).toBeDisabled();
+  await expect(page.getByLabel('Exact quantity (unscaled tokens)')).toBeDisabled();
   await selector.fill('not-a-supported-token');
   await expect(
     page.getByRole('form', { name: 'Find protection' }).getByRole('status'),
@@ -30,7 +30,7 @@ test('PreStocks search selects actual mints, clears incompatible quantities and 
   await expect.poll(() => requests.at(-1)?.searchParams.get('mint')).toBe(openai.mint);
   await expect(page.getByRole('article')).toHaveCount(1);
   await expect(page.getByRole('article')).toContainText('OpenAI PreStocks');
-  await page.getByLabel('Exact quantity (raw-token units)').fill('1');
+  await page.getByLabel('Exact quantity (unscaled tokens)').fill('1');
   await page.getByRole('button', { name: 'Find matching offers' }).click();
   await expect.poll(() => requests.at(-1)?.searchParams.get('quantity_raw')).toBe('1000000000');
   // A mainnet reference resolves to its LOCAL mint; mainnet can never enter a signing request.
@@ -39,7 +39,7 @@ test('PreStocks search selects actual mints, clears incompatible quantities and 
   await selector.press('Enter');
   await expect.poll(() => requests.at(-1)?.searchParams.get('mint')).toBe(spacex.mint);
   expect(requests.at(-1)?.searchParams.has('quantity_raw')).toBe(false);
-  await expect(page.getByLabel('Exact quantity (raw-token units)')).toHaveValue('');
+  await expect(page.getByLabel('Exact quantity (unscaled tokens)')).toHaveValue('');
   await expect(page.getByRole('article')).toHaveCount(1);
   await expect(page.getByRole('article')).toContainText('SpaceX PreStocks');
   const offers = (await (
@@ -87,7 +87,7 @@ test('creation and signing review identify the selected PreStocks replica and wa
   await page.goto('/offers/new');
   await page.getByRole('button', { name: 'Connect Test Wallet 2', exact: true }).click();
   await selectAsset(page, 'ANTHROPIC');
-  await page.getByLabel('Gross quantity (raw-token units)', { exact: true }).fill('0.000000001');
+  await page.getByLabel('Gross quantity (unscaled tokens)', { exact: true }).fill('0.000000001');
   await page.getByRole('button', { name: 'Review funded offer' }).click();
   const review = page.getByRole('dialog');
   await expect(review).toContainText('Anthropic PreStocks');

@@ -55,11 +55,15 @@ export function ActionReview({
                 ? 'Recover any residual USDC and hand off an unused settlement account. This does not close the agreement record.'
                 : 'Return the reserved payout to your selected USDC account. This is allowed only by the current agreement state.'}
       </p>
-      <AssetIdentity assets={assets} mint={review.underlyingMint} />
+      <AssetIdentity assets={assets} mint={review.underlyingMint} openContextInNewTab />
       <dl className={styles.terms}>
         <div>
           <dt>Gross delivery</dt>
-          <dd>{formatUnits(review.quantityRaw, review.underlyingDecimals)} raw-token units</dd>
+          <dd>{formatUnits(review.quantityRaw, review.underlyingDecimals)} unscaled tokens</dd>
+        </div>
+        <div>
+          <dt>Exact on-chain delivery</dt>
+          <dd>{review.quantityRaw} base units</dd>
         </div>
         <div>
           <dt>Contractual USDC payout</dt>
@@ -88,12 +92,12 @@ export function ActionReview({
           <>
             <div>
               <dt>Estimated issuer fee at exercise</dt>
-              <dd>{formatUnits(review.issuerFee, review.underlyingDecimals)} raw-token units</dd>
+              <dd>{formatUnits(review.issuerFee, review.underlyingDecimals)} unscaled tokens</dd>
             </div>
             <div>
               <dt>Estimated net writer receipt</dt>
               <dd>
-                {formatUnits(review.estimatedNetReceipt, review.underlyingDecimals)} raw-token units
+                {formatUnits(review.estimatedNetReceipt, review.underlyingDecimals)} unscaled tokens
               </dd>
             </div>
           </>
@@ -141,8 +145,10 @@ export function ActionReview({
         </ul>
       )}
       <p className={styles.note}>
-        Values are in unscaled token units. Fee estimates can change; eligibility is checked again
-        before signing. Network fees can apply to a rejected on-chain transaction.
+        PreStocks quantities exclude the issuer's display multiplier and may differ from your
+        external wallet's display. The exact base-unit obligation stays fixed. Fee estimates can
+        change; eligibility is checked again before signing. Network fees can apply to a rejected
+        on-chain transaction.
       </p>
       <div className={styles.actions}>
         <button className={styles.outlineButton} disabled={busy} onClick={onCancel}>

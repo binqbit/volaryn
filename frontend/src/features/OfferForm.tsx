@@ -136,7 +136,7 @@ export function OfferForm({
         <legend>Set the terms</legend>
         <div className={`${styles.formGrid} ${styles.priceFields}`}>
           <label className={styles.field}>
-            <span>Gross quantity (raw-token units)</span>
+            <span>Gross quantity (unscaled tokens)</span>
             <input
               required
               inputMode="decimal"
@@ -163,6 +163,13 @@ export function OfferForm({
             />
           </label>
         </div>
+        {asset && (
+          <p className={styles.note}>
+            Enter {asset.symbol} before the issuer's display multiplier. One unscaled token is{' '}
+            {(10n ** BigInt(asset.decimals)).toString()} base units. Your external wallet may show a
+            different scaled balance.
+          </p>
+        )}
         <div className={styles.formGrid}>
           <label className={styles.field}>
             <span>Acceptance deadline (UTC)</span>

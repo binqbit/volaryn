@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect } from 'react';
+import { useSearchParams } from 'react-router';
 import { useRequest } from '@solana/react';
 import { api } from '../lib/api/client';
 import { observationStatus } from '../lib/api/observation';
@@ -12,7 +13,8 @@ function timestamp(value: number | null | undefined) {
 }
 
 export function OfficialAssets() {
-  const [query, setQuery] = useState('');
+  const [search, setSearch] = useSearchParams();
+  const query = search.get('q') ?? '';
   const source = useCallback(async (signal: AbortSignal) => {
     const response = await api.GET('/api/assets/official', { signal });
     if (!response.data) throw new Error('Official asset observations are unavailable');
@@ -61,7 +63,10 @@ export function OfficialAssets() {
         <input
           type="search"
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            const value = event.target.value;
+            void setSearch(value ? { q: value } : {}, { replace: true });
+          }}
           placeholder="Name, ticker or mainnet mint"
         />
       </label>

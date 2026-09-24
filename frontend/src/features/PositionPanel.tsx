@@ -78,8 +78,9 @@ export function PositionPanel({
                 })}
               </div>
               <p className={styles.note}>
-                Token holdings are separate from purchased protection. Frozen holdings cannot be
-                delivered.
+                PreStocks balances exclude the issuer's display multiplier and can differ from your
+                external wallet's display. They are separate from purchased protection. Frozen
+                holdings cannot be delivered.
               </p>
             </>
           ) : (

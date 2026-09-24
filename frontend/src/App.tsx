@@ -18,7 +18,6 @@ import {
 } from 'react-router';
 import { shortAddress, type Deployment } from './lib/api/client';
 import type { AppClient } from './lib/chain/client';
-import type { PortfolioQuery } from './features/usePortfolio';
 import { useWallet } from './features/useWallet';
 import { ActionReview } from './features/ActionReview';
 import { TransactionStatus } from './features/TransactionStatus';
@@ -43,7 +42,6 @@ export function App({ deployment }: { deployment: Deployment }) {
   const navigate = useNavigate();
   const location = useLocation();
   const owner = connected?.account.address;
-  const [filters, setFilters] = useState<PortfolioQuery>({ mode: 'offers' });
   const [revision, setRevision] = useState(0);
   // Keep transaction recovery mounted when the user moves between pages.
   const transaction = useTransaction(
@@ -225,17 +223,7 @@ export function App({ deployment }: { deployment: Deployment }) {
               </div>
             }
           >
-            <Route
-              path="/offers"
-              element={
-                <OffersPage
-                  deployment={deployment}
-                  owner={owner}
-                  filters={filters}
-                  onFilters={setFilters}
-                />
-              }
-            />
+            <Route path="/offers" element={<OffersPage deployment={deployment} owner={owner} />} />
             <Route
               path="/offers/new"
               element={

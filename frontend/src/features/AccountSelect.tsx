@@ -21,6 +21,7 @@ export function AccountSelect({
   status,
   required,
   requiredLabel = 'Required for this action',
+  unscaled = false,
   onUseBalance,
 }: {
   label: string;
@@ -32,6 +33,7 @@ export function AccountSelect({
   status: string;
   required?: bigint;
   requiredLabel?: string;
+  unscaled?: boolean;
   onUseBalance?: (raw: string) => void;
 }) {
   const account = chooseAccount(accounts ?? [], selected);
@@ -91,6 +93,9 @@ export function AccountSelect({
             </div>
           )}
         </dl>
+        {unscaled && (
+          <p>All token amounts above are unscaled, before the issuer's display multiplier.</p>
+        )}
         {status === 'error' && <p>Balance unavailable. Refresh observations before continuing.</p>}
         {shortfall && (
           <p className={balances.shortfall}>The selected account cannot cover this amount.</p>

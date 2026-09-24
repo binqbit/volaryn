@@ -1,3 +1,4 @@
+import { Link } from 'react-router';
 import { formatUnits, type Asset, type TokenAccount } from '../lib/api/client';
 import { TokenAccounts } from './TokenAccounts';
 import styles from './HoldingCard.module.css';
@@ -18,7 +19,10 @@ export function HoldingCard({ asset, accounts }: { asset: Asset; accounts: Token
           <h4>{asset.symbol}</h4>
           <p>{asset.name}</p>
         </div>
-        <strong className={styles.balance}>{display(total)}</strong>
+        <div className={styles.balance}>
+          <strong>{display(total)}</strong>
+          <small>Unscaled tokens</small>
+        </div>
       </div>
       {frozen > 0n && (
         <p className={styles.frozen}>
@@ -26,6 +30,9 @@ export function HoldingCard({ asset, accounts }: { asset: Asset; accounts: Token
         </p>
       )}
       <TokenAccounts accounts={accounts} symbol={asset.symbol} />
+      <Link className={styles.protect} to={`/offers?mint=${asset.mint}`}>
+        Find protection <span aria-hidden="true">↗</span>
+      </Link>
     </article>
   );
 }

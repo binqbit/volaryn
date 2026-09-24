@@ -222,13 +222,13 @@ test('split and frozen accounts never authorize delivery from a combined balance
   ).toBeVisible();
 });
 
-test('returning to protection shows the same criteria used by the offer query', async ({
+test('Back restores the offer criteria while global navigation starts a new search', async ({
   page,
 }) => {
   await page.goto('/offers');
   await selectAsset(page, 'OPENAI');
   await page.getByText('More filters', { exact: true }).click();
-  await page.getByLabel('Exact quantity (raw-token units)').fill('0.2');
+  await page.getByLabel('Exact quantity (unscaled tokens)').fill('0.2');
   await page.getByLabel('Minimum payout (USDC)').fill('5');
   await page.getByLabel('Maximum premium (USDC)').fill('0.1');
   const query = page.waitForRequest(
@@ -244,11 +244,20 @@ test('returning to protection shows the same criteria used by the offer query', 
     .getByRole('navigation', { name: 'Main navigation' })
     .getByRole('link', { name: 'Create offer', exact: true })
     .click();
+  await expect(page).toHaveURL(/\/offers\/new$/);
+  await page.goBack();
+  await expect(page.getByLabel('Exact quantity (unscaled tokens)')).toHaveValue('0.2');
+  await expect(page.getByLabel('Minimum payout (USDC)')).toHaveValue('5');
+  await expect(page.getByLabel('Maximum premium (USDC)')).toHaveValue('0.1');
   await page
     .getByRole('navigation', { name: 'Main navigation' })
     .getByRole('link', { name: 'Explore offers', exact: true })
     .click();
-  await expect(page.getByLabel('Exact quantity (raw-token units)')).toHaveValue('0.2');
-  await expect(page.getByLabel('Minimum payout (USDC)')).toHaveValue('5');
-  await expect(page.getByLabel('Maximum premium (USDC)')).toHaveValue('0.1');
+  await expect(page).toHaveURL(/\/offers$/);
+  await expect(page.getByRole('combobox', { name: 'PreStocks token' })).toHaveValue(
+    'All PreStocks',
+  );
+  await expect(page.getByLabel('Exact quantity (unscaled tokens)')).toHaveValue('');
+  await expect(page.getByLabel('Minimum payout (USDC)')).toHaveValue('');
+  await expect(page.getByLabel('Maximum premium (USDC)')).toHaveValue('');
 });

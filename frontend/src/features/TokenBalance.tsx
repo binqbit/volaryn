@@ -23,7 +23,7 @@ export function TokenBalance({
   return (
     <div className={styles.holdings} role="group" aria-label={`${symbol} holdings`}>
       <div className={styles.heading}>
-        <span>Your {symbol} balance</span>
+        <span>Your {symbol} balance · unscaled</span>
         <small>
           {status === 'error'
             ? accounts
