@@ -2,46 +2,59 @@ import { Link } from 'react-router';
 import { shortAddress, type Asset } from '../lib/api/client';
 import styles from '../App.module.css';
 import { Details } from './Details';
+import { InfoPopover } from './InfoPopover';
+import info from './InfoContent.module.css';
 
 export function AssetIdentity({
   assets,
   mint,
   compact = false,
   openContextInNewTab = false,
+  inline = false,
 }: {
   assets: Asset[];
   mint: string;
   compact?: boolean;
   openContextInNewTab?: boolean;
+  inline?: boolean;
 }) {
   const asset = assets.find((item) => item.mint === mint);
   const identityContent = (
     <>
-      <p>
-        {import.meta.env.MODE === 'localnet' ? 'Local settlement mint' : 'Settlement mint'}{' '}
-        <code>{mint}</code>
-      </p>
+      <dl className={info.addresses}>
+        <div>
+          <dt>
+            {import.meta.env.MODE === 'localnet' ? 'Local settlement mint' : 'Settlement mint'}
+          </dt>
+          <dd>
+            <code>{mint}</code>
+          </dd>
+        </div>
+        {asset && import.meta.env.MODE === 'localnet' && (
+          <div>
+            <dt>Referenced PreStocks mint (mainnet)</dt>
+            <dd>
+              <code>{asset.referenceMint}</code>
+            </dd>
+          </div>
+        )}
+      </dl>
       {asset && (
         <>
-          {import.meta.env.MODE === 'localnet' && (
-            <p>
-              Referenced PreStocks mint (mainnet) <code>{asset.referenceMint}</code>
-            </p>
-          )}
-          <a href={asset.source} target="_blank" rel="noreferrer">
-            View on PreStocks ↗
-          </a>
-          <p>
+          <div className={info.links}>
+            <a href={asset.source} target="_blank" rel="noreferrer">
+              View on PreStocks <span aria-hidden="true">↗</span>
+            </a>
             <Link
               to={`/issuer-assets?q=${asset.referenceMint}`}
               target={openContextInNewTab ? '_blank' : undefined}
               rel={openContextInNewTab ? 'noopener noreferrer' : undefined}
             >
-              Verified issuer context ↗
+              Verified issuer context <span aria-hidden="true">↗</span>
             </Link>
-          </p>
+          </div>
           {import.meta.env.MODE === 'localnet' && (
-            <p>
+            <p className={info.note}>
               This disposable replica demonstrates the protection flow. It is not issued by
               PreStocks and carries no private-market exposure.
             </p>
@@ -51,7 +64,13 @@ export function AssetIdentity({
     </>
   );
   const identity = asset ? (
-    <Details title="Token identity">{identityContent}</Details>
+    inline ? (
+      <Details title="Token identity">{identityContent}</Details>
+    ) : (
+      <InfoPopover title="Token identity" context={asset.name}>
+        {identityContent}
+      </InfoPopover>
+    )
   ) : (
     identityContent
   );

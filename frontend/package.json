@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@floating-ui/react-dom": "2.1.9",
     "@solana/kit": "8.3.0",
     "@solana/kit-plugin-wallet": "0.20.0",
     "@solana/react": "8.3.0",

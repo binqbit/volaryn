@@ -55,7 +55,7 @@ export function ActionReview({
                 ? 'Recover any residual USDC and hand off an unused settlement account. This does not close the agreement record.'
                 : 'Return the reserved payout to your selected USDC account. This is allowed only by the current agreement state.'}
       </p>
-      <AssetIdentity assets={assets} mint={review.underlyingMint} openContextInNewTab />
+      <AssetIdentity assets={assets} mint={review.underlyingMint} openContextInNewTab inline />
       <dl className={styles.terms}>
         <div>
           <dt>Gross delivery</dt>

@@ -114,12 +114,12 @@
   letter-spacing: 0.8px;
   white-space: nowrap;
 }
-.demoNotice > details {
+.demoNotice > div {
   border: 0;
   width: auto;
   max-width: 640px;
 }
-.demoNotice summary {
+.demoNotice > div > button {
   font-size: 11px;
 }
 .eyebrow {

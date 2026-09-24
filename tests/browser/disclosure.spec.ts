@@ -153,12 +153,25 @@ test('agreement costs, deadlines and blocking warnings stay visible with technic
   await expect(agreement.getByRole('button', { name: 'Activate protection' })).toBeDisabled();
   await expect(agreement.getByText(state.agreement.reserve, { exact: true })).not.toBeVisible();
   await page.screenshot({ path: info.outputPath('agreement-desktop.png'), fullPage: true });
-  const details = agreement.locator('summary').filter({ hasText: 'On-chain details' });
+  const details = agreement.getByRole('button', { name: /^On-chain details/ });
+  const box = await documentBox(agreement);
   await details.focus();
   await details.press('Enter');
-  await expect(agreement.getByText(state.agreement.reserve, { exact: true })).toBeVisible();
+  const dialog = page.getByRole('dialog', { name: 'On-chain details', exact: true });
+  await expect(dialog.getByText(state.agreement.reserve, { exact: true })).toBeVisible();
+  expect(
+    await documentBox(
+      page.getByRole('article', {
+        name: `Agreement ${state.agreement.address}`,
+        exact: true,
+        includeHidden: true,
+      }),
+    ),
+  ).toEqual(box);
+  await page.keyboard.press('Escape');
+  await expect(dialog).not.toBeVisible();
+  await expect(details).toBeFocused();
   await expect(agreement.getByRole('button', { name: 'Activate protection' })).toBeDisabled();
-  await details.press('Space');
   await expect(agreement.getByText(state.agreement.reserve, { exact: true })).not.toBeVisible();
   expect(state.unexpected).toEqual([]);
 });

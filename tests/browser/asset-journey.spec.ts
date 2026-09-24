@@ -85,7 +85,7 @@ test('agreement identity opens the exact official reference without changing the
   };
   await page.route('**/api/assets/official', (route) => route.fulfill({ json: snapshot }));
   await page.goto(`/agreements/${state.agreement.address}`);
-  await page.getByText('Token identity', { exact: true }).click();
+  await page.getByRole('button', { name: 'Token identity', exact: true }).click();
   const context = page.getByRole('link', { name: 'Verified issuer context' });
   await expect(context).toHaveAttribute('href', `/issuer-assets?q=${asset.referenceMint}`);
   await context.click();
@@ -106,7 +106,7 @@ test('agreement identity opens the exact official reference without changing the
   expect(new URL(page.url()).searchParams.has('q')).toBe(false);
   await page.goBack();
   await expect(page).toHaveURL(new RegExp(`/agreements/${state.agreement.address}$`));
-  await expect(page.getByText('Token identity', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Token identity', exact: true })).toBeVisible();
   expect(state.unexpected).toEqual([]);
 });
 

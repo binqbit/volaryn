@@ -24,7 +24,7 @@ test('wallet restores after reload; explicit disconnect clears the saved connect
   await expect(wallet).toContainText('Connect to see your balances and manage your protection.');
   await expect(wallet.getByText('Available test USDC', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('heading', { name: 'Agreement details' })).toBeVisible();
-  await expect(page.getByText('On-chain details', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^On-chain details/ })).toBeVisible();
   expect(owners).toEqual([]);
   await page.screenshot({ path: info.outputPath('disconnected.png'), fullPage: true });
 
@@ -46,7 +46,7 @@ test('wallet restores after reload; explicit disconnect clears the saved connect
   // An agreement refresh must not fetch disconnected wallet holdings.
   await page.waitForResponse('**/api/agreements/*');
   await expect(page.getByRole('heading', { name: 'Agreement details' })).toBeVisible();
-  await expect(page.getByText('On-chain details', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^On-chain details/ })).toBeVisible();
   expect(owners).toHaveLength(countAfterDisconnect);
 
   await connect.click();
@@ -56,7 +56,7 @@ test('wallet restores after reload; explicit disconnect clears the saved connect
   await expect(wallet).toContainText(config.localnet!.holder);
   await expect(wallet.getByText('Available test USDC', { exact: true })).toBeVisible();
   await expect(connect).toHaveCount(0);
-  await expect(page.getByText('On-chain details', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^On-chain details/ })).toBeVisible();
   expect(owners.length).toBeGreaterThan(countBeforeReload);
   expect(submissions).toBe(0);
   await page.setViewportSize({ width: 320, height: 844 });

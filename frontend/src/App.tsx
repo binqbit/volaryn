@@ -24,7 +24,8 @@ import { TransactionStatus } from './features/TransactionStatus';
 import type { ActionRequest, ActionReview as Review } from './lib/chain/actionTypes';
 import { useTransaction } from './features/useTransaction';
 import { PositionPanel } from './features/PositionPanel';
-import { Details } from './features/Details';
+import { InfoPopover } from './features/InfoPopover';
+import info from './features/InfoContent.module.css';
 import { OfficialAssets } from './features/OfficialAssets';
 import { HomePage } from './pages/HomePage';
 import { OffersPage } from './pages/OffersPage';
@@ -188,12 +189,22 @@ export function App({ deployment }: { deployment: Deployment }) {
         {import.meta.env.MODE === 'localnet' && (
           <div className={styles.demoNotice}>
             <span>LOCALNET DEMO</span>
-            <Details title="Test tokens · no real funds">
-              <p>
-                Try the full workflow with disposable PreStocks replicas. Official PreStocks assets
-                are available for read-only browsing.
-              </p>
-            </Details>
+            <InfoPopover title="Test tokens · no real funds">
+              <section className={info.section}>
+                <h3>Test wallets & tokens</h3>
+                <p>
+                  Try the full workflow with disposable PreStocks replicas. No real funds or
+                  private-market exposure.
+                </p>
+              </section>
+              <section className={info.section}>
+                <h3>Official PreStocks assets</h3>
+                <p>
+                  Mainnet assets are available for read-only browsing, separate from your test
+                  balances.
+                </p>
+              </section>
+            </InfoPopover>
           </div>
         )}
         {(connect.error ||

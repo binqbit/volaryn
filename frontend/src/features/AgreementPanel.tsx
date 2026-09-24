@@ -11,12 +11,13 @@ import { AccountSelect, chooseAccount } from './AccountSelect';
 import { date } from './ActionReview';
 import { AssetIdentity } from './AssetIdentity';
 import { TokenBalance } from './TokenBalance';
-import { Details } from './Details';
+import { InfoPopover } from './InfoPopover';
 import { agreementLifecycle } from './agreementLifecycle';
 import { agreementAction } from './agreementAction';
 import { agreementPerspective } from './agreementPerspective';
 import type { ActivityItem } from './activity/model';
 import styles from '../App.module.css';
+import info from './InfoContent.module.css';
 
 export function AgreementPanel({
   agreement,
@@ -300,31 +301,75 @@ export function AgreementPanel({
         Issuer transfer fees reduce the writer's net receipt, not the holder's USDC payout. Issuer
         restrictions can prevent delivery. The premium is not refunded when protection expires.
       </p>
-      <Details title="On-chain details" hint={shortAddress(agreement.address)}>
-        <p>
-          Agreement <code>{agreement.address}</code>
-        </p>
-        <p>
-          Writer <code>{agreement.writer}</code>
-        </p>
-        <p>
-          Holder{' '}
-          <code>
-            {agreement.holder ??
-              (funded ? (agreement.designatedHolder ?? 'Any eligible wallet') : 'Not activated')}
-          </code>
-        </p>
-        <p>Gross delivery: {agreement.quantityRaw} base units.</p>
-        <p>
-          Reserve account <code>{agreement.reserve}</code>
-        </p>
-        {completed && (
-          <p>
-            The asset was delivered and the payout transferred atomically. The writer controls the
-            delivered token account: <code>{agreement.settlement}</code>
-          </p>
-        )}
-      </Details>
+      <InfoPopover title="On-chain details" hint={shortAddress(agreement.address)}>
+        <section className={info.section}>
+          <h3>Agreement accounts</h3>
+          <dl className={info.addresses}>
+            <div>
+              <dt>Agreement</dt>
+              <dd>
+                <code>{agreement.address}</code>
+              </dd>
+            </div>
+            <div>
+              <dt>Reserve account</dt>
+              <dd>
+                <code>{agreement.reserve}</code>
+              </dd>
+            </div>
+          </dl>
+        </section>
+        <section className={info.section}>
+          <h3>Participants</h3>
+          <dl className={info.addresses}>
+            <div>
+              <dt>Writer</dt>
+              <dd>
+                <code>{agreement.writer}</code>
+              </dd>
+            </div>
+            <div>
+              <dt>Holder</dt>
+              <dd>
+                {agreement.holder || (funded && agreement.designatedHolder) ? (
+                  <code>{agreement.holder ?? agreement.designatedHolder}</code>
+                ) : funded ? (
+                  'Any eligible wallet'
+                ) : (
+                  'Not activated'
+                )}
+              </dd>
+            </div>
+          </dl>
+        </section>
+        <section className={info.section}>
+          <h3>Settlement</h3>
+          <dl className={info.facts}>
+            <div>
+              <dt>Gross delivery</dt>
+              <dd>
+                {agreement.quantityRaw}
+                <small>base units</small>
+              </dd>
+            </div>
+          </dl>
+          {completed && (
+            <>
+              <dl className={info.addresses}>
+                <div>
+                  <dt>Delivered token account · writer controlled</dt>
+                  <dd>
+                    <code>{agreement.settlement}</code>
+                  </dd>
+                </div>
+              </dl>
+              <p className={info.note}>
+                The asset was delivered and the payout transferred atomically.
+              </p>
+            </>
+          )}
+        </section>
+      </InfoPopover>
     </article>
   );
 }
