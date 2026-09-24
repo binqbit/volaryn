@@ -55,7 +55,31 @@ for (const width of [1440, 375, 320]) {
     const wallet = page.getByRole('region', { name: 'Your wallet', exact: true });
     await expect(wallet).toBeInViewport();
     await expect(balance.locator('strong').first()).toBeInViewport({ ratio: 1 });
-    await page.screenshot({ path: info.outputPath('wallet-panel.png'), fullPage: true });
+    const holdings = wallet.getByRole('region', { name: 'PreStocks demo balances', exact: true });
+    await expect
+      .poll(() => holdings.evaluate((node) => node.scrollHeight > node.clientHeight))
+      .toBe(true);
+    if (width > 800) {
+      await expect(wallet).toHaveAttribute('data-bounded', 'true');
+      const box = await wallet.boundingBox();
+      expect(box!.y + box!.height).toBeLessThanOrEqual(900);
+    }
+    await page.screenshot({ path: info.outputPath('wallet-panel.png') });
+    const usdcBeforeScroll = await balance.boundingBox();
+    await holdings.focus();
+    await holdings.press('End');
+    const lastToken = wallet.getByRole('article').last();
+    await lastToken.getByRole('link', { name: 'Find protection' }).focus();
+    await expect(lastToken.getByRole('link', { name: 'Find protection' })).toBeInViewport();
+    if (width > 800) expect(await balance.boundingBox()).toEqual(usdcBeforeScroll);
+    await wallet
+      .getByRole('article')
+      .first()
+      .getByRole('link', { name: 'Find protection' })
+      .focus();
+    await holdings.evaluate((node) => {
+      node.scrollTop = 0;
+    });
     funds.amountRaw = '18446744073709551615';
     await expect(balance.locator('strong').first()).toHaveText('18446744073709.551615');
     await expect(wallet.getByRole('article')).toHaveCount(d.assets.length);
@@ -70,7 +94,7 @@ for (const width of [1440, 375, 320]) {
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true,
     );
-    await page.screenshot({ path: info.outputPath('wallet-token-cards.png'), fullPage: true });
+    await page.screenshot({ path: info.outputPath('wallet-token-cards.png') });
 
     await navigation.getByRole('link', { name: 'Home', exact: true }).click();
     await expect(wallet).toHaveCount(0);
@@ -82,3 +106,71 @@ for (const width of [1440, 375, 320]) {
     expect(state.unexpected).toEqual([]);
   });
 }
+
+test('desktop wallet fits on entry and stays pinned while the form and holdings scroll independently', async ({
+  page,
+}, info) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const { state, account } = await balanceFixture(page);
+  const d = state.deployment;
+  state.wallets[d.localnet!.writer]!.accounts = [
+    account(d.usdcMint, d.localnet!.writerUsdc, '10000000000'),
+    ...d.assets.map((asset) => account(asset.mint, asset.mint, '100000000000')),
+  ];
+  await page.goto('/offers/new');
+  await page.getByRole('button', { name: 'Connect Test Wallet 2', exact: true }).click();
+  const wallet = page.getByRole('region', { name: 'Your wallet', exact: true });
+  const holdings = wallet.getByRole('region', { name: 'PreStocks demo balances', exact: true });
+  await expect(wallet).toHaveAttribute('data-bounded', 'true');
+  await expect
+    .poll(async () => {
+      const box = (await wallet.boundingBox())!;
+      return box.y + box.height;
+    })
+    .toBeLessThanOrEqual(876);
+  await page.screenshot({ path: info.outputPath('wallet-entry.png') });
+  // Stay within the workspace; the sidebar naturally releases before the page footer.
+  await page.evaluate(() => window.scrollTo(0, 200));
+  await expect.poll(async () => (await wallet.boundingBox())!.y).toBe(24);
+  const balance = wallet.getByRole('group', { name: 'USDC balance', exact: true });
+  await expect(balance).toBeInViewport({ ratio: 1 });
+  await holdings.hover();
+  await page.mouse.wheel(0, 500);
+  await expect.poll(() => holdings.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+  const scrollTop = await holdings.evaluate((node) => node.scrollTop);
+  const balanceBox = await balance.boundingBox();
+  await page.waitForRequest('**/api/wallet?*');
+  await expect.poll(() => holdings.evaluate((node) => node.scrollTop)).toBe(scrollTop);
+  expect(await balance.boundingBox()).toEqual(balanceBox);
+  await page.screenshot({ path: info.outputPath('wallet-sticky.png') });
+  expect(state.unexpected).toEqual([]);
+});
+
+test('wallet adapts to short screens and lets a short list keep its natural height', async ({
+  page,
+}, info) => {
+  const { state, account } = await balanceFixture(page);
+  const d = state.deployment;
+  state.wallets[d.localnet!.writer]!.accounts = [
+    account(d.usdcMint, d.localnet!.writerUsdc, '10000000000'),
+    account(d.assets[0]!.mint, d.assets[0]!.mint, '100000000000'),
+  ];
+  await page.goto('/portfolio');
+  await page.getByRole('button', { name: 'Connect Test Wallet 2', exact: true }).click();
+  const wallet = page.getByRole('region', { name: 'Your wallet', exact: true });
+  const holdings = wallet.getByRole('region', { name: 'PreStocks demo balances', exact: true });
+  await expect(wallet).toHaveAttribute('data-bounded', 'true');
+  const natural = await wallet.boundingBox();
+  expect(natural!.height).toBeLessThan(800);
+  expect(await holdings.evaluate((node) => node.scrollHeight <= node.clientHeight)).toBe(true);
+  await page.setViewportSize({ width: 1024, height: 500 });
+  await expect(wallet).toHaveAttribute('data-bounded', 'false');
+  await wallet.getByRole('link', { name: 'Find protection' }).focus();
+  await expect(wallet.getByRole('link', { name: 'Find protection' })).toBeInViewport();
+  await page.screenshot({ path: info.outputPath('wallet-short-viewport.png'), fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 1100 });
+  await page.evaluate(() => window.scrollTo(0, 0));
+  await expect(wallet).toHaveAttribute('data-bounded', 'true');
+  await expect(wallet.getByRole('group', { name: 'USDC balance', exact: true })).toBeInViewport();
+  expect(state.unexpected).toEqual([]);
+});

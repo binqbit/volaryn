@@ -141,6 +141,7 @@
 }
 .walletAside {
   min-width: 0;
+  align-self: stretch;
 }
 .position,
 .surface {
@@ -150,7 +151,30 @@
   padding: var(--space-card);
 }
 .position {
+  display: flex;
+  flex-direction: column;
   scroll-margin-top: 24px;
+}
+.position[data-bounded='true'] {
+  position: sticky;
+  top: 24px;
+}
+.walletPinned {
+  display: flow-root;
+  flex: none;
+}
+.holdingsScroll {
+  min-height: 0;
+  max-height: min(28rem, 50dvh);
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #716b89 transparent;
+  padding: 2px 4px 2px 2px;
+}
+.position[data-bounded='true'] .holdingsScroll {
+  max-height: none;
 }
 .pageHeading {
   display: flex;
