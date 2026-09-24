@@ -118,7 +118,7 @@ for (const width of [1440, 375, 320]) {
       const information = page.getByRole('dialog', { name: title, exact: true });
       await expectAnchored(trigger, information);
       await page.screenshot({
-        path: info.outputPath(`${title.split(' ')[0].toLowerCase()}-tooltip.png`),
+        path: info.outputPath(`${title.split(' ')[0]!.toLowerCase()}-tooltip.png`),
       });
       await information.getByRole('button', { name: 'Close', exact: true }).click();
       expect(await documentBox(catalogHeading)).toEqual(headingBefore);

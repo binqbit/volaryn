@@ -35,7 +35,10 @@ test('holder cancels review, isolates tabs, restores after closing a tab, and ex
   await page.goto('/offers');
   await page.getByRole('button', { name: 'Connect Test Wallet 1' }).click();
   await selectAsset(page, 'OPENAI');
-  await page.getByRole('link', { name: 'View offer', exact: true }).click();
+  await page
+    .getByRole('article', { name: `Agreement ${accounts.agreement}`, exact: true })
+    .getByRole('link', { name: 'View offer', exact: true })
+    .click();
   const activate = page.getByRole('button', { name: 'Activate protection' });
   await expect(activate).toBeEnabled();
 
