@@ -37,8 +37,16 @@ export async function prepareTransaction(
     (tx) => setTransactionMessageLifetimeUsingBlockhash(lifetime, tx),
     (tx) => appendTransactionMessageInstructions(instructions, tx),
   );
+  // Wallet Standard signers may modify messages. Pin the approved bytes, including
+  // the blockhash, so returned signatures cannot change terms or recovery lifetime.
+  const reviewedMessage = new Uint8Array(compileTransaction(message).messageBytes);
   await beforeSign?.();
   const transaction = await signTransactionMessageWithSigners(message);
+  if (
+    transaction.messageBytes.length !== reviewedMessage.length ||
+    !transaction.messageBytes.every((byte, index) => byte === reviewedMessage[index])
+  )
+    throw new Error('Wallet changed the reviewed transaction. Review and sign again.');
   return {
     signature: getSignatureFromTransaction(transaction),
     encoded: getBase64EncodedWireTransaction(transaction),
