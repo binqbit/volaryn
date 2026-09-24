@@ -1,5 +1,8 @@
 import { spawn } from 'node:child_process';
 import { browserProxy } from './browser-proxy';
+import { seedBrowserFixtures } from './browser-fixtures';
+
+await seedBrowserFixtures('http://validator:8899', 'http://app:8080');
 
 // Wallet Standard needs a secure browser context. Only this test container's
 // loopback forwarder reaches the app on the private Compose network.

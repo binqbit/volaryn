@@ -5,18 +5,15 @@ import { parseArgs } from 'node:util';
 import { createSolanaRpc, lamports, type Instruction } from '@solana/kit';
 import {
   VOLARYN_PROGRAM_ADDRESS,
-  OfferSide,
   getCreateAssetPolicyInstruction,
-  getCreateOfferInstruction,
   getInitializeInstruction,
-  fetchMaybeAgreement,
   fetchMaybeProtocolConfig,
   fetchMaybeAssetPolicy,
   protocolAddresses,
   sendAndFinalize,
 } from '@volaryn/protocol';
 import { fixtureSigners, recipe } from './identity';
-import { demoBalances, fixtureAssets, fixtureUnits } from './assets';
+import { demoBalances, fixtureAssets } from './assets';
 import { fixtureTokens } from './tokens';
 import { withProgress } from './progress';
 import { checkLocalManifest } from './manifest';
@@ -93,9 +90,9 @@ for (const path of [values.manifest, `${values.manifest}.pending`]) {
 await mkdir(dirname(values.manifest), { recursive: true });
 await writeFile(`${values.manifest}.pending`, JSON.stringify(manifest, null, 2) + '\n');
 
-async function execute(label: string, instructions: Instruction[], payer = keys.authority) {
+async function execute(label: string, instructions: Instruction[]) {
   return withProgress(`${label}; waiting for finalization`, () =>
-    sendAndFinalize(rpc, payer, instructions),
+    sendAndFinalize(rpc, keys.authority, instructions),
   );
 }
 console.log('[bootstrap] Initializing missing fixtures; a fresh ledger can take several minutes');
@@ -161,9 +158,6 @@ else if (
   config.data.usdcMint !== keys.usdc.address
 )
   throw new Error('Protocol configuration differs from the fixture');
-const slot = await rpc.getSlot({ commitment: 'finalized' }).send();
-const now = await rpc.getBlockTime(slot).send();
-if (now === null) throw new Error('Validator clock is unavailable');
 // Eight independent assets share one protocol and USDC reserve mint.
 await Promise.all(
   assets.map(async ({ mint, holderAccount, writerAccount, asset }) => {
@@ -201,35 +195,7 @@ await Promise.all(
   }),
 );
 
-// Give the market two real funded fixtures; other assets are ready for user-created offers.
-for (const [index, { mint, asset }] of assets.slice(0, 2).entries()) {
-  const nonce = BigInt(index + 1);
-  const addresses = await protocolAddresses(mint.address, keys.writer.address, nonce);
-  if (!(await fetchMaybeAgreement(rpc, addresses.agreement, { commitment: 'finalized' })).exists) {
-    await execute(
-      `Creating the ${asset.symbol} funded offer`,
-      [
-        getCreateOfferInstruction({
-          ...addresses,
-          creator: keys.writer,
-          underlyingMint: mint.address,
-          usdcMint: keys.usdc.address,
-          creatorUsdc: keys.writerUsdc.address,
-          nonce,
-          side: OfferSide.Writer,
-          designatedCounterparty: keys.holder.address,
-          quantityRaw: fixtureUnits(recipe.quantityRaw, asset.decimals),
-          payout: BigInt(recipe.payout),
-          premium: BigInt(recipe.premium),
-          acceptBefore: now + BigInt(recipe.acceptanceSeconds),
-          expiresAt: now + BigInt(recipe.protectionSeconds),
-        }),
-      ],
-      keys.writer,
-    );
-  }
-}
 await rename(`${values.manifest}.pending`, values.manifest);
 console.log(
-  `[bootstrap] Local fixture ready in ${((Date.now() - started) / 1000).toFixed(1)}s: ${accounts.agreement}`,
+  `[bootstrap] Local wallets and assets ready in ${((Date.now() - started) / 1000).toFixed(1)}s`,
 );

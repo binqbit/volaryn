@@ -1,6 +1,7 @@
 import { restoreBackup } from './database-recovery';
 import { independentExercise } from './independent-exercise';
 import { fixtureAssets } from './assets';
+import { seedBrowserFixtures } from './browser-fixtures';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
@@ -92,6 +93,7 @@ async function fixtureState() {
 try {
   await bootValidator('validator.log');
   await bootstrap('bootstrap.log');
+  await bootstrap('bootstrap-empty-restart.log');
   await finish(
     start(
       'target/debug/volaryn',
@@ -100,6 +102,7 @@ try {
     ),
   );
   await bootApp('app.log');
+  await seedBrowserFixtures(rpc, appUrl);
   await finish(
     start(
       'node_modules/.bin/playwright',
@@ -234,6 +237,7 @@ try {
         passed: true,
         browser: true,
         browserArguments,
+        emptyStartup: true,
         restart: true,
         databaseOutageRecovery: true,
         bootstrapIdempotency: true,
