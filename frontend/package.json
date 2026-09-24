@@ -10,7 +10,9 @@
     "@solana/wallet-standard-features": "1.5.0",
     "@volaryn/protocol": "0.1.0",
     "@wallet-standard/core": "1.1.2",
+    "@walletconnect/sign-client": "2.25.0",
     "openapi-fetch": "0.17.0",
+    "qrcode": "1.5.4",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-router": "8.4.0"
