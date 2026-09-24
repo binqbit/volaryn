@@ -20,7 +20,7 @@ export function PositionPanel({
   status: string;
   children: ReactNode;
 }) {
-  const { panel, pinned } = useWalletLayout(Boolean(owner && wallet));
+  const { panel, pinned, footer } = useWalletLayout(Boolean(owner && wallet));
   const demo =
     import.meta.env.MODE === 'localnet' &&
     (owner === deployment.localnet?.holder || owner === deployment.localnet?.writer);
@@ -86,29 +86,33 @@ export function PositionPanel({
         )}
       </div>
       {owner && wallet && (
-        <div
-          className={styles.holdingsScroll}
-          role="region"
-          aria-labelledby="holdings-title"
-          tabIndex={0}
-        >
-          <div className={styles.holdingsGrid}>
-            {holdings.map((asset) => {
-              const accounts = wallet.accounts.filter((account) => account.mint === asset.mint);
-              return <HoldingCard key={asset.mint} asset={asset} accounts={accounts} />;
-            })}
+        <>
+          <div
+            className={styles.holdingsScroll}
+            role="region"
+            aria-labelledby="holdings-title"
+            tabIndex={0}
+          >
+            <div className={styles.holdingsGrid}>
+              {holdings.map((asset) => {
+                const accounts = wallet.accounts.filter((account) => account.mint === asset.mint);
+                return <HoldingCard key={asset.mint} asset={asset} accounts={accounts} />;
+              })}
+            </div>
           </div>
-          <p className={styles.note}>
-            PreStocks balances exclude the issuer's display multiplier and can differ from your
-            external wallet's display. They are separate from purchased protection. Frozen holdings
-            cannot be delivered.
-          </p>
-          <p className={styles.note}>
-            {import.meta.env.MODE === 'localnet' && demo
-              ? 'This is a provided test wallet. Balances reflect its activity on this local ledger.'
-              : 'Balances are read for this address on the connected network.'}
-          </p>
-        </div>
+          <div ref={footer} className={styles.walletFooter}>
+            <p className={styles.note}>
+              PreStocks balances exclude the issuer's display multiplier and can differ from your
+              external wallet's display. They are separate from purchased protection. Frozen
+              holdings cannot be delivered.
+            </p>
+            <p className={styles.note}>
+              {import.meta.env.MODE === 'localnet' && demo
+                ? 'This is a provided test wallet. Balances reflect its activity on this local ledger.'
+                : 'Balances are read for this address on the connected network.'}
+            </p>
+          </div>
+        </>
       )}
     </section>
   );

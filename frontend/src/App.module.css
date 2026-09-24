@@ -157,9 +157,15 @@
   position: sticky;
   top: 24px;
 }
-.walletPinned {
+.walletPinned,
+.walletFooter {
   display: flow-root;
   flex: none;
+}
+.walletFooter .note {
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 1.6;
 }
 .holdingsScroll {
   min-height: 0;

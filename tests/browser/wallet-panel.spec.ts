@@ -56,6 +56,10 @@ for (const width of [1440, 375, 320]) {
     await expect(wallet).toBeInViewport();
     await expect(balance.locator('strong').first()).toBeInViewport({ ratio: 1 });
     const holdings = wallet.getByRole('region', { name: 'PreStocks demo balances', exact: true });
+    await expect(holdings).not.toContainText("PreStocks balances exclude the issuer's display");
+    await expect(holdings).not.toContainText('This is a provided test wallet.');
+    await expect(wallet.getByText(/^PreStocks balances exclude/)).toBeVisible();
+    await expect(wallet.getByText(/^This is a provided test wallet/)).toBeVisible();
     await expect
       .poll(() => holdings.evaluate((node) => node.scrollHeight > node.clientHeight))
       .toBe(true);
@@ -134,6 +138,12 @@ test('desktop wallet fits on entry and stays pinned while the form and holdings 
   await expect.poll(async () => (await wallet.boundingBox())!.y).toBe(24);
   const balance = wallet.getByRole('group', { name: 'USDC balance', exact: true });
   await expect(balance).toBeInViewport({ ratio: 1 });
+  const unitsNote = wallet.getByText(/^PreStocks balances exclude/);
+  const networkNote = wallet.getByText(/^This is a provided test wallet/);
+  await expect(unitsNote).toBeInViewport({ ratio: 1 });
+  await expect(networkNote).toBeInViewport({ ratio: 1 });
+  const unitsBox = await unitsNote.boundingBox();
+  const networkBox = await networkNote.boundingBox();
   await holdings.hover();
   await page.mouse.wheel(0, 500);
   await expect.poll(() => holdings.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
@@ -142,6 +152,8 @@ test('desktop wallet fits on entry and stays pinned while the form and holdings 
   await page.waitForRequest('**/api/wallet?*');
   await expect.poll(() => holdings.evaluate((node) => node.scrollTop)).toBe(scrollTop);
   expect(await balance.boundingBox()).toEqual(balanceBox);
+  expect(await unitsNote.boundingBox()).toEqual(unitsBox);
+  expect(await networkNote.boundingBox()).toEqual(networkBox);
   await page.screenshot({ path: info.outputPath('wallet-sticky.png') });
   expect(state.unexpected).toEqual([]);
 });
