@@ -98,7 +98,7 @@ async fn pages_filters_and_targeted_updates_work_beyond_one_thousand_agreements(
         .items
         .iter()
         .all(|row| row.holder.as_ref() == Some(&holder) && row.status == "active"));
-    let offers = store::agreements(&pool, &Default::default(), true, None)
+    let offers = store::agreements(&pool, &Default::default(), true, Some(100))
         .await
         .unwrap();
     assert!(offers.items.iter().all(|row| row.status == "funded"));
@@ -140,7 +140,7 @@ async fn offer_matching_uses_exact_amounts_and_designated_holder_eligibility() {
         .map(|index| {
             let mut row = agreement::agreement(10, 100);
             row.address = Pubkey::new_unique().to_string();
-            row.accept_before = (volaryn_backend::domain::now() + 3600).to_string();
+            row.accept_before = "3700".into();
             if index == 1 {
                 row.designated_holder = Some(holder.clone());
             }
@@ -173,7 +173,9 @@ async fn offer_matching_uses_exact_amounts_and_designated_holder_eligibility() {
         eligible_holder: Some(holder.clone()),
         ..Default::default()
     };
-    let page = store::agreements(&pool, &query, true, None).await.unwrap();
+    let page = store::agreements(&pool, &query, true, Some(100))
+        .await
+        .unwrap();
     assert_eq!(page.items.len(), 2);
     assert!(page
         .items
@@ -185,7 +187,7 @@ async fn offer_matching_uses_exact_amounts_and_designated_holder_eligibility() {
     };
     let mut found = Vec::new();
     loop {
-        let page = store::agreements(&pool, &paged_query, true, None)
+        let page = store::agreements(&pool, &paged_query, true, Some(100))
             .await
             .unwrap();
         found.extend(page.items.into_iter().map(|row| row.address));

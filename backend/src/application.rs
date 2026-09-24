@@ -82,9 +82,10 @@ impl Application {
     ) -> Result<store::AgreementPage, AppError> {
         query.page_size()?;
         self.ready()?;
-        let chain_time = if query
-            .lifecycle
-            .is_some_and(|lifecycle| lifecycle.needs_time())
+        let chain_time = if offers_only
+            || query
+                .lifecycle
+                .is_some_and(|lifecycle| lifecycle.needs_time())
         {
             self.ensure_chain().await?;
             Some(self.chain.time().await?)

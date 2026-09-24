@@ -346,3 +346,74 @@ async fn portfolio_http_validates_filters_and_observes_chain_deadlines() {
     database.close().await;
     server.abort();
 }
+
+#[tokio::test]
+async fn offer_discovery_uses_chain_time_across_host_skew_and_deadline_boundaries() {
+    let ledger = chain::Ledger::new(0);
+    let (endpoint, server) = ledger.serve().await;
+    let database = database::Database::new().await;
+    let pool = store::open(database.options.clone(), &support::deployment())
+        .await
+        .unwrap();
+    let app = Application::new(
+        support::deployment(),
+        Chain::new(endpoint.clone()).unwrap(),
+        pool,
+        Catalog::new(endpoint).unwrap(),
+    );
+    app.reconcile().await.unwrap();
+    let service = router(
+        app.clone(),
+        std::path::PathBuf::from("missing-test-frontend"),
+    );
+    let observed_at = volaryn_backend::domain::now();
+    let mut offer = agreement::agreement(11, observed_at);
+    offer.address = Pubkey::new_unique().to_string();
+    // Observe both directions of host/chain skew without changing the process clock.
+    for deadline in [observed_at - 3600, observed_at + 3600] {
+        offer.accept_before = deadline.to_string();
+        offer.expires_at = (deadline + 3600).to_string();
+        store::upsert(&app.pool, &[offer.clone()], 11, observed_at)
+            .await
+            .unwrap();
+        for (chain_time, expected) in [(deadline - 1, 1), (deadline, 0), (deadline + 1, 0)] {
+            ledger.time.store(chain_time, Ordering::Relaxed);
+            for path in ["/api/offers", "/api/offers?lifecycle=available"] {
+                let response = service
+                    .clone()
+                    .oneshot(Request::get(path).body(Body::empty()).unwrap())
+                    .await
+                    .unwrap();
+                assert_eq!(response.status(), 200, "{path}");
+                let body: Vec<serde_json::Value> = serde_json::from_slice(
+                    &response.into_body().collect().await.unwrap().to_bytes(),
+                )
+                .unwrap();
+                assert_eq!(
+                    body.len(),
+                    expected,
+                    "{path}: chain time {chain_time}, acceptance deadline {deadline}"
+                );
+            }
+        }
+    }
+    ledger.time.store(0, Ordering::Relaxed);
+    let response = service
+        .oneshot(Request::get("/api/offers").body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    assert_eq!(
+        response.status(),
+        503,
+        "Unavailable chain time fails closed"
+    );
+    assert!(
+        store::agreements(&app.pool, &Default::default(), true, None)
+            .await
+            .is_err(),
+        "The store cannot substitute host time for missing chain time"
+    );
+    app.pool.close().await;
+    database.close().await;
+    server.abort();
+}

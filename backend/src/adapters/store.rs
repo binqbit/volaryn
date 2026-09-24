@@ -178,7 +178,7 @@ pub async fn agreements(
     }
     if offers_only {
         sql.push(" AND status = 'funded' AND accept_before > ")
-            .push_bind(crate::domain::now())
+            .push_bind(chain_time.ok_or(AppError::Chain)?)
             .push(" AND (projection ->> 'reserveAmount')::NUMERIC >= (projection ->> 'payout')::NUMERIC");
     }
     for (expression, value) in [
