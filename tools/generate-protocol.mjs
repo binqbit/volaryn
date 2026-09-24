@@ -15,5 +15,7 @@ await client.accept(
   renderVisitor(fileURLToPath(new URL('../packages/protocol', import.meta.url)), {
     syncPackageJson: false,
     erasableSyntax: true,
+    // Keep generator formatting identical inside the repository and in temporary checks.
+    prettierOptions: { singleQuote: false, printWidth: 80, trailingComma: 'all' },
   }),
 );

@@ -28,7 +28,11 @@ try {
   const idl = JSON.parse(await readFile('packages/protocol/idl/volaryn.json', 'utf8'));
   assert.equal(idl.metadata.spec, '0.1.0');
   await createFromRoot(rootNodeFromAnchor(idl)).accept(
-    renderVisitor(temporary, { syncPackageJson: false, erasableSyntax: true }),
+    renderVisitor(temporary, {
+      syncPackageJson: false,
+      erasableSyntax: true,
+      prettierOptions: { singleQuote: false, printWidth: 80, trailingComma: 'all' },
+    }),
   );
   await compare(join(temporary, 'src/generated'), resolve('packages/protocol/src/generated'));
   const schema = join(temporary, 'schema.ts');
