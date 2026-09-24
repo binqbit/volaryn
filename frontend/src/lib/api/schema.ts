@@ -20,6 +20,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admission": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["admission"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/agreements": {
         parameters: {
             query?: never;
@@ -116,6 +132,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/release": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["release"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/wallet": {
         parameters: {
             query?: never;
@@ -155,6 +187,11 @@ export interface components {
             next?: string | null;
             /** @description Independent of pagination, so older unresolved operations remain recoverable. */
             pending: components["schemas"]["Activity"][];
+        };
+        Admission: {
+            mint: string;
+            newCommitments: boolean;
+            reason: string;
         };
         AgreementView: {
             acceptBefore: string;
@@ -196,20 +233,16 @@ export interface components {
         Deployment: {
             assets: components["schemas"]["AssetView"][];
             authority: string;
-            /** Format: int32 */
-            fixtureVersion: number;
             genesisHash: string;
-            holder: string;
-            holderUsdc: string;
+            localnet?: null | components["schemas"]["LocalFixtures"];
             mode: string;
             programId: string;
             programLength: number;
             programSha256: string;
             /** Format: int32 */
             schemaVersion: number;
+            upgradeAuthority?: string | null;
             usdcMint: string;
-            writer: string;
-            writerUsdc: string;
         };
         /** @enum {string} */
         Eligibility: "compatible" | "unsupported" | "unreviewed" | "expired" | "stale" | "unavailable";
@@ -222,6 +255,14 @@ export interface components {
             basisPoints: number;
             epoch: string;
             maximumRaw: string;
+        };
+        LocalFixtures: {
+            /** Format: int32 */
+            fixtureVersion: number;
+            holder: string;
+            holderUsdc: string;
+            writer: string;
+            writerUsdc: string;
         };
         MarketContext: {
             impliedValuation?: string | null;
@@ -275,6 +316,12 @@ export interface components {
         };
         /** @enum {string} */
         Operation: "create" | "activate" | "exercise" | "cancel" | "reclaim" | "cleanup";
+        Release: {
+            localnet: boolean;
+            programSha256?: string | null;
+            revision?: string | null;
+            version: string;
+        };
         ReviewedAsset: {
             /** Format: int64 */
             conversionDeadline?: number | null;
@@ -354,6 +401,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ActivityPage"];
+                };
+            };
+        };
+    };
+    admission: {
+        parameters: {
+            query: {
+                mint: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Admission"];
                 };
             };
         };
@@ -504,6 +572,25 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgreementView"][];
+                };
+            };
+        };
+    };
+    release: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Release"];
                 };
             };
         };

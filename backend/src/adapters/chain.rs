@@ -9,7 +9,6 @@ use anchor_spl::token_2022::spl_token_2022::{
 };
 use base64::{engine::general_purpose::STANDARD, Engine};
 use serde_json::{json, Value};
-use sha2::{Digest, Sha256};
 use solana_rpc_client::{nonblocking::rpc_client::RpcClient, rpc_client::RpcClientConfig};
 use solana_rpc_client_api::request::RpcRequest;
 use std::{collections::BTreeSet, str::FromStr};
@@ -20,7 +19,7 @@ pub struct Chain {
     pub transport: Transport,
 }
 
-fn data(account: &Value) -> Result<Vec<u8>, AppError> {
+pub(super) fn data(account: &Value) -> Result<Vec<u8>, AppError> {
     STANDARD
         .decode(account["data"][0].as_str().ok_or(AppError::Chain)?)
         .map_err(|_| AppError::Chain)
@@ -38,7 +37,7 @@ fn token_amount(account: &Value, mint: &str, owner: &str, program: &str) -> Resu
     Ok(token.base.amount)
 }
 
-fn pda(seeds: &[&[u8]]) -> Pubkey {
+pub(super) fn pda(seeds: &[&[u8]]) -> Pubkey {
     Pubkey::find_program_address(seeds, &volaryn::ID).0
 }
 
@@ -58,43 +57,6 @@ impl Chain {
             .send(request, params)
             .await
             .map_err(|_| AppError::Chain)
-    }
-
-    async fn account(&self, address: &str) -> Result<Value, AppError> {
-        let result = self
-            .request(
-                RpcRequest::GetAccountInfo,
-                json!([address, {"encoding":"base64", "commitment":"finalized"}]),
-            )
-            .await?;
-        if result["value"].is_null() {
-            return Err(AppError::NotFound);
-        }
-        Ok(result["value"].clone())
-    }
-
-    pub async fn verify_identity(&self, deployment: &Deployment) -> Result<(), AppError> {
-        let genesis = self.request(RpcRequest::GetGenesisHash, json!([])).await?;
-        if genesis.as_str() != Some(&deployment.genesis_hash) {
-            return Err(AppError::Identity);
-        }
-        let loader = anchor_lang::solana_program::bpf_loader_upgradeable::ID;
-        let program_data = Pubkey::find_program_address(&[volaryn::ID.as_ref()], &loader).0;
-        let executable = self.account(&deployment.program_id).await?;
-        if executable["executable"] != true || executable["owner"] != loader.to_string() {
-            return Err(AppError::Identity);
-        }
-        let account = self.account(&program_data.to_string()).await?;
-        let bytes = data(&account)?;
-        let program = bytes
-            .get(45..45 + deployment.program_length)
-            .ok_or(AppError::Identity)?;
-        if account["owner"] != loader.to_string()
-            || format!("{:x}", Sha256::digest(program)) != deployment.program_sha256
-        {
-            return Err(AppError::Identity);
-        }
-        Ok(())
     }
 
     /// Discover identities without downloading every agreement's data.

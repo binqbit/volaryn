@@ -19,7 +19,11 @@ test('holder rejects, isolates tabs, restores after closing a tab, and exercises
   ).json()) as components['schemas']['Deployment'];
   const localAsset = (await fixtureAssets()).find((item) => item.asset.symbol === 'OPENAI')!;
   const rpc = createSolanaRpc(`${baseURL}/rpc`);
-  const accounts = await protocolAddresses(localAsset.mint.address, address(config.writer), 1n);
+  const accounts = await protocolAddresses(
+    localAsset.mint.address,
+    address(config.localnet!.writer),
+    1n,
+  );
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('websocket', () => errors.push('Unexpected WebSocket connection'));
@@ -60,7 +64,7 @@ test('holder rejects, isolates tabs, restores after closing a tab, and exercises
         });
       });
     });
-  }, `volaryn:pending:${config.genesisHash}:${config.programId}:${config.holder}`);
+  }, `volaryn:pending:${config.genesisHash}:${config.programId}:${config.localnet!.holder}`);
   await activate.click();
   await confirmReview(page);
   await expect(page.getByRole('alert')).toContainText('Another tab is handling this wallet');
@@ -124,7 +128,9 @@ test('holder rejects, isolates tabs, restores after closing a tab, and exercises
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('websocket', () => errors.push('Unexpected WebSocket connection'));
   await page.goto(agreementUrl);
-  await expect(page.getByRole('region', { name: 'Your wallet' })).toContainText(config.holder);
+  await expect(page.getByRole('region', { name: 'Your wallet' })).toContainText(
+    config.localnet!.holder,
+  );
   await expect(page.getByRole('group', { name: 'USDC balance', exact: true })).toBeVisible();
   await expect(page.getByRole('status', { name: 'Transaction status' })).toContainText(
     'Transaction finalized',
@@ -135,7 +141,8 @@ test('holder rejects, isolates tabs, restores after closing a tab, and exercises
   const active = (await fetchAgreement(rpc, accounts.agreement, { commitment: 'finalized' })).data;
   expect(active.status).toBe(AgreementStatus.Active);
   expect(
-    (await fetchToken(rpc, address(config.holderUsdc), { commitment: 'finalized' })).data.amount,
+    (await fetchToken(rpc, address(config.localnet!.holderUsdc), { commitment: 'finalized' })).data
+      .amount,
   ).toBe(demoBalances.usdc - BigInt(recipe.premium));
   expect(
     (await fetchToken2022(rpc, localAsset.holderAccount.address, { commitment: 'finalized' })).data
@@ -153,14 +160,16 @@ test('holder rejects, isolates tabs, restores after closing a tab, and exercises
   const settled = (await fetchAgreement(rpc, accounts.agreement, { commitment: 'finalized' })).data;
   const delivered = await fetchToken2022(rpc, accounts.settlement, { commitment: 'finalized' });
   expect(settled.status).toBe(AgreementStatus.Exercised);
-  expect(delivered.data.owner).toBe(config.writer);
+  expect(delivered.data.owner).toBe(config.localnet!.writer);
   expect(delivered.data.amount).toBe(settled.netReceived);
   expect(settled.netReceived).toBe(992500000n);
   expect(
-    (await fetchToken(rpc, address(config.holderUsdc), { commitment: 'finalized' })).data.amount,
+    (await fetchToken(rpc, address(config.localnet!.holderUsdc), { commitment: 'finalized' })).data
+      .amount,
   ).toBe(demoBalances.usdc - BigInt(recipe.premium) + BigInt(recipe.payout));
   expect(
-    (await fetchToken(rpc, address(config.writerUsdc), { commitment: 'finalized' })).data.amount,
+    (await fetchToken(rpc, address(config.localnet!.writerUsdc), { commitment: 'finalized' })).data
+      .amount,
   ).toBe(demoBalances.usdc - 2n * BigInt(recipe.payout) + BigInt(recipe.premium));
   expect((await fetchToken(rpc, accounts.reserve, { commitment: 'finalized' })).data.amount).toBe(
     0n,
@@ -202,7 +211,10 @@ test('a fixture wallet cannot open a deployment naming a different holder', asyn
   await page.route('**/api/config', async (route) => {
     const response = await route.fetch();
     const config = (await response.json()) as components['schemas']['Deployment'];
-    await route.fulfill({ response, json: { ...config, holder: config.writer } });
+    await route.fulfill({
+      response,
+      json: { ...config, localnet: { ...config.localnet, holder: config.localnet!.writer } },
+    });
   });
   let submissions = 0;
   page.on('request', (request) => {

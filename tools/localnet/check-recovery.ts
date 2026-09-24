@@ -18,8 +18,8 @@ const rpc = createSolanaRpc('http://app:8080/rpc');
 const accounts = await rpc
   .getMultipleAccounts(
     [
-      config.writerUsdc,
-      config.holderUsdc,
+      config.localnet!.writerUsdc,
+      config.localnet!.holderUsdc,
       ...(await fixtureAssets()).flatMap((item) => [
         item.holderAccount.address,
         item.writerAccount.address,

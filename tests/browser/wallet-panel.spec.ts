@@ -9,11 +9,11 @@ for (const width of [1440, 375, 320]) {
     await page.setViewportSize({ width, height: width === 320 ? 640 : 900 });
     const { state, account } = await balanceFixture(page);
     const d = state.deployment;
-    const funds = account(d.usdcMint, d.writerUsdc, '1234500001');
+    const funds = account(d.usdcMint, d.localnet!.writerUsdc, '1234500001');
     const tokens = d.assets.map((asset) => account(asset.mint, asset.mint, '100000000000'));
-    state.wallets[d.writer]!.accounts = [
+    state.wallets[d.localnet!.writer]!.accounts = [
       funds,
-      account(d.usdcMint, d.holderUsdc, '500000000', true),
+      account(d.usdcMint, d.localnet!.holderUsdc, '500000000', true),
       ...tokens,
     ];
     await page.goto('/');

@@ -14,7 +14,7 @@ fn fixture_manifests_require_the_explicit_localnet_build() {
 #[test]
 fn incompatible_versions_and_program_identity_fail_closed() {
     let mut deployment = support::deployment();
-    deployment.schema_version = 3;
+    deployment.schema_version = 2;
     assert!(validate_deployment(&deployment).is_err());
     deployment = support::deployment();
     deployment.program_id = "11111111111111111111111111111111".into();
@@ -45,4 +45,65 @@ fn local_asset_identity_must_match_a_reviewed_reference_without_aliases() {
     deployment = original.clone();
     deployment.assets[0].mint = deployment.assets[0].reference_mint.clone();
     assert!(volaryn_backend::config::validate_deployment(&deployment).is_err());
+}
+
+#[test]
+fn live_manifests_bind_mainnet_currency_and_exclude_local_participants() {
+    let mut deployment = support::deployment();
+    deployment.mode = "mainnet".into();
+    deployment.genesis_hash = volaryn_backend::assets::MAINNET_GENESIS.into();
+    deployment.usdc_mint = volaryn_backend::config::MAINNET_USDC.into();
+    deployment.localnet = None;
+    for asset in &mut deployment.assets {
+        asset.mint = asset.reference_mint.clone();
+    }
+    assert_eq!(
+        validate_deployment(&deployment).is_ok(),
+        !cfg!(feature = "localnet")
+    );
+    let encoded = serde_json::to_value(&deployment).unwrap();
+    assert!(encoded.get("localnet").is_none());
+    deployment.localnet = support::deployment().localnet;
+    assert!(validate_deployment(&deployment).is_err());
+    deployment.localnet = None;
+    deployment.usdc_mint = support::deployment().usdc_mint;
+    assert!(validate_deployment(&deployment).is_err());
+    deployment.usdc_mint = volaryn_backend::config::MAINNET_USDC.into();
+    deployment.genesis_hash = support::deployment().genesis_hash;
+    assert!(validate_deployment(&deployment).is_err());
+}
+
+#[test]
+fn connection_files_are_explicit_and_errors_do_not_disclose_credentials() {
+    use clap::Parser;
+    let mut config = volaryn_backend::config::Config::try_parse_from([
+        "volaryn",
+        "--database-url",
+        "postgresql://example",
+    ])
+    .unwrap();
+    config.database_url = None;
+    let directory = tempfile::tempdir().unwrap();
+    let secret = directory.path().join("connection");
+    std::fs::write(&secret, "postgresql://app:private-value@db/app\n").unwrap();
+    config.database_url_file = Some(secret.clone());
+    assert_eq!(
+        config.database_connection().unwrap(),
+        "postgresql://app:private-value@db/app"
+    );
+    std::fs::write(&secret, "private-value\nsecond-line").unwrap();
+    assert_eq!(
+        config.database_connection().unwrap_err(),
+        "Invalid connection secret file"
+    );
+    let mut live = support::deployment();
+    live.mode = "mainnet".into();
+    assert!(config.chain_connection(&live).is_err());
+    config.rpc_url = Some("http://example.invalid/?key=private-value".into());
+    assert_eq!(
+        config.chain_connection(&live).unwrap_err(),
+        "External RPC connections require HTTPS"
+    );
+    config.rpc_url = Some("https://example.invalid/?key=private-value".into());
+    assert!(config.chain_connection(&live).is_ok());
 }

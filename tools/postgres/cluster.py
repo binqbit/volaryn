@@ -58,7 +58,9 @@ class Cluster:
             finally:
                 password.unlink(missing_ok=True)
         elif (self.data / "PG_VERSION").read_text().strip() != "17":
-            raise RuntimeError("The local cluster needs an explicit PostgreSQL major-version upgrade")
+            raise RuntimeError(
+                "The local cluster needs an explicit PostgreSQL major-version upgrade"
+            )
         # No shared system socket; all TCP access is loopback and uses SCRAM.
         self.run(
             [

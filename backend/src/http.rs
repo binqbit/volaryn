@@ -63,7 +63,9 @@ struct Api;
 fn api() -> OpenApiRouter<Arc<Application>> {
     OpenApiRouter::with_openapi(Api::openapi())
         .routes(routes!(config))
+        .routes(routes!(release))
         .routes(routes!(assets))
+        .routes(routes!(admission))
         .routes(routes!(official_assets))
         .routes(routes!(wallet))
         .routes(routes!(offers))
@@ -100,6 +102,42 @@ pub fn router(application: Arc<Application>, frontend: PathBuf) -> Router {
             HeaderValue::from_static("no-store"),
         ))
         .layer(TraceLayer::new_for_http())
+        .layer(axum::middleware::from_fn(request_context))
+}
+
+async fn request_context(
+    request: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> Response {
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use tracing::Instrument;
+    static NEXT: AtomicU64 = AtomicU64::new(0);
+    let id = format!(
+        "{:x}-{:x}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_micros(),
+        NEXT.fetch_add(1, Ordering::Relaxed)
+    );
+    let span = tracing::info_span!("request", request_id = %id, method = %request.method(), path = request.uri().path());
+    let mut response = async {
+        let started = std::time::Instant::now();
+        let response = next.run(request).await;
+        tracing::info!(
+            status = response.status().as_u16(),
+            elapsed_ms = started.elapsed().as_millis() as u64,
+            "request completed"
+        );
+        response
+    }
+    .instrument(span)
+    .await;
+    response.headers_mut().insert(
+        "x-request-id",
+        HeaderValue::from_str(&id).expect("generated request identity"),
+    );
+    response
 }
 
 async fn serve_frontend(uri: Uri, directory: PathBuf) -> Response {
@@ -169,10 +207,32 @@ async fn config(State(app): State<Arc<Application>>) -> Result<Json<Deployment>,
     Ok(Json(app.deployment.clone()))
 }
 
+#[utoipa::path(get, path = "/api/release", responses((status = 200, body = crate::release::Release)))]
+async fn release() -> Json<crate::release::Release> {
+    Json(crate::release::current())
+}
+
 #[utoipa::path(get, path = "/api/assets", responses((status = 200, body = [AssetView])))]
 async fn assets(State(app): State<Arc<Application>>) -> Result<Json<Vec<AssetView>>, AppError> {
     app.ensure_chain().await?;
     Ok(Json(app.deployment.assets.clone()))
+}
+
+#[derive(Deserialize)]
+struct MintQuery {
+    mint: String,
+}
+
+#[utoipa::path(get, path = "/api/admission", params(("mint" = String, Query)), responses((status = 200, body = crate::adapters::deployment::Admission)))]
+async fn admission(
+    State(app): State<Arc<Application>>,
+    Query(query): Query<MintQuery>,
+) -> Result<Json<crate::adapters::deployment::Admission>, AppError> {
+    app.ensure_chain().await?;
+    app.chain
+        .admission(&app.deployment, &query.mint)
+        .await
+        .map(Json)
 }
 
 #[derive(Deserialize)]

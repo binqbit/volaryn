@@ -29,16 +29,16 @@ test('wallet restores after reload; explicit disconnect clears the saved connect
   await page.screenshot({ path: info.outputPath('disconnected.png'), fullPage: true });
 
   await connect.click();
-  await expect(wallet).toContainText(config.holder);
+  await expect(wallet).toContainText(config.localnet!.holder);
   await expect(wallet).toContainText('Balances reflect its activity on this local ledger.');
   await expect(wallet.getByText('Available test USDC', { exact: true })).toBeVisible();
   expect(owners.length).toBeGreaterThan(0);
-  expect(owners.every((owner) => owner === config.holder)).toBe(true);
+  expect(owners.every((owner) => owner === config.localnet!.holder)).toBe(true);
   await page.screenshot({ path: info.outputPath('connected.png'), fullPage: true });
 
   await page.getByRole('button', { name: 'Disconnect', exact: true }).click();
   await expect(connect).toBeVisible();
-  await expect(wallet.getByText(config.holder, { exact: true })).toHaveCount(0);
+  await expect(wallet.getByText(config.localnet!.holder, { exact: true })).toHaveCount(0);
   await expect(wallet.getByText('Available test USDC', { exact: true })).toHaveCount(0);
   const countAfterDisconnect = owners.length;
   await page.reload();
@@ -53,7 +53,7 @@ test('wallet restores after reload; explicit disconnect clears the saved connect
   await expect(wallet.getByText('Available test USDC', { exact: true })).toBeVisible();
   const countBeforeReload = owners.length;
   await page.reload();
-  await expect(wallet).toContainText(config.holder);
+  await expect(wallet).toContainText(config.localnet!.holder);
   await expect(wallet.getByText('Available test USDC', { exact: true })).toBeVisible();
   await expect(connect).toHaveCount(0);
   await expect(page.getByText('On-chain details', { exact: true })).toBeVisible();
@@ -73,7 +73,7 @@ test('public agreement ownership and reserved offers never imply personal protec
   const config = (await (await request.get('/api/config')).json()) as Deployment;
   const [original] = (await (await request.get('/api/agreements')).json()) as Agreement[];
   if (!original) throw new Error('The localnet fixture must contain an agreement');
-  let agreement: Agreement = { ...original, status: 'active', holder: config.writer };
+  let agreement: Agreement = { ...original, status: 'active', holder: config.localnet!.writer };
   // Presentation fixtures only; this scenario never signs or submits a transaction.
   await page.route('**/api/agreements**', (route) =>
     route.fulfill({
@@ -91,12 +91,17 @@ test('public agreement ownership and reserved offers never imply personal protec
   ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Exercise protection' })).toHaveCount(0);
 
-  agreement = { ...agreement, holder: config.holder };
+  agreement = { ...agreement, holder: config.localnet!.holder };
   await page.waitForResponse('**/api/agreements/*');
   await expect(page.getByText('YOUR PROTECTION', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Exercise protection' })).toBeEnabled();
 
-  agreement = { ...agreement, status: 'funded', holder: null, designatedHolder: config.writer };
+  agreement = {
+    ...agreement,
+    status: 'funded',
+    holder: null,
+    designatedHolder: config.localnet!.writer,
+  };
   await page.waitForResponse('**/api/agreements/*');
   await expect(
     page.getByText('This offer is reserved for another wallet.', { exact: true }),
@@ -149,7 +154,7 @@ test('split and frozen accounts never authorize delivery from a combined balance
   const agreement = {
     ...original,
     status: 'active',
-    holder: config.holder,
+    holder: config.localnet!.holder,
     underlyingMint: config.assets[0]!.mint,
     underlyingDecimals: 9,
     quantityRaw: '1000000000',
@@ -159,10 +164,10 @@ test('split and frozen accounts never authorize delivery from a combined balance
   await page.route('**/api/wallet?**', (route) =>
     route.fulfill({
       json: {
-        owner: config.holder,
+        owner: config.localnet!.holder,
         accounts: [
           {
-            address: config.holderUsdc,
+            address: config.localnet!.holderUsdc,
             mint: config.usdcMint,
             tokenProgram: 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
             amountRaw: '1000000',
@@ -171,7 +176,7 @@ test('split and frozen accounts never authorize delivery from a combined balance
             finalizedSlot: '100',
           },
           {
-            address: config.holder,
+            address: config.localnet!.holder,
             mint: config.assets[0]!.mint,
             tokenProgram: 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',
             amountRaw: '600000000',
@@ -180,7 +185,7 @@ test('split and frozen accounts never authorize delivery from a combined balance
             finalizedSlot: '100',
           },
           {
-            address: config.writer,
+            address: config.localnet!.writer,
             mint: config.assets[0]!.mint,
             tokenProgram: 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',
             amountRaw: '600000000',

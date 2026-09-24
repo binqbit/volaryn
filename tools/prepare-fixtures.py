@@ -9,7 +9,11 @@ from pathlib import Path
 
 def find_program_source(root: Path, crate: str, version: str) -> Path:
     """Resolve fixtures from Cargo's locked dependency, not the global cache order."""
-    metadata = json.loads(subprocess.check_output(["cargo", "metadata", "--locked", "--format-version", "1"], cwd=root))
+    metadata = json.loads(
+        subprocess.check_output(
+            ["cargo", "metadata", "--locked", "--format-version", "1"], cwd=root
+        )
+    )
     for package in metadata["packages"]:
         if package["name"] == crate and package["version"] == version:
             return Path(package["manifest_path"]).parent / "src/programs/elf"

@@ -7,3 +7,4 @@ node_modules/
 __pycache__/
 frontend/dist/
 frontend/dist-live/
+/deployment/

@@ -33,7 +33,8 @@ test('writer funds and cancels offers, holder matches and exercises, writer rece
   const config = (await (await request.get('/api/config')).json()) as Deployment;
   const rpc = createSolanaRpc(`${baseURL}/rpc`);
   const balance = async () =>
-    (await fetchToken(rpc, address(config.writerUsdc), { commitment: 'finalized' })).data.amount;
+    (await fetchToken(rpc, address(config.localnet!.writerUsdc), { commitment: 'finalized' })).data
+      .amount;
   const start = await balance();
   await fillOffer(page);
   await page.getByRole('button', { name: 'Review funded offer' }).click();
@@ -75,7 +76,7 @@ test('writer funds and cancels offers, holder matches and exercises, writer rece
   await expect
     .poll(
       async () =>
-        (await activities(config.writer)).items.find(
+        (await activities(config.localnet!.writer)).items.find(
           (item) => item.agreement === cancelledAddress && item.operation === 'create',
         )?.status,
     )
@@ -87,7 +88,7 @@ test('writer funds and cancels offers, holder matches and exercises, writer rece
   await signAction(page, 'Recover residual funds');
   await expect
     .poll(async () =>
-      (await activities(config.writer)).items
+      (await activities(config.localnet!.writer)).items
         .filter((item) => item.agreement === cancelledAddress && item.status === 'finalized')
         .map((item) => item.operation)
         .sort(),
@@ -96,7 +97,7 @@ test('writer funds and cancels offers, holder matches and exercises, writer rece
 
   await fillOffer(page);
   await page.getByText('Restrict to a wallet', { exact: true }).click();
-  await page.getByLabel('Designated holder (optional)').fill(config.holder);
+  await page.getByLabel('Designated holder (optional)').fill(config.localnet!.holder);
   await signAction(page, 'Review funded offer');
   const agreementAddress = address(page.url().split('/').at(-1)!);
   await switchWallet(page, 'holder');
@@ -157,7 +158,7 @@ test('writer funds and cancels offers, holder matches and exercises, writer rece
   expect(settled.status).toBe(AgreementStatus.Exercised);
   await expect
     .poll(async () =>
-      (await activities(config.holder)).items
+      (await activities(config.localnet!.holder)).items
         .filter((item) => item.agreement === agreementAddress && item.status === 'finalized')
         .map((item) => item.operation)
         .sort(),
@@ -166,7 +167,7 @@ test('writer funds and cancels offers, holder matches and exercises, writer rece
   expect(settled.netReceived).toBe(198500000n);
   const accounts = await protocolAddresses(settled.underlyingMint, settled.writer, settled.nonce);
   const receipt = (await fetchAsset(rpc, accounts.settlement)).data;
-  expect(receipt.owner).toBe(config.writer);
+  expect(receipt.owner).toBe(config.localnet!.writer);
   expect(receipt.amount).toBe(settled.netReceived);
   expect(await balance()).toBe(start - 5_000_000n + 100_000n);
   await switchWallet(page, 'writer');
@@ -199,10 +200,12 @@ test('expired protection disables delivery and returns the reserve only to its w
   });
   await expect(page.getByRole('button', { name: 'Exercise protection' })).toBeDisabled();
   await switchWallet(page, 'writer');
-  const before = (await fetchToken(rpc, address(config.writerUsdc))).data.amount;
+  const before = (await fetchToken(rpc, address(config.localnet!.writerUsdc))).data.amount;
   await signAction(page, 'Reclaim expired reserve');
   expect((await fetchAgreement(rpc, agreementAddress)).data.status).toBe(AgreementStatus.Expired);
-  expect((await fetchToken(rpc, address(config.writerUsdc))).data.amount).toBe(before + 5_000_000n);
+  expect((await fetchToken(rpc, address(config.localnet!.writerUsdc))).data.amount).toBe(
+    before + 5_000_000n,
+  );
 });
 
 test('cancelling test signing by button or Escape submits nothing and permits another review', async ({

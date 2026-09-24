@@ -107,13 +107,11 @@ impl Ledger {
 async fn respond(State(ledger): State<Arc<Ledger>>, Json(request): Json<Value>) -> Json<Value> {
     let result = match request["method"].as_str().unwrap() {
         "getGenesisHash" => json!("11111111111111111111111111111111"),
-        "getAccountInfo" if request["params"][0] == volaryn::ID.to_string() => {
-            json!({"value":{"owner":"BPFLoaderUpgradeab1e11111111111111111111111", "executable":true}})
-        }
-        "getAccountInfo" => {
-            let mut bytes = vec![0; 45];
-            bytes.push(7);
-            json!({"value":{"owner":"BPFLoaderUpgradeab1e11111111111111111111111","data":[STANDARD.encode(bytes),"base64"]}})
+        "getMultipleAccounts"
+            if crate::support::identity::response(&request, &crate::support::deployment())
+                .is_some() =>
+        {
+            crate::support::identity::response(&request, &crate::support::deployment()).unwrap()
         }
         "getProgramAccounts" => {
             ledger.discoveries.fetch_add(1, Ordering::Relaxed);

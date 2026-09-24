@@ -9,3 +9,5 @@ pub mod http;
 pub mod indexer;
 pub mod observations;
 pub mod queries;
+
+pub mod release;

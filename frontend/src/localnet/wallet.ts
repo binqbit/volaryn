@@ -16,14 +16,12 @@ import type { Deployment } from '../lib/api/client';
 import recipe from '../../../tests/fixtures/recipe.json' with { type: 'json' };
 import { requestDemoSignature } from './approval';
 
-export async function registerDemoWallet(
-  deployment: Pick<Deployment, 'mode' | 'fixtureVersion' | 'holder' | 'writer'>,
-) {
-  if (deployment.mode !== 'localnet' || deployment.fixtureVersion !== recipe.version)
+export async function registerDemoWallet(deployment: Pick<Deployment, 'mode' | 'localnet'>) {
+  if (deployment.mode !== 'localnet' || deployment.localnet?.fixtureVersion !== recipe.version)
     throw new Error('Demo wallet requires the local fixture deployment');
   await Promise.all([
-    registerParticipant(deployment.holder, recipe.seeds.holder, 'Test Wallet 1'),
-    registerParticipant(deployment.writer, recipe.seeds.writer, 'Test Wallet 2'),
+    registerParticipant(deployment.localnet.holder, recipe.seeds.holder, 'Test Wallet 1'),
+    registerParticipant(deployment.localnet.writer, recipe.seeds.writer, 'Test Wallet 2'),
   ]);
 }
 

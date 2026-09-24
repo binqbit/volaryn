@@ -100,8 +100,12 @@ async fn account_pair_reads_reject_older_contexts_missing_accounts_and_wrong_own
         Err(AppError::Chain)
     ));
     assert!(matches!(
-        rpc.agreement_batch(&deployment, std::slice::from_ref(&deployment.holder), 0)
-            .await,
+        rpc.agreement_batch(
+            &deployment,
+            std::slice::from_ref(&deployment.localnet.as_ref().unwrap().holder),
+            0
+        )
+        .await,
         Err(AppError::NotFound)
     ));
     server.abort();
@@ -111,7 +115,7 @@ async fn account_pair_reads_reject_older_contexts_missing_accounts_and_wrong_own
         .unwrap()
         .accounts
         .get_mut(&key)
-        .unwrap()["owner"] = serde_json::json!(deployment.holder);
+        .unwrap()["owner"] = serde_json::json!(deployment.localnet.as_ref().unwrap().holder);
     let (url, server) = ledger.serve().await;
     let rpc = Chain::new(url).unwrap();
     assert!(matches!(

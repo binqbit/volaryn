@@ -78,8 +78,8 @@ test('creation shows wallet information directly while holder restrictions remai
 }, info) => {
   const { state, account } = await balanceFixture(page);
   const d = state.deployment;
-  state.wallets[d.writer]!.accounts = [
-    account(d.usdcMint, d.writerUsdc, '100000000'),
+  state.wallets[d.localnet!.writer]!.accounts = [
+    account(d.usdcMint, d.localnet!.writerUsdc, '100000000'),
     ...d.assets.map((asset) => account(asset.mint, asset.mint, '2000000000')),
   ];
   await page.goto('/offers/new');
@@ -98,7 +98,7 @@ test('creation shows wallet information directly while holder restrictions remai
   await expect(form.getByRole('group', { name: 'OPENAI holdings' })).toContainText('2 OPENAI');
   await expect(wallet.getByRole('group', { name: 'USDC balance', exact: true })).toBeVisible();
   await expect(wallet.getByRole('article')).toHaveCount(8);
-  await expect(wallet.getByText(d.writer, { exact: true })).toBeVisible();
+  await expect(wallet.getByText(d.localnet!.writer, { exact: true })).toBeVisible();
   await expect(wallet.locator('details')).toHaveCount(0);
   const token = wallet.getByRole('article', { name: 'OPENAI wallet balance' });
   await expect(token.getByText('OpenAI PreStocks', { exact: true })).toBeVisible();
@@ -109,7 +109,7 @@ test('creation shows wallet information directly while holder restrictions remai
   await expect(token.getByRole('list')).not.toContainText('2 OPENAI');
   await expect(token.getByText(d.assets[0]!.mint, { exact: true })).toBeVisible();
   const usdc = wallet.getByRole('group', { name: 'USDC balance', exact: true });
-  await expect(usdc.getByText(d.writerUsdc, { exact: true })).toBeVisible();
+  await expect(usdc.getByText(d.localnet!.writerUsdc, { exact: true })).toBeVisible();
   const walletBox = await documentBox(wallet);
   await page.waitForResponse('**/api/wallet?*');
   expect(await documentBox(wallet)).toEqual(walletBox);
@@ -118,11 +118,11 @@ test('creation shows wallet information directly while holder restrictions remai
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: info.outputPath('create-mobile.png'), fullPage: true });
   await restriction.click();
-  await designated.fill(d.holder);
+  await designated.fill(d.localnet!.holder);
   await restriction.click();
-  await expect(restriction).toContainText(shortAddress(d.holder));
+  await expect(restriction).toContainText(shortAddress(d.localnet!.holder));
   await restriction.click();
-  await expect(designated).toHaveValue(d.holder);
+  await expect(designated).toHaveValue(d.localnet!.holder);
   await designated.fill('not-a-wallet');
   await restriction.click();
   await form.getByRole('button', { name: 'Review funded offer' }).click();
@@ -137,7 +137,9 @@ test('agreement costs, deadlines and blocking warnings stay visible with technic
 }, info) => {
   const { state, account } = await balanceFixture(page);
   const d = state.deployment;
-  state.wallets[d.holder]!.accounts = [account(d.usdcMint, d.holderUsdc, '300000')];
+  state.wallets[d.localnet!.holder]!.accounts = [
+    account(d.usdcMint, d.localnet!.holderUsdc, '300000'),
+  ];
   await page.goto(`/agreements/${state.agreement.address}`);
   await page.getByRole('button', { name: 'Connect Test Wallet 1', exact: true }).click();
   const agreement = page.getByRole('article', {

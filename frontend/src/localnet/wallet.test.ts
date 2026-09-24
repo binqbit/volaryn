@@ -34,9 +34,13 @@ async function setup() {
   );
   await registerDemoWallet({
     mode: 'localnet',
-    fixtureVersion: recipe.version,
-    holder: holder.address,
-    writer: writer.address,
+    localnet: {
+      fixtureVersion: recipe.version,
+      holder: holder.address,
+      writer: writer.address,
+      holderUsdc: holder.address,
+      writerUsdc: writer.address,
+    },
   });
   const wallet = vi
     .mocked(registerWallet)

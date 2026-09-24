@@ -6,13 +6,15 @@
     "textWrap": "maintain"
   },
   "ruff": {
-    "indentWidth": 4
+    "indentWidth": 4,
+    "lineLength": 100
   },
   "excludes": [
     "**/target/**",
     "**/node_modules/**",
     "artifacts/**",
     "debug-tools/**",
+    "deployment/**",
     "packages/protocol/idl/**",
     "Cargo.lock",
     "frontend/dist/**",

@@ -1,0 +1,32 @@
+#!/bin/sh
+set -eu
+if [ "$#" -ne 1 ]; then
+  echo 'Usage: tools/release/build OUTPUT_DIRECTORY' >&2
+  exit 2
+fi
+if [ -n "$(git status --porcelain)" ]; then
+  echo 'Build releases from a clean checkout so the revision identifies all source files.' >&2
+  exit 1
+fi
+revision=$(git rev-parse HEAD)
+output=$(realpath -m "$1")
+if [ -e "$output" ]; then
+  echo 'The release output directory must not already exist.' >&2
+  exit 1
+fi
+mkdir -p "$output"
+docker build --target app-live --build-arg "RELEASE_REVISION=$revision" \
+  --tag "volaryn:$revision" --iidfile "$output/image-id" .
+release_image=$(cat "$output/image-id")
+container=$(docker create "$release_image")
+trap 'docker rm "$container" >/dev/null' EXIT HUP INT TERM
+docker cp "$container:/app/release/." "$output/"
+docker image save --output "$output/app.tar" "$release_image"
+printf 'VOLARYN_IMAGE=%s\n' "$release_image" >"$output/release.env"
+cp compose.live.yaml "$output/compose.live.yaml"
+mkdir -p "$output/tools/postgres" "$output/tools/release" "$output/docs"
+cp tools/postgres/init-live.sh "$output/tools/postgres/init-live.sh"
+cp tools/release/configure.py tools/release/smoke.py "$output/tools/release/"
+cp docs/deployment.md "$output/docs/deployment.md"
+(cd "$output" && find . -type f ! -name SHA256SUMS -print0 | sort -z | xargs -0 sha256sum >SHA256SUMS)
+echo "Release prepared: $output"

@@ -68,7 +68,7 @@ test('creation and signing review identify the selected PreStocks replica and wa
 }) => {
   const config = (await (await request.get('/api/config')).json()) as Deployment;
   const anthropic = config.assets.find((asset) => asset.symbol === 'ANTHROPIC')!;
-  for (const owner of [config.holder, config.writer]) {
+  for (const owner of [config.localnet!.holder, config.localnet!.writer]) {
     const wallet = (await (await request.get(`/api/wallet?owner=${owner}`)).json()) as Wallet;
     for (const asset of config.assets) {
       const balances = wallet.accounts.filter((account) => account.mint === asset.mint);

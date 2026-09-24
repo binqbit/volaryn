@@ -9,6 +9,8 @@ for tool in rustup node npm python3 postgres initdb pg_ctl psql; do
     exit 1
   fi
 done
+python3 -m unittest discover -s tests/release
+cargo test --locked -p volaryn-backend --no-default-features --test config --test deployment --test admission --test release
 cargo clippy --locked -p volaryn-backend --all-targets --features localnet -- -D warnings
 python3 tools/postgres/with-test-db.py cargo test --locked -p volaryn-backend --features localnet
 cargo run --locked --quiet -p volaryn-backend --bin export-openapi >target/openapi.json

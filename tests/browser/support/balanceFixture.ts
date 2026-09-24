@@ -14,19 +14,22 @@ export async function balanceFixture(page: Page) {
   const keys = await fixtureSigners();
   const assets = await fixtureAssets();
   const deployment: Deployment = {
-    schemaVersion: 2,
-    fixtureVersion: 1,
+    schemaVersion: 3,
     mode: 'localnet',
     genesisHash: keys.authority.address,
     programId: VOLARYN_PROGRAM_ADDRESS,
     programSha256: '0'.repeat(64),
     programLength: 1,
     authority: keys.authority.address,
-    holder: keys.holder.address,
-    writer: keys.writer.address,
+    upgradeAuthority: keys.authority.address,
     usdcMint: keys.usdc.address,
-    holderUsdc: keys.holderUsdc.address,
-    writerUsdc: keys.writerUsdc.address,
+    localnet: {
+      fixtureVersion: 1,
+      holder: keys.holder.address,
+      writer: keys.writer.address,
+      holderUsdc: keys.holderUsdc.address,
+      writerUsdc: keys.writerUsdc.address,
+    },
     assets: assets.map(({ asset }) => asset),
   };
   const underlying = assets[0]!;
@@ -35,7 +38,7 @@ export async function balanceFixture(page: Page) {
   const agreement: Agreement = {
     address: addresses.agreement,
     version: 1,
-    writer: deployment.writer,
+    writer: deployment.localnet!.writer,
     holder: null,
     designatedHolder: null,
     underlyingMint: underlying.mint.address,
@@ -57,8 +60,8 @@ export async function balanceFixture(page: Page) {
     observedAt: now,
   };
   const wallets: Record<string, Wallet> = {
-    [deployment.writer]: { owner: deployment.writer, accounts: [] },
-    [deployment.holder]: { owner: deployment.holder, accounts: [] },
+    [deployment.localnet!.writer]: { owner: deployment.localnet!.writer, accounts: [] },
+    [deployment.localnet!.holder]: { owner: deployment.localnet!.holder, accounts: [] },
   };
   const state = {
     deployment,

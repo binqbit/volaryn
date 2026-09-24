@@ -13,7 +13,7 @@ WORKDIR /workspace
 FROM contract-tools AS contract-tests
 COPY . .
 # Enforce formatting in CI, then prepare the network-isolated test run.
-RUN ./tools/format --check && ./tools/test fast
+RUN ./tools/format --check && python3 -m unittest discover -s tests/release && ./tools/test fast
 ENTRYPOINT ["./tools/test", "fast"]
 
 FROM contract-tests AS application-rust
@@ -64,13 +64,37 @@ COPY --from=application-rust /workspace/target/fixtures/ /fixtures/
 USER validator
 ENTRYPOINT ["solana-test-validator"]
 
-FROM debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251 AS app
+FROM debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251 AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libgcc-s1 \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --uid 1000 app \
     && mkdir /deployment && chown app:app /deployment
-COPY --from=application-rust /workspace/target/release/volaryn /usr/local/bin/volaryn
-COPY --from=application-js /workspace/frontend/dist/ /app/frontend/
 USER app
 EXPOSE 8080
 ENTRYPOINT ["volaryn"]
+
+FROM contract-tests AS live-rust
+ARG RELEASE_REVISION
+RUN ./tools/rustup/cargo test --locked -p volaryn-backend --no-default-features --test config --test deployment --test admission --test release \
+    && test "${#RELEASE_REVISION}" -eq 40 \
+    && VOLARYN_RELEASE_REVISION="$RELEASE_REVISION" \
+       VOLARYN_PROGRAM_SHA256="$(sha256sum target/deploy/volaryn.so | cut -d ' ' -f 1)" \
+       ./tools/rustup/cargo build --locked --release -p volaryn-backend --no-default-features \
+    && target/release/export-openapi > /tmp/openapi.json \
+    && cmp packages/api/openapi.json /tmp/openapi.json
+
+FROM application-js AS release-files
+ARG RELEASE_REVISION
+COPY --from=live-rust /workspace/target/deploy/volaryn.so target/deploy/volaryn.so
+RUN node tools/release/metadata.mjs /release "$RELEASE_REVISION"
+
+FROM runtime AS app-live
+ARG RELEASE_REVISION
+LABEL org.opencontainers.image.title="Volaryn" org.opencontainers.image.revision="$RELEASE_REVISION"
+COPY --from=live-rust /workspace/target/release/volaryn /usr/local/bin/volaryn
+COPY --from=application-js /workspace/frontend/dist-live/ /app/frontend/
+COPY --from=release-files /release/ /app/release/
+
+FROM runtime AS app
+COPY --from=application-rust /workspace/target/release/volaryn /usr/local/bin/volaryn
+COPY --from=application-js /workspace/frontend/dist/ /app/frontend/

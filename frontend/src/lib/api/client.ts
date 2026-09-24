@@ -14,26 +14,33 @@ export type Wallet = components['schemas']['WalletView'];
 export type TokenAccount = components['schemas']['WalletTokenAccount'];
 
 export function validateDeployment(value: Deployment, buildMode: string): Deployment {
-  if (value.mode === 'localnet' && buildMode !== 'localnet')
-    throw new Error('This application build cannot open a localnet deployment.');
-  if (
-    value.schemaVersion !== 2 ||
-    value.mode !== 'localnet' ||
-    value.fixtureVersion !== 1 ||
-    value.programId !== VOLARYN_PROGRAM_ADDRESS
-  )
+  const local = buildMode === 'localnet';
+  if (value.schemaVersion !== 3 || value.programId !== VOLARYN_PROGRAM_ADDRESS)
     throw new Error('Unsupported deployment configuration');
-  for (const key of [
-    value.genesisHash,
-    value.programId,
-    value.usdcMint,
-    value.holder,
-    value.writer,
-    value.writerUsdc,
-    value.authority,
-    value.holderUsdc,
-  ])
+  if (
+    local
+      ? value.mode !== 'localnet' || value.localnet?.fixtureVersion !== 1
+      : value.mode !== 'mainnet' || !!value.localnet
+  )
+    throw new Error('This application build cannot open this deployment.');
+  if (
+    !local &&
+    (value.genesisHash !== '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d' ||
+      value.usdcMint !== 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v')
+  )
+    throw new Error('Unsupported mainnet identity');
+  for (const key of [value.genesisHash, value.programId, value.usdcMint, value.authority])
     address(key);
+  if (value.upgradeAuthority) address(value.upgradeAuthority);
+  if (local && value.localnet) {
+    for (const key of [
+      value.localnet.holder,
+      value.localnet.writer,
+      value.localnet.holderUsdc,
+      value.localnet.writerUsdc,
+    ])
+      address(key);
+  }
   if (
     !value.assets.length ||
     new Set(value.assets.map((asset) => asset.mint)).size !== value.assets.length
@@ -44,7 +51,7 @@ export function validateDeployment(value: Deployment, buildMode: string): Deploy
     address(asset.referenceMint);
     if (
       asset.mint === value.usdcMint ||
-      asset.mint === asset.referenceMint ||
+      (local ? asset.mint === asset.referenceMint : asset.mint !== asset.referenceMint) ||
       !Number.isInteger(asset.decimals) ||
       asset.decimals < 0 ||
       asset.decimals > 18

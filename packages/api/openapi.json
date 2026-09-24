@@ -44,6 +44,33 @@
         }
       }
     },
+    "/api/admission": {
+      "get": {
+        "operationId": "admission",
+        "parameters": [
+          {
+            "name": "mint",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Admission"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/agreements": {
       "get": {
         "operationId": "agreements",
@@ -357,6 +384,23 @@
         }
       }
     },
+    "/api/release": {
+      "get": {
+        "operationId": "release",
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Release"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/wallet": {
       "get": {
         "operationId": "wallet",
@@ -467,6 +511,25 @@
               "$ref": "#/components/schemas/Activity"
             },
             "description": "Independent of pagination, so older unresolved operations remain recoverable."
+          }
+        }
+      },
+      "Admission": {
+        "type": "object",
+        "required": [
+          "mint",
+          "newCommitments",
+          "reason"
+        ],
+        "properties": {
+          "mint": {
+            "type": "string"
+          },
+          "newCommitments": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
           }
         }
       },
@@ -614,19 +677,14 @@
         "type": "object",
         "required": [
           "schemaVersion",
-          "fixtureVersion",
           "mode",
           "genesisHash",
           "programId",
           "programSha256",
           "programLength",
           "authority",
-          "holder",
-          "writer",
           "usdcMint",
-          "assets",
-          "writerUsdc",
-          "holderUsdc"
+          "assets"
         ],
         "properties": {
           "assets": {
@@ -638,19 +696,19 @@
           "authority": {
             "type": "string"
           },
-          "fixtureVersion": {
-            "type": "integer",
-            "format": "int32",
-            "minimum": 0
-          },
           "genesisHash": {
             "type": "string"
           },
-          "holder": {
-            "type": "string"
-          },
-          "holderUsdc": {
-            "type": "string"
+          "localnet": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/LocalFixtures",
+                "description": "Disposable participant identities exist only in a localnet deployment."
+              }
+            ]
           },
           "mode": {
             "type": "string"
@@ -670,13 +728,13 @@
             "format": "int32",
             "minimum": 0
           },
+          "upgradeAuthority": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
           "usdcMint": {
-            "type": "string"
-          },
-          "writer": {
-            "type": "string"
-          },
-          "writerUsdc": {
             "type": "string"
           }
         },
@@ -728,6 +786,36 @@
             "type": "string"
           }
         }
+      },
+      "LocalFixtures": {
+        "type": "object",
+        "required": [
+          "fixtureVersion",
+          "holder",
+          "writer",
+          "writerUsdc",
+          "holderUsdc"
+        ],
+        "properties": {
+          "fixtureVersion": {
+            "type": "integer",
+            "format": "int32",
+            "minimum": 0
+          },
+          "holder": {
+            "type": "string"
+          },
+          "holderUsdc": {
+            "type": "string"
+          },
+          "writer": {
+            "type": "string"
+          },
+          "writerUsdc": {
+            "type": "string"
+          }
+        },
+        "additionalProperties": false
       },
       "MarketContext": {
         "type": "object",
@@ -976,6 +1064,33 @@
           "reclaim",
           "cleanup"
         ]
+      },
+      "Release": {
+        "type": "object",
+        "required": [
+          "version",
+          "localnet"
+        ],
+        "properties": {
+          "localnet": {
+            "type": "boolean"
+          },
+          "programSha256": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "revision": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "version": {
+            "type": "string"
+          }
+        }
       },
       "ReviewedAsset": {
         "type": "object",

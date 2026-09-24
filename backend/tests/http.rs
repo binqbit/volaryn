@@ -8,7 +8,6 @@ use axum::{
     routing::post,
     Router,
 };
-use base64::{engine::general_purpose::STANDARD, Engine};
 use http_body_util::BodyExt;
 use serde_json::{json, Value};
 use tower::ServiceExt;
@@ -27,13 +26,10 @@ async fn upstream(body: Bytes) -> String {
     let request: Value = serde_json::from_slice(&body).unwrap();
     let result = match request["method"].as_str().unwrap() {
         "getGenesisHash" => json!("11111111111111111111111111111111"),
-        "getAccountInfo" if request["params"][0] == volaryn::ID.to_string() => {
-            json!({"value":{"owner":"BPFLoaderUpgradeab1e11111111111111111111111", "executable":true}})
-        }
-        "getAccountInfo" => {
-            let mut bytes = vec![0; 45];
-            bytes.push(7);
-            json!({"value":{"owner":"BPFLoaderUpgradeab1e11111111111111111111111", "data":[STANDARD.encode(bytes),"base64"]}})
+        "getMultipleAccounts"
+            if support::identity::response(&request, &support::deployment()).is_some() =>
+        {
+            support::identity::response(&request, &support::deployment()).unwrap()
         }
         "getProgramAccounts" => json!({"context":{"slot":21}, "value":[]}),
         _ => return r#"{"jsonrpc":"2.0","id":7,"result":{"value":18446744073709551615}}"#.into(),
@@ -73,6 +69,7 @@ async fn readiness_proxy_and_static_routes_keep_their_boundaries() {
     app.reconcile().await.unwrap();
     for (path, expected) in [
         ("/health/ready", 200),
+        ("/api/release", 200),
         ("/", 200),
         ("/offers", 200),
         ("/offers/new", 200),
@@ -102,6 +99,7 @@ async fn readiness_proxy_and_static_routes_keep_their_boundaries() {
     let raw = r#"{"jsonrpc":"2.0","id":7,"method":"getBalance","params":[]}"#.to_owned();
     let response = service.clone().oneshot(request(raw.clone())).await.unwrap();
     assert_eq!(response.headers()["cache-control"], "no-store");
+    assert!(!response.headers()["x-request-id"].is_empty());
     let body = response.into_body().collect().await.unwrap().to_bytes();
     assert_eq!(
         body,

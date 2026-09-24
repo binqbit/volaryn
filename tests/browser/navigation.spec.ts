@@ -77,7 +77,7 @@ test('offer cards lead to full terms and portfolio lists remain wallet scoped', 
       portfolioQueries.push(url);
       return route.fulfill({
         json: url.searchParams.has('holder')
-          ? [{ ...offer, status: 'exercised', holder: config.holder }]
+          ? [{ ...offer, status: 'exercised', holder: config.localnet!.holder }]
           : [],
       });
     }
@@ -109,14 +109,14 @@ test('offer cards lead to full terms and portfolio lists remain wallet scoped', 
   await navigation.getByRole('link', { name: 'My portfolio', exact: true }).click();
   await expect(page.getByRole('article', { name: /^Agreement / })).toHaveCount(1);
   await expect(page.getByRole('article', { name: /^Agreement / })).toContainText('Exercised');
-  expect(portfolioQueries.at(-1)?.searchParams.get('holder')).toBe(config.holder);
+  expect(portfolioQueries.at(-1)?.searchParams.get('holder')).toBe(config.localnet!.holder);
   expect(portfolioQueries.at(-1)?.searchParams.has('status')).toBe(false);
   await page
     .getByRole('navigation', { name: 'Portfolio views' })
     .getByRole('link', { name: 'My offers', exact: true })
     .click();
   await expect(page.getByRole('heading', { name: 'No offers created yet' })).toBeVisible();
-  expect(portfolioQueries.at(-1)?.searchParams.get('writer')).toBe(config.holder);
+  expect(portfolioQueries.at(-1)?.searchParams.get('writer')).toBe(config.localnet!.holder);
   await page.getByRole('button', { name: 'Disconnect', exact: true }).click();
   await expect(page.getByRole('article')).toHaveCount(0);
   await expect(

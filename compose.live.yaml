@@ -1,0 +1,73 @@
+# Standalone deployment: docker compose --env-file deployment/release.env -f compose.live.yaml up -d --wait
+# The host's HTTPS proxy forwards to 127.0.0.1:8080. No local validator or disposable signer is included.
+services:
+  database:
+    image: postgres:17.11-bookworm@sha256:639ab7ceb90e13123085b741fb31ef493fba25463002f6da665352e7b534b652
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_INITDB_ARGS: --data-checksums --auth-host=scram-sha-256
+    secrets: [postgres_password, database_password]
+    volumes:
+      - postgres:/var/lib/postgresql/data
+      - ./tools/postgres/init-live.sh:/docker-entrypoint-initdb.d/10-volaryn.sh:ro
+    healthcheck:
+      test: [CMD, pg_isready, -h, 127.0.0.1, -U, volaryn, -d, volaryn]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    shm_size: 128mb
+    stop_grace_period: 30s
+    logging:
+      driver: local
+      options: { max-size: "10m", max-file: "3" }
+
+  app:
+    image: ${VOLARYN_IMAGE:?Set the tested release image in deployment/release.env}
+    pull_policy: never
+    read_only: true
+    init: true
+    restart: unless-stopped
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    depends_on:
+      database:
+        condition: service_healthy
+    secrets: [database_url, rpc_url]
+    volumes:
+      - ./deployment/deployment.json:/deployment/deployment.json:ro
+    command: [
+      --manifest,
+      /deployment/deployment.json,
+      --frontend,
+      /app/frontend,
+      --rpc-url-file,
+      /run/secrets/rpc_url,
+      --database-url-file,
+      /run/secrets/database_url,
+      --bind,
+      "0.0.0.0:8080",
+    ]
+    ports: ["127.0.0.1:8080:8080"]
+    healthcheck:
+      test: [CMD, volaryn, --healthcheck, --bind, "127.0.0.1:8080"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    stop_grace_period: 15s
+    logging:
+      driver: local
+      options: { max-size: "10m", max-file: "3" }
+
+secrets:
+  postgres_password:
+    file: ./deployment/secrets/postgres-password
+  database_password:
+    file: ./deployment/secrets/database-password
+  database_url:
+    file: ./deployment/secrets/database-url
+  rpc_url:
+    file: ./deployment/secrets/rpc-url
+volumes:
+  postgres:

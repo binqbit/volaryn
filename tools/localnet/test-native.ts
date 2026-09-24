@@ -1,3 +1,5 @@
+import { restoreBackup } from './database-recovery';
+import { independentExercise } from './independent-exercise';
 import { fixtureAssets } from './assets';
 import assert from 'node:assert/strict';
 import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -35,12 +37,12 @@ async function bootValidator(log: string) {
   validator = start('solana-test-validator', validatorArgs, `${directory}/${log}`);
   await waitFor(rpc, validator, { jsonrpc: '2.0', id: 1, method: 'getHealth', params: [] });
 }
-async function bootApp(log: string) {
+async function bootApp(log: string, databaseUrl?: string) {
   app = start(
     'target/debug/volaryn',
     ['--manifest', manifest, '--rpc-url', rpc, '--bind', `127.0.0.1:${appPort}`],
     `${directory}/${log}`,
-    applicationEnvironment(),
+    { ...applicationEnvironment(), ...(databaseUrl ? { DATABASE_URL: databaseUrl } : {}) },
   );
   await waitFor(`${appUrl}/health/index`, app);
 }
@@ -61,7 +63,9 @@ async function observations() {
   );
 }
 async function fixtureState() {
-  const config = JSON.parse(await readFile(manifest, 'utf8')) as Record<string, string>;
+  const config = JSON.parse(
+    await readFile(manifest, 'utf8'),
+  ) as import('../../frontend/src/lib/api/client').Deployment;
   const response = await fetch(rpc, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -71,8 +75,8 @@ async function fixtureState() {
       method: 'getMultipleAccounts',
       params: [
         [
-          config.writerUsdc,
-          config.holderUsdc,
+          config.localnet!.writerUsdc,
+          config.localnet!.holderUsdc,
           ...(await fixtureAssets()).flatMap((item) => [
             item.holderAccount.address,
             item.writerAccount.address,
@@ -87,6 +91,13 @@ async function fixtureState() {
 try {
   await bootValidator('validator.log');
   await bootstrap('bootstrap.log');
+  await finish(
+    start(
+      'target/debug/volaryn',
+      ['--manifest', manifest, '--rpc-url', rpc, '--check-deployment'],
+      `${directory}/deployment-check.log`,
+    ),
+  );
   await bootApp('app.log');
   await finish(
     start('node_modules/.bin/playwright', ['test'], `${directory}/browser.log`, {
@@ -96,12 +107,11 @@ try {
   );
   const before = await observations();
   const deployment = JSON.parse(await readFile(manifest, 'utf8')) as {
-    holder: string;
-    writer: string;
+    localnet: { holder: string; writer: string };
   };
   const history = async () =>
     Promise.all(
-      [deployment.holder, deployment.writer].map(async (owner) => {
+      [deployment.localnet!.holder, deployment.localnet!.writer].map(async (owner) => {
         const response = await fetch(`${appUrl}/api/activity?owner=${owner}`);
         assert.equal(response.status, 200);
         const page = (await response.json()) as { items: { signature: string }[] };
@@ -169,6 +179,14 @@ try {
   await stop(app);
   await stop(validator);
   await bootValidator('validator-restart.log');
+  // Rehearse the previous metadata layout against the used ledger and retained database.
+  const {
+    localnet,
+    schemaVersion: _schema,
+    upgradeAuthority: _upgrade,
+    ...network
+  } = JSON.parse(identity) as import('../../frontend/src/lib/api/client').Deployment;
+  await writeFile(manifest, JSON.stringify({ ...network, schemaVersion: 2, ...localnet }) + '\n');
   await bootstrap('bootstrap-restart.log');
   assert.equal(await readFile(manifest, 'utf8'), identity, 'Bootstrap must retain ledger identity');
   assert.deepEqual(await fixtureState(), balances, 'Bootstrap must not reset used token balances');
@@ -196,6 +214,17 @@ try {
     before,
     'An empty projection must rebuild from the same ledger',
   );
+  await stop(app);
+  const restoredDatabase = restoreBackup(directory);
+  await bootApp('app-restored.log', restoredDatabase);
+  assert.deepEqual(
+    await observations(),
+    before,
+    'Restored database must preserve agreement projections',
+  );
+  assert.deepEqual(await history(), recorded, 'Restored database must preserve operation history');
+  await stop(app);
+  await independentExercise(rpc, appUrl);
   assert.equal(interrupted, false);
   await writeFile(
     `${directory}/result.json`,
@@ -207,6 +236,10 @@ try {
         databaseOutageRecovery: true,
         bootstrapIdempotency: true,
         projectionRebuild: true,
+        independentExercise: true,
+        backupRestore: true,
+        deploymentCheck: true,
+        manifestUpgrade: true,
       },
       null,
       2,

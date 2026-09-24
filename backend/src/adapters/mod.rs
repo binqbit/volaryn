@@ -1,5 +1,6 @@
 pub mod activity;
 pub mod chain;
+pub mod deployment;
 pub mod issuer_chain;
 pub mod prestocks;
 pub mod rpc;

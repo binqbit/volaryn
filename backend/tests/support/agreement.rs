@@ -5,7 +5,7 @@ pub fn agreement(slot: u64, observed_at: i64) -> AgreementView {
     AgreementView {
         address: "agreement".into(),
         version: 1,
-        writer: deployment.writer.clone(),
+        writer: deployment.localnet.as_ref().unwrap().writer.clone(),
         holder: None,
         designated_holder: None,
         underlying_mint: deployment.assets[0].mint.clone(),

@@ -8,11 +8,13 @@ test('a newly signed offer waits for finalized data without a false outage and a
 }) => {
   const { state, account } = await balanceFixture(page);
   const d = state.deployment;
-  state.wallets[d.writer]!.accounts = [account(d.usdcMint, d.writerUsdc, '100000000')];
+  state.wallets[d.localnet!.writer]!.accounts = [
+    account(d.usdcMint, d.localnet!.writerUsdc, '100000000'),
+  ];
   const pending: PendingTransaction = {
     signature: '1'.repeat(64),
     lastValidBlockHeight: '1000',
-    owner: d.writer,
+    owner: d.localnet!.writer,
     operation: 'create',
     agreement: state.agreement.address,
     createdTerms: {
@@ -26,7 +28,7 @@ test('a newly signed offer waits for finalized data without a false outage and a
       designatedHolder: null,
     },
   };
-  const key = journalKey(d.genesisHash, d.programId, d.writer);
+  const key = journalKey(d.genesisHash, d.programId, d.localnet!.writer);
   await page.addInitScript(
     ({ key, pending }) => {
       localStorage.setItem(key, JSON.stringify(pending));
@@ -91,7 +93,9 @@ test('an unavailable API remains an error, keeps known terms, and disables actio
 }) => {
   const { state, account } = await balanceFixture(page);
   const d = state.deployment;
-  state.wallets[d.holder]!.accounts = [account(d.usdcMint, d.holderUsdc, '1500000')];
+  state.wallets[d.localnet!.holder]!.accounts = [
+    account(d.usdcMint, d.localnet!.holderUsdc, '1500000'),
+  ];
   let unavailable = false;
   await page.route('**/api/agreements/*', (route) =>
     route.fulfill(

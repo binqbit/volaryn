@@ -21,7 +21,7 @@ export function PositionPanel({
 }) {
   const demo =
     import.meta.env.MODE === 'localnet' &&
-    (owner === deployment.holder || owner === deployment.writer);
+    (owner === deployment.localnet?.holder || owner === deployment.localnet?.writer);
   const holdings = deployment.assets.filter((asset) =>
     wallet?.accounts.some((account) => account.mint === asset.mint),
   );

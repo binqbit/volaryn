@@ -34,20 +34,12 @@ struct Network {
 async fn upstream(State(state): State<Arc<Network>>, Json(request): Json<Value>) -> Json<Value> {
     let result = match request["method"].as_str().unwrap() {
         "getGenesisHash" => json!("11111111111111111111111111111111"),
-        "getAccountInfo" if request["params"][0] == volaryn::ID.to_string() => {
-            json!({"value":{"owner":"BPFLoaderUpgradeab1e11111111111111111111111", "executable":true}})
+        "getMultipleAccounts"
+            if support::identity::response(&request, &support::deployment()).is_some() =>
+        {
+            support::identity::response(&request, &support::deployment()).unwrap()
         }
-        "getAccountInfo" => {
-            let loader = anchor_lang::solana_program::bpf_loader_upgradeable::ID;
-            let data = Pubkey::find_program_address(&[volaryn::ID.as_ref()], &loader).0;
-            if request["params"][0] == data.to_string() {
-                let mut bytes = vec![0; 45];
-                bytes.push(7);
-                json!({"value":{"owner":loader.to_string(),"data":[STANDARD.encode(bytes),"base64"]}})
-            } else {
-                json!({"context":{"slot":1000},"value":null})
-            }
-        }
+        "getAccountInfo" => json!({"context":{"slot":1000},"value":null}),
         "isBlockhashValid" => json!({"context":{"slot":10},"value":true}),
         "getLatestBlockhash" => json!({"value":{"lastValidBlockHeight":200}}),
         "getEpochInfo" => {

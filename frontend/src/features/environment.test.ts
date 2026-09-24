@@ -17,19 +17,22 @@ beforeAll(async () => {
   const keys = await fixtureSigners();
   const reference = registry.assets.find((asset) => asset.symbol === 'OPENAI')!;
   deployment = {
-    schemaVersion: 2,
-    fixtureVersion: 1,
+    schemaVersion: 3,
     mode: 'localnet',
     genesisHash: keys.authority.address,
     programId: VOLARYN_PROGRAM_ADDRESS,
     programSha256: '0'.repeat(64),
     programLength: 1,
     authority: keys.authority.address,
-    holder: keys.holder.address,
-    writer: keys.writer.address,
+    upgradeAuthority: keys.authority.address,
     usdcMint: keys.usdc.address,
-    writerUsdc: keys.writerUsdc.address,
-    holderUsdc: keys.holderUsdc.address,
+    localnet: {
+      fixtureVersion: 1,
+      holder: keys.holder.address,
+      writer: keys.writer.address,
+      holderUsdc: keys.holderUsdc.address,
+      writerUsdc: keys.writerUsdc.address,
+    },
     assets: [
       {
         mint: keys.underlying.address,
@@ -42,10 +45,10 @@ beforeAll(async () => {
     ],
   };
   wallet = {
-    owner: deployment.holder,
+    owner: deployment.localnet!.holder,
     accounts: [
       {
-        address: deployment.holderUsdc,
+        address: deployment.localnet!.holderUsdc,
         mint: deployment.usdcMint,
         amountRaw: '18500001',
         decimals: 6,
@@ -122,14 +125,32 @@ describe('deployment and build identity', () => {
   it('only the localnet build accepts fixture deployments', () => {
     expect(validateDeployment(deployment, 'localnet')).toBe(deployment);
     for (const mode of ['production', 'development']) {
-      expect(() => validateDeployment(deployment, mode)).toThrow(
-        'cannot open a localnet deployment',
-      );
+      expect(() => validateDeployment(deployment, mode)).toThrow('cannot open this deployment');
     }
   });
   it('does not treat an undeclared external deployment as ready for trading', () => {
     expect(() => validateDeployment({ ...deployment, mode: 'mainnet' }, 'production')).toThrow(
-      'Unsupported deployment configuration',
+      'cannot open this deployment',
     );
   });
+});
+
+it('accepts verified mainnet identities without disposable participants', () => {
+  const live: Deployment = {
+    ...deployment,
+    mode: 'mainnet',
+    genesisHash: '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d',
+    usdcMint: 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+    localnet: undefined,
+    assets: deployment.assets.map((asset) => ({ ...asset, mint: asset.referenceMint })),
+  };
+  expect(validateDeployment(live, 'production')).toBe(live);
+  expect(() => validateDeployment(live, 'localnet')).toThrow();
+  expect(() =>
+    validateDeployment({ ...live, genesisHash: deployment.genesisHash }, 'production'),
+  ).toThrow();
+  expect(() =>
+    validateDeployment({ ...live, usdcMint: deployment.usdcMint }, 'production'),
+  ).toThrow();
+  expect(() => validateDeployment({ ...live, assets: deployment.assets }, 'production')).toThrow();
 });

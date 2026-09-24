@@ -8,12 +8,12 @@ test('creation shows token holdings and funds the payout from the selected USDC 
   const { state, account } = await balanceFixture(page);
   const d = state.deployment;
   const mint = d.assets[0]!.mint;
-  state.wallets[d.writer]!.accounts = [
-    account(d.usdcMint, d.writerUsdc, '30500001'),
-    account(d.usdcMint, d.holderUsdc, '12000000'),
+  state.wallets[d.localnet!.writer]!.accounts = [
+    account(d.usdcMint, d.localnet!.writerUsdc, '30500001'),
+    account(d.usdcMint, d.localnet!.holderUsdc, '12000000'),
     account(d.usdcMint, d.authority, '500000000', true),
-    account(mint, d.writer, '1234567890'),
-    account(mint, d.holder, '2000000000', true),
+    account(mint, d.localnet!.writer, '1234567890'),
+    account(mint, d.localnet!.holder, '2000000000', true),
   ];
   await page.goto('/offers/new');
   await page.getByRole('button', { name: 'Connect Test Wallet 2', exact: true }).click();
@@ -32,14 +32,14 @@ test('creation shows token holdings and funds the payout from the selected USDC 
   await expect(usdcCard).toContainText('Frozen: 500 test USDC');
   expect((await usdcCard.boundingBox())!.y).toBeLessThan((await holdingCard.boundingBox())!.y);
   await expect(page.getByText('Token accounts and balances', { exact: true })).toHaveCount(0);
-  await expect(holdingCard.getByText(d.writer, { exact: true })).toBeVisible();
+  await expect(holdingCard.getByText(d.localnet!.writer, { exact: true })).toBeVisible();
   await expect(holdingCard.getByText('OpenAI PreStocks', { exact: true })).toBeVisible();
   const tokenAccounts = holdingCard.getByRole('list', { name: 'OPENAI token accounts' });
   await expect(tokenAccounts.getByRole('listitem')).toHaveCount(2);
   await expect(tokenAccounts).toContainText('1.23456789 OPENAI');
-  await expect(tokenAccounts.getByRole('listitem').filter({ hasText: d.holder })).toContainText(
-    'Frozen',
-  );
+  await expect(
+    tokenAccounts.getByRole('listitem').filter({ hasText: d.localnet!.holder }),
+  ).toContainText('Frozen');
   const usdcAccounts = usdcCard.getByRole('list', { name: 'test USDC token accounts' });
   await expect(usdcAccounts.getByRole('listitem')).toHaveCount(3);
   await expect(usdcAccounts).toContainText('30.500001 test USDC');
@@ -61,7 +61,7 @@ test('creation shows token holdings and funds the payout from the selected USDC 
   await expect(review).toBeDisabled();
   await page
     .getByRole('combobox', { name: 'Funding USDC account', exact: true })
-    .selectOption(d.holderUsdc);
+    .selectOption(d.localnet!.holderUsdc);
   await expect(funding).toContainText('19 USDC');
   await page.getByRole('button', { name: 'Use full USDC balance' }).click();
   await expect(page.getByLabel('Payout (USDC)', { exact: true })).toHaveValue('12');
@@ -93,9 +93,9 @@ test('activation exposes premium affordability and exercise exposes the full sin
   const { state, account } = await balanceFixture(page);
   const d = state.deployment;
   const mint = d.assets[0]!.mint;
-  const balances = (state.wallets[d.holder]!.accounts = [
-    account(d.usdcMint, d.holderUsdc, '300000'),
-    account(d.usdcMint, d.writerUsdc, '250000'),
+  const balances = (state.wallets[d.localnet!.holder]!.accounts = [
+    account(d.usdcMint, d.localnet!.holderUsdc, '300000'),
+    account(d.usdcMint, d.localnet!.writerUsdc, '250000'),
     account(d.usdcMint, d.authority, '1000000', true),
   ]);
   await page.goto(`/agreements/${state.agreement.address}`);
@@ -110,10 +110,10 @@ test('activation exposes premium affordability and exercise exposes the full sin
   await expect(page.getByRole('button', { name: 'Activate protection' })).toBeEnabled();
   await expect(page.getByRole('group', { name: 'OPENAI holdings' })).toContainText('0 OPENAI');
   await page.screenshot({ path: info.outputPath('activation-balances.png'), fullPage: true });
-  state.agreement = { ...state.agreement, status: 'active', holder: d.holder };
+  state.agreement = { ...state.agreement, status: 'active', holder: d.localnet!.holder };
   balances.push(
-    account(mint, d.writer, '600000000'),
-    account(mint, d.holder, '600000000'),
+    account(mint, d.localnet!.writer, '600000000'),
+    account(mint, d.localnet!.holder, '600000000'),
     account(mint, mint, '2000000000', true),
   );
   await page.reload();
@@ -126,7 +126,7 @@ test('activation exposes premium affordability and exercise exposes the full sin
   balances[3]!.amountRaw = '1250000000';
   await page
     .getByRole('combobox', { name: 'Delivery token account', exact: true })
-    .selectOption(d.writer);
+    .selectOption(d.localnet!.writer);
   await expect(delivery).toContainText('0.25 OPENAI');
   await expect(page.getByRole('button', { name: 'Exercise protection' })).toBeEnabled();
   expect(state.unexpected).toEqual([]);
@@ -137,7 +137,9 @@ test('loading and failed observations are not zero balances or permission to spe
 }) => {
   const { state, account } = await balanceFixture(page);
   const d = state.deployment;
-  state.wallets[d.holder]!.accounts = [account(d.usdcMint, d.holderUsdc, '1500000')];
+  state.wallets[d.localnet!.holder]!.accounts = [
+    account(d.usdcMint, d.localnet!.holderUsdc, '1500000'),
+  ];
   let release = () => {};
   state.walletDelay = new Promise<void>((resolve) => {
     release = resolve;
@@ -165,7 +167,7 @@ test('loading and failed observations are not zero balances or permission to spe
   await expect(balance).toContainText('Unavailable · last known');
   await expect(page.getByRole('button', { name: 'Activate protection' })).toBeDisabled();
   state.walletUnavailable = false;
-  state.wallets[d.holder]!.accounts = [];
+  state.wallets[d.localnet!.holder]!.accounts = [];
   await expect(usdc).toContainText('Available in selected account');
   await expect(usdc).toContainText('0 USDC');
   await expect(page.getByRole('button', { name: 'Activate protection' })).toBeDisabled();

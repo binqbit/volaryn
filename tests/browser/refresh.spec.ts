@@ -16,8 +16,8 @@ test('background wallet refresh preserves layout, focus, inputs and usable contr
 }) => {
   const { state, account } = await balanceFixture(page);
   const d = state.deployment;
-  const fundingAccount = account(d.usdcMint, d.writerUsdc, '100000000');
-  state.wallets[d.writer]!.accounts = [fundingAccount];
+  const fundingAccount = account(d.usdcMint, d.localnet!.writerUsdc, '100000000');
+  state.wallets[d.localnet!.writer]!.accounts = [fundingAccount];
   await page.goto('/offers/new');
   await page.getByRole('button', { name: 'Connect Test Wallet 2', exact: true }).click();
   await selectAsset(page, 'OPENAI');
@@ -80,7 +80,9 @@ test('a pending retry keeps the last failure visible and financial actions pause
 }) => {
   const { state, account } = await balanceFixture(page);
   const d = state.deployment;
-  state.wallets[d.holder]!.accounts = [account(d.usdcMint, d.holderUsdc, '1500000')];
+  state.wallets[d.localnet!.holder]!.accounts = [
+    account(d.usdcMint, d.localnet!.holderUsdc, '1500000'),
+  ];
   await page.goto(`/agreements/${state.agreement.address}`);
   await page.getByRole('button', { name: 'Connect Test Wallet 1', exact: true }).click();
   const activate = page.getByRole('button', { name: 'Activate protection' });

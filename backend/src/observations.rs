@@ -7,17 +7,26 @@ use utoipa::ToSchema;
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Deployment {
     pub schema_version: u8,
-    pub fixture_version: u8,
     pub mode: String,
     pub genesis_hash: String,
     pub program_id: String,
     pub program_sha256: String,
     pub program_length: usize,
     pub authority: String,
-    pub holder: String,
-    pub writer: String,
+    pub upgrade_authority: Option<String>,
     pub usdc_mint: String,
     pub assets: Vec<AssetView>,
+    /// Disposable participant identities exist only in a localnet deployment.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub localnet: Option<LocalFixtures>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LocalFixtures {
+    pub fixture_version: u8,
+    pub holder: String,
+    pub writer: String,
     pub writer_usdc: String,
     pub holder_usdc: String,
 }

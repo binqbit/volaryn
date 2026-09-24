@@ -13,7 +13,7 @@ test('pending offers restore from the server, survive reload, and become complet
   const receipt = () => ({
     id: '1',
     signature,
-    owner: d.writer,
+    owner: d.localnet!.writer,
     agreement: state.agreement.address,
     operation: 'create',
     createdTerms: {
@@ -32,7 +32,7 @@ test('pending offers restore from the server, survive reload, and become complet
     updatedAt: 1800000000,
   });
   await page.route('**/api/activity?*', (route) => {
-    const mine = new URL(route.request().url()).searchParams.get('owner') === d.writer;
+    const mine = new URL(route.request().url()).searchParams.get('owner') === d.localnet!.writer;
     return route.fulfill({
       json: {
         items: mine ? [receipt()] : [],
@@ -71,10 +71,10 @@ test('pending offers restore from the server, survive reload, and become complet
   await expect(progress).toContainText('Create funded offer');
   await expect(progress).toContainText('Awaiting confirmation');
   await expect(page.getByRole('heading', { name: 'No offers created yet' })).toHaveCount(0);
-  const key = journalKey(d.genesisHash, d.programId, d.writer);
+  const key = journalKey(d.genesisHash, d.programId, d.localnet!.writer);
   await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), key)).not.toBeNull();
   await page.reload();
-  await expect(page.getByRole('region', { name: 'Your wallet' })).toContainText(d.writer);
+  await expect(page.getByRole('region', { name: 'Your wallet' })).toContainText(d.localnet!.writer);
   await expect(progress).toBeVisible();
   finalized = true;
   await expect(
@@ -101,7 +101,7 @@ test('interrupted signing remains visible without inventing a transaction or rec
 }) => {
   const { state } = await balanceFixture(page);
   const d = state.deployment;
-  const key = activityKey(journalKey(d.genesisHash, d.programId, d.holder));
+  const key = activityKey(journalKey(d.genesisHash, d.programId, d.localnet!.holder));
   await page.addInitScript(
     ({ key, owner, agreement }) => {
       localStorage.setItem(
@@ -120,7 +120,7 @@ test('interrupted signing remains visible without inventing a transaction or rec
         ]),
       );
     },
-    { key, owner: d.holder, agreement: state.agreement.address },
+    { key, owner: d.localnet!.holder, agreement: state.agreement.address },
   );
   await page.goto('/portfolio/activity');
   await page.getByRole('button', { name: 'Connect Test Wallet 1', exact: true }).click();
@@ -139,7 +139,10 @@ test('interrupted signing remains visible without inventing a transaction or rec
 test('wallet preference from another ledger is never restored', async ({ page }) => {
   const { state } = await balanceFixture(page);
   await page.addInitScript((d) => {
-    localStorage.setItem(`volaryn:wallet:other-ledger:${d.programId}`, `Test Wallet 1:${d.holder}`);
+    localStorage.setItem(
+      `volaryn:wallet:other-ledger:${d.programId}`,
+      `Test Wallet 1:${d.localnet!.holder}`,
+    );
   }, state.deployment);
   await page.goto('/portfolio');
   await expect(
@@ -154,11 +157,13 @@ test('an activity outage preserves ongoing confirmation and the saved signature'
 }) => {
   const { state, account } = await balanceFixture(page);
   const d = state.deployment;
-  state.wallets[d.holder]!.accounts = [account(d.usdcMint, d.holderUsdc, '100000000')];
+  state.wallets[d.localnet!.holder]!.accounts = [
+    account(d.usdcMint, d.localnet!.holderUsdc, '100000000'),
+  ];
   const receipt = {
     id: '1',
     signature: '1'.repeat(64),
-    owner: d.holder,
+    owner: d.localnet!.holder,
     agreement: state.agreement.address,
     operation: 'activate',
     createdTerms: null,
@@ -193,7 +198,7 @@ test('an activity outage preserves ongoing confirmation and the saved signature'
   await expect(page.getByRole('alert')).toContainText('Activity is unavailable');
   await expect(status).toContainText(receipt.signature);
   await expect(page.getByRole('button', { name: /^Activate protection/ })).toBeDisabled();
-  const key = journalKey(d.genesisHash, d.programId, d.holder);
+  const key = journalKey(d.genesisHash, d.programId, d.localnet!.holder);
   expect(await page.evaluate((key) => localStorage.getItem(key), key)).toContain(receipt.signature);
   unavailable = false;
   await page.getByRole('button', { name: 'Refresh activity', exact: true }).click();

@@ -24,12 +24,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
     tracing_subscriber::fmt().json().init();
     let deployment = read_deployment(&config.manifest)?;
-    let chain = Chain::new(config.rpc_url)?;
+    volaryn_backend::release::current().verify(&deployment)?;
+    let chain = Chain::new(config.chain_connection(&deployment)?)
+        .map_err(|_| "Invalid RPC transport configuration")?;
     chain.verify_identity(&deployment).await?;
-    let database_url = config
-        .database_url
-        .as_deref()
-        .ok_or("Set DATABASE_URL or --database-url for PostgreSQL")?;
+    if config.check_deployment {
+        let admission = chain.check_admission(&deployment).await?;
+        println!("{}", serde_json::to_string_pretty(&admission)?);
+        return Ok(());
+    }
+    let database_url = config.database_connection()?;
     let database_options = database_url
         .parse()
         .map_err(|_| "Invalid PostgreSQL connection URL")?;

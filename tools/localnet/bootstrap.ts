@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto';
-import { isDeepStrictEqual } from 'node:util';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -19,6 +18,7 @@ import { fixtureSigners, recipe } from './identity';
 import { demoBalances, fixtureAssets, fixtureUnits } from './assets';
 import { fixtureTokens } from './tokens';
 import { withProgress } from './progress';
+import { checkLocalManifest } from './manifest';
 import type { components } from '../../frontend/src/lib/api/schema';
 
 const { values } = parseArgs({
@@ -41,6 +41,7 @@ const tokens = fixtureTokens(rpc, keys.authority);
 const program = await readFile(values.program);
 const programSha256 = createHash('sha256').update(program).digest('hex');
 const genesisHash = await rpc.getGenesisHash().send();
+console.log(`[bootstrap] Local ledger: ${genesisHash}`);
 const accounts = await protocolAddresses(assets[0]!.mint.address, keys.writer.address, 1n);
 const deployed = await rpc
   .getAccountInfo(accounts.programData, { encoding: 'base64', commitment: 'finalized' })
@@ -57,35 +58,38 @@ if (
   );
 
 const manifest: components['schemas']['Deployment'] = {
-  schemaVersion: 2,
-  fixtureVersion: recipe.version,
+  schemaVersion: 3,
   mode: 'localnet',
   genesisHash,
   programId: VOLARYN_PROGRAM_ADDRESS,
   programSha256,
   programLength: program.length,
   authority: keys.authority.address,
-  holder: keys.holder.address,
-  writer: keys.writer.address,
+  upgradeAuthority: keys.authority.address,
   usdcMint: keys.usdc.address,
   assets: assets.map(({ asset }) => asset),
-  writerUsdc: keys.writerUsdc.address,
-  holderUsdc: keys.holderUsdc.address,
+  localnet: {
+    fixtureVersion: recipe.version,
+    holder: keys.holder.address,
+    writer: keys.writer.address,
+    writerUsdc: keys.writerUsdc.address,
+    holderUsdc: keys.holderUsdc.address,
+  },
 };
 async function readExisting(path: string) {
   try {
-    return JSON.parse(await readFile(path, 'utf8')) as typeof manifest;
+    return JSON.parse(await readFile(path, 'utf8')) as unknown;
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return undefined;
     throw error;
   }
 }
-const existing =
-  (await readExisting(values.manifest)) ?? (await readExisting(`${values.manifest}.pending`));
-if (existing && !isDeepStrictEqual(existing, manifest))
-  throw new Error(
-    'Deployment identity differs from the existing fixture manifest. Use a fresh localnet for the PreStocks fixtures; see docs/development.md. Existing data was not reset.',
-  );
+let upgradeManifest = false;
+for (const path of [values.manifest, `${values.manifest}.pending`]) {
+  const existing = await readExisting(path);
+  if (existing !== undefined)
+    upgradeManifest = checkLocalManifest(existing, manifest) || upgradeManifest;
+}
 await mkdir(dirname(values.manifest), { recursive: true });
 await writeFile(`${values.manifest}.pending`, JSON.stringify(manifest, null, 2) + '\n');
 
@@ -225,6 +229,7 @@ for (const [index, { mint, asset }] of assets.slice(0, 2).entries()) {
   }
 }
 await rename(`${values.manifest}.pending`, values.manifest);
+if (upgradeManifest) console.log('[bootstrap] Updated the local deployment manifest to schema 3');
 console.log(
   `[bootstrap] Local fixture ready in ${((Date.now() - started) / 1000).toFixed(1)}s: ${accounts.agreement}`,
 );

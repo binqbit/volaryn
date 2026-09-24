@@ -90,6 +90,31 @@ impl Application {
         if store::find(&self.pool, &intent.signature).await?.is_some() {
             return Ok(());
         }
+        if self.deployment.mode == "mainnet"
+            && matches!(intent.operation, Operation::Create | Operation::Activate)
+        {
+            let mint = if let Some(terms) = &intent.created_terms {
+                terms.underlying_mint.clone()
+            } else {
+                let (_, agreements) = self
+                    .chain
+                    .agreement_batch(&self.deployment, std::slice::from_ref(&intent.agreement), 0)
+                    .await?;
+                agreements
+                    .first()
+                    .ok_or(AppError::NotFound)?
+                    .underlying_mint
+                    .clone()
+            };
+            if !self
+                .chain
+                .admission(&self.deployment, &mint)
+                .await?
+                .new_commitments
+            {
+                return Err(AppError::Invalid);
+            }
+        }
         // Establish a server-observed upper lifetime bound, never a client-supplied height.
         let valid = self
             .chain

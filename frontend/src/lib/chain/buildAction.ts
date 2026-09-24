@@ -34,7 +34,7 @@ import {
   protocolAddresses,
   VOLARYN_PROGRAM_ADDRESS,
 } from '@volaryn/protocol';
-import { amount, type Deployment } from '../api/client';
+import { api, amount, type Deployment } from '../api/client';
 import type { AppClient } from './client';
 import type { ActionPlan, ActionRequest } from './actionTypes';
 import { mintTerms } from './mint';
@@ -77,6 +77,12 @@ export async function buildAction(
   const asset = deployment.assets.find((item) => item.mint === mintAddress);
   if (request.operation === 'create' && !asset)
     throw new Error('Choose a supported PreStocks token');
+  if (deployment.mode === 'mainnet' && ['create', 'activate'].includes(request.operation)) {
+    const admission = await api.GET('/api/admission', { params: { query: { mint: mintAddress } } });
+    if (!admission.data)
+      throw new Error('Asset admission is unavailable; try again before signing');
+    if (!admission.data.newCommitments) throw new Error(admission.data.reason);
+  }
   const usdcMint = address(deployment.usdcMint);
   const usdcAddress = address(request.usdcAccount);
   const { data: usdc, programAddress: usdcProgram } = await fetchToken(rpc, usdcAddress, {
