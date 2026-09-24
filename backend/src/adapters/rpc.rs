@@ -11,6 +11,21 @@ use std::time::Duration;
 
 pub const BODY_LIMIT: usize = 2 * 1024 * 1024;
 
+// RPC URLs can contain credentials. Log failure classes, never reqwest's URL-bearing errors.
+fn transport_error(error: &reqwest::Error, stage: &'static str) -> AppError {
+    let reason = if error.is_timeout() {
+        "timeout"
+    } else if error.is_connect() {
+        "connection"
+    } else if error.is_body() {
+        "response_body"
+    } else {
+        "request"
+    };
+    tracing::warn!(stage, reason, "RPC transport failed");
+    AppError::Chain
+}
+
 #[derive(Clone)]
 pub struct Transport {
     client: reqwest::Client,
@@ -47,13 +62,26 @@ impl Transport {
                 .body(body)
                 .send()
                 .await
-                .map_err(|_| AppError::Chain)?;
+                .map_err(|error| transport_error(&error, "send"))?;
             if !response.status().is_success() {
+                tracing::warn!(
+                    status = response.status().as_u16(),
+                    "RPC returned an unsuccessful HTTP status"
+                );
                 return Err(AppError::Chain);
             }
             let mut bytes = Vec::new();
-            while let Some(chunk) = response.chunk().await.map_err(|_| AppError::Chain)? {
+            while let Some(chunk) = response
+                .chunk()
+                .await
+                .map_err(|error| transport_error(&error, "read"))?
+            {
                 if bytes.len() + chunk.len() > response_limit {
+                    tracing::warn!(
+                        response_limit,
+                        received_bytes = bytes.len() + chunk.len(),
+                        "RPC response exceeded its byte limit"
+                    );
                     return Err(AppError::Chain);
                 }
                 bytes.extend_from_slice(&chunk);
@@ -61,7 +89,10 @@ impl Transport {
             Ok(Bytes::from(bytes))
         })
         .await
-        .map_err(|_| AppError::Chain)?
+        .map_err(|_| {
+            tracing::warn!(reason = "timeout", "RPC operation exceeded its deadline");
+            AppError::Chain
+        })?
     }
 }
 
@@ -75,8 +106,20 @@ impl RpcSender for Transport {
             .raw(bytes.into())
             .await
             .map_err(|error| Error::from(ErrorKind::Custom(error.to_string())))?;
-        let value: Value = serde_json::from_slice(&response)?;
+        let value: Value = serde_json::from_slice(&response).inspect_err(|error| {
+            tracing::warn!(
+                method = %request,
+                line = error.line(),
+                column = error.column(),
+                "RPC returned invalid JSON"
+            );
+        })?;
         if value.get("error").is_some() || value.get("result").is_none() {
+            tracing::warn!(
+                method = %request,
+                rpc_code = value["error"]["code"].as_i64(),
+                "RPC rejected the request or omitted its result"
+            );
             return Err(ErrorKind::Custom("Upstream rejected the RPC request".into()).into());
         }
         Ok(value["result"].clone())
