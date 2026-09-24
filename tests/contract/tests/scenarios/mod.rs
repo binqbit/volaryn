@@ -1,4 +1,5 @@
 mod admission;
+mod adversarial;
 mod atomicity;
 mod authorization;
 mod lifecycle;
