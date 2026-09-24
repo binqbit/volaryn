@@ -16,13 +16,12 @@ async function expectAnchored(trigger: Locator, tooltip: Locator) {
       return Math.abs(gap - 10) < 2;
     })
     .toBe(true);
-  const anchor = (await trigger.boundingBox())!;
   const popup = (await tooltip.boundingBox())!;
   expect(popup.width).toBeLessThanOrEqual(352);
   expect(popup.height).toBeLessThanOrEqual(352);
   const arrow = (await tooltip.locator('span[aria-hidden="true"]').first().boundingBox())!;
-  expect(arrow.x + arrow.width / 2).toBeGreaterThanOrEqual(anchor.x);
-  expect(arrow.x + arrow.width / 2).toBeLessThanOrEqual(anchor.x + anchor.width);
+  const icon = (await trigger.locator('span[aria-hidden="true"]').boundingBox())!;
+  expect(Math.abs(arrow.x + arrow.width / 2 - icon.x - icon.width / 2)).toBeLessThan(3);
   await expect(trigger).toHaveAttribute('aria-expanded', 'true');
   expect(
     await tooltip
@@ -37,6 +36,38 @@ async function expectAnchored(trigger: Locator, tooltip: Locator) {
     })),
   ).toEqual({ modal: false, backdrop: 'rgba(0, 0, 0, 0)', scrollLocked: false });
 }
+
+test('wide offer form tooltips open beside the information icon for pointer and keyboard use', async ({
+  page,
+}, info) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  const { state } = await balanceFixture(page);
+  await page.goto('/offers/new');
+  await connectWallet(page, 'Test Wallet 2');
+  await selectAsset(page, 'OPENAI');
+  const form = page.getByRole('form', { name: 'Create an offer' });
+  await expect(form.getByRole('button', { name: 'Asset date limits', exact: true })).toBeVisible();
+  const before = await documentBox(form);
+  for (const title of ['Asset date limits', 'How amounts are calculated']) {
+    const trigger = form.getByRole('button', { name: title, exact: true });
+    const tooltip = page.getByRole('dialog', { name: title, exact: true });
+    await trigger.locator('span[aria-hidden="true"]').click();
+    await expectAnchored(trigger, tooltip);
+    const icon = (await trigger.locator('span[aria-hidden="true"]').boundingBox())!;
+    const popup = (await tooltip.boundingBox())!;
+    expect(popup.x + popup.width).toBeGreaterThan(icon.x);
+    expect(await documentBox(form)).toEqual(before);
+    await page.screenshot({
+      path: info.outputPath(`${title.split(' ')[0]!.toLowerCase()}-wide.png`),
+    });
+    await page.keyboard.press('Escape');
+    await trigger.focus();
+    await trigger.press('Enter');
+    await expectAnchored(trigger, tooltip);
+    await page.keyboard.press('Escape');
+  }
+  expect(state.unexpected).toEqual([]);
+});
 
 for (const width of [1440, 375, 320]) {
   test(`information tooltips stay beside their triggers without changing the grid at ${width}px`, async ({

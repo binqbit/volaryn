@@ -29,7 +29,7 @@ export function InfoPopover({
   const { refs, elements, floatingStyles, middlewareData, placement, isPositioned, update } =
     useFloating<HTMLButtonElement>({
       open,
-      placement: 'bottom-start',
+      placement: 'bottom-end',
       strategy: 'fixed',
       middleware: [
         offset(10),
@@ -63,21 +63,26 @@ export function InfoPopover({
 
   return (
     <div className={styles.root}>
-      <button
-        ref={refs.setReference}
-        type="button"
-        className={styles.trigger}
-        popoverTarget={id}
-        aria-haspopup="dialog"
-        aria-expanded={open}
-        aria-controls={id}
-      >
-        <span>{title}</span>
-        {hint && <small>{hint}</small>}
-        <span className={styles.icon} aria-hidden="true">
-          ⓘ
-        </span>
-      </button>
+      <div className={styles.row}>
+        <div id={`${id}-label`} className={styles.label}>
+          <span>{title}</span>
+          {hint && <small>{hint}</small>}
+        </div>
+        <button
+          ref={refs.setReference}
+          type="button"
+          className={styles.trigger}
+          popoverTarget={id}
+          aria-labelledby={`${id}-label`}
+          aria-haspopup="dialog"
+          aria-expanded={open}
+          aria-controls={id}
+        >
+          <span className={styles.icon} aria-hidden="true">
+            ⓘ
+          </span>
+        </button>
+      </div>
       <div
         ref={refs.setFloating}
         id={id}
