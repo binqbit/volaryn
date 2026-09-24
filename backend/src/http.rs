@@ -15,11 +15,11 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, value::RawValue, Value};
-use std::{path::PathBuf, sync::Arc};
+use std::{path::PathBuf, sync::Arc, time::Duration};
 use tower::ServiceExt;
 use tower_http::{
     limit::RequestBodyLimitLayer, services::ServeDir, set_header::SetResponseHeaderLayer,
-    trace::TraceLayer,
+    timeout::RequestBodyDeadlineLayer, trace::TraceLayer,
 };
 use utoipa::{OpenApi, ToSchema};
 use utoipa_axum::{router::OpenApiRouter, routes};
@@ -96,6 +96,8 @@ pub fn router(application: Arc<Application>, frontend: PathBuf) -> Router {
                 response
             }
         }))
+        // Bound the entire upload; trickled chunks must not restart the deadline.
+        .layer(RequestBodyDeadlineLayer::new(Duration::from_secs(10)))
         .layer(tower::limit::ConcurrencyLimitLayer::new(32))
         .layer(SetResponseHeaderLayer::if_not_present(
             header::CACHE_CONTROL,
