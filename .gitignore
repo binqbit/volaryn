@@ -8,3 +8,4 @@ __pycache__/
 frontend/dist/
 frontend/dist-live/
 /deployment/
+/demo-videos/
