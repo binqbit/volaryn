@@ -26,6 +26,7 @@ test('background wallet refresh preserves layout, focus, inputs and usable contr
   const form = page.getByRole('form', { name: 'Create an offer' });
   const premium = page.getByLabel('Premium (USDC)', { exact: true });
   await expect(funding).toContainText('100 USDC');
+  await page.getByLabel('Payout (USDC)', { exact: true }).fill('20');
   await premium.fill('0.75');
   const text = await funding.innerText();
   const tokenText = await holdings.innerText();

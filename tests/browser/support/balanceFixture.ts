@@ -1,5 +1,12 @@
 import type { Page } from '@playwright/test';
-import { VOLARYN_PROGRAM_ADDRESS, protocolAddresses } from '@volaryn/protocol';
+import { address, getBase64Decoder } from '@solana/kit';
+import { TOKEN_2022_PROGRAM_ADDRESS } from '@solana-program/token-2022';
+import {
+  findPolicyPda,
+  getAssetPolicyEncoder,
+  VOLARYN_PROGRAM_ADDRESS,
+  protocolAddresses,
+} from '@volaryn/protocol';
 import type {
   Agreement,
   Deployment,
@@ -35,6 +42,26 @@ export async function balanceFixture(page: Page) {
   const underlying = assets[0]!;
   const addresses = await protocolAddresses(underlying.mint.address, keys.writer.address, 91n);
   const now = Math.floor(Date.now() / 1000);
+  const policies = new Map(
+    await Promise.all(
+      deployment.assets.map(async (asset) => {
+        const mint = address(asset.mint);
+        const [policyAddress] = await findPolicyPda({ mint });
+        const encoded = getBase64Decoder().decode(
+          getAssetPolicyEncoder().encode({
+            mint,
+            tokenProgram: TOKEN_2022_PROGRAM_ADDRESS,
+            decimals: asset.decimals,
+            version: 1,
+            enabled: true,
+            reviewedUntil: 9_223_372_036_854_775_807n,
+            maxExpiry: 9_223_372_036_854_775_807n,
+          }),
+        );
+        return [policyAddress as string, encoded] as const;
+      }),
+    ),
+  );
   const agreement: Agreement = {
     address: addresses.agreement,
     version: 1,
@@ -94,15 +121,38 @@ export async function balanceFixture(page: Page) {
     await route.fulfill({ status: 404 });
   });
   await page.route('**/rpc', async (route) => {
-    const request = route.request().postDataJSON() as { id: number; method: string };
-    const result =
-      request.method === 'getGenesisHash'
-        ? deployment.genesisHash
-        : request.method === 'getSlot'
-          ? 42
-          : request.method === 'getBlockTime'
-            ? Math.floor(Date.now() / 1000)
-            : undefined;
+    const request = route.request().postDataJSON() as {
+      id: number;
+      method: string;
+      params?: unknown[];
+    };
+    const result = (() => {
+      switch (request.method) {
+        case 'getGenesisHash':
+          return deployment.genesisHash;
+        case 'getSlot':
+          return 42;
+        case 'getBlockTime':
+          return Math.floor(Date.now() / 1000);
+        case 'getAccountInfo': {
+          const encoded = policies.get(String(request.params?.[0]));
+          if (!encoded) return undefined;
+          return {
+            context: { slot: 42 },
+            value: {
+              data: [encoded, 'base64'],
+              executable: false,
+              lamports: 1,
+              owner: VOLARYN_PROGRAM_ADDRESS,
+              rentEpoch: 0,
+              space: 94,
+            },
+          };
+        }
+        default:
+          return undefined;
+      }
+    })();
     if (result === undefined) state.unexpected.push(request.method);
     await route.fulfill({
       json: {

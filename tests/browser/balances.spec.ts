@@ -51,6 +51,7 @@ test('creation shows token holdings and funds the payout from the selected USDC 
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: info.outputPath('account-details-mobile.png'), fullPage: true });
   await page.setViewportSize({ width: 1440, height: 1100 });
+  await page.getByLabel('Payout (USDC)', { exact: true }).fill('20');
   const funding = page.getByRole('group', { name: 'Funding USDC account balance' });
   await expect(funding).toContainText('30.500001 USDC');
   await expect(funding).toContainText('10.500001 USDC');

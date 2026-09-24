@@ -2,6 +2,18 @@
 
 An agreement represents an on-chain right and its reserved funds. An operation is an attempt to create or change that agreement. The portfolio shows both without treating a signature, pending transaction, or database receipt as a funded offer.
 
+## Suggested offer terms
+
+**Create offer** provides editable starting terms: one unscaled token, a 100 USDC payout, and a 10% premium, initially 10 USDC. These defaults apply to both localnet and mainnet; localnet uses test funds. They are a starting template, not a token valuation, market price, risk forecast, or estimate of demand. The starting premium is not an enforced minimum.
+
+The writer can edit **Premium (USDC)** or **Premium (%)**. The last edited field determines the pricing basis: a USDC amount stays fixed when payout changes; a percentage recalculates the premium. Calculations use integer base units and round percentage-based premiums upward to a whole USDC micro-unit. The displayed percentage for a fixed amount is approximate and never changes that amount. The form shows the writer's activation premium and the holder's payout less that premium if exercised, before other costs. Neither figure is an investment return.
+
+Date suggestions read confirmed network time and the selected mint's on-chain policy after verifying its network, program, token program, and precision. Localnet starts with two hours of protection and one hour to accept; mainnet starts with seven days and up to one day to accept, limited to half the selected duration. Suggested protection is capped by `maxExpiry`; acceptance ends before both protection expiry and `reviewedUntil`. Review validity limits admission, not the lifetime of already activated protection. A disabled, expired, or nearly expired policy cannot produce a suggestion. Local replica policies remain separate from mainnet issuer deadlines.
+
+Untouched date fields initialize once per selected asset. Background refreshes never move deadlines or overwrite amounts. Manually edited dates survive asset changes and are validated against the new policy. Changing the duration selector alone does not change existing dates; **Apply suggested dates** explicitly replaces both. Failed reads remove suggestions and offer a retry while permitting manual entry. Preparation rechecks policy and chain time before signing, regardless of how terms were entered.
+
+The [official asset context](asset-integration.md#context-and-units) remains separate. Unverified source prices cannot populate payouts, protection percentages, or premium estimates. No price oracle, new service, or external provider credential is required for these templates.
+
 ## Agreement lifecycle
 
 | State in the interface      | Meaning                                                                            | Available next action                                                                                                                 |

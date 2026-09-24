@@ -681,9 +681,6 @@
 .formSection .note {
   margin-top: 12px;
 }
-.priceFields {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
 .offerForm h2 {
   font-size: 18px;
   font-weight: 500;

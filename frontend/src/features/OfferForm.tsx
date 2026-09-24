@@ -13,16 +13,10 @@ import { AssetSelect } from './AssetSelect';
 import { AssetIdentity } from './AssetIdentity';
 import { TokenBalance } from './TokenBalance';
 import { Details } from './Details';
+import { useOfferTerms } from './offers/useOfferTerms';
+import { OfferTermsFields } from './offers/OfferTermsFields';
+import { utcSeconds } from './offers/terms';
 import styles from '../App.module.css';
-
-const initialDate = (seconds: number) =>
-  new Date(Date.now() + seconds * 1000).toISOString().slice(0, 19);
-export function utcSeconds(value: string) {
-  const milliseconds = Date.parse(`${value}Z`);
-  if (!Number.isFinite(milliseconds) || milliseconds < 0)
-    throw new Error('Enter a valid UTC deadline');
-  return BigInt(Math.floor(milliseconds / 1000)).toString();
-}
 
 export function OfferForm({
   wallet,
@@ -39,11 +33,8 @@ export function OfferForm({
 }) {
   const [mint, setMint] = useState('');
   const asset = deployment.assets.find((item) => item.mint === mint);
-  const [quantity, setQuantity] = useState('1');
-  const [payout, setPayout] = useState('20');
-  const [premium, setPremium] = useState('0.5');
-  const [acceptBefore, setAcceptBefore] = useState(() => initialDate(3600));
-  const [expiresAt, setExpiresAt] = useState(() => initialDate(7200));
+  const terms = useOfferTerms(deployment, asset);
+  const { quantity, payout, pricing, dates } = terms;
   const [designated, setDesignated] = useState('');
   const [selected, setSelected] = useState('');
   const [error, setError] = useState('');
@@ -64,6 +55,8 @@ export function OfferForm({
     setError('');
     try {
       if (!asset) throw new Error('Choose the PreStocks token for this offer');
+      if (terms.dateError) throw new Error(terms.dateError);
+      if (pricing.error) throw new Error(pricing.error);
       if (!account) throw new Error('A USDC token account is required');
       const funding = parseUnits(payout);
       if (funding > BigInt(account.amountRaw))
@@ -97,9 +90,9 @@ export function OfferForm({
           underlyingMint: asset.mint,
           quantityRaw: parseUnits(quantity, asset.decimals).toString(),
           payout: funding.toString(),
-          premium: parseUnits(premium).toString(),
-          acceptBefore: utcSeconds(acceptBefore),
-          expiresAt: utcSeconds(expiresAt),
+          premium: parseUnits(pricing.premium).toString(),
+          acceptBefore: utcSeconds(dates.acceptBefore),
+          expiresAt: utcSeconds(dates.expiresAt),
           designatedHolder: designated.trim() || null,
         },
       });
@@ -134,64 +127,7 @@ export function OfferForm({
       </fieldset>
       <fieldset className={styles.formSection}>
         <legend>Set the terms</legend>
-        <div className={`${styles.formGrid} ${styles.priceFields}`}>
-          <label className={styles.field}>
-            <span>Gross quantity (unscaled tokens)</span>
-            <input
-              required
-              inputMode="decimal"
-              value={quantity}
-              onChange={(event) => setQuantity(event.target.value)}
-            />
-          </label>
-          <label className={styles.field}>
-            <span>Payout (USDC)</span>
-            <input
-              required
-              inputMode="decimal"
-              value={payout}
-              onChange={(event) => setPayout(event.target.value)}
-            />
-          </label>
-          <label className={styles.field}>
-            <span>Premium (USDC)</span>
-            <input
-              required
-              inputMode="decimal"
-              value={premium}
-              onChange={(event) => setPremium(event.target.value)}
-            />
-          </label>
-        </div>
-        {asset && (
-          <p className={styles.note}>
-            Enter {asset.symbol} before the issuer's display multiplier. One unscaled token is{' '}
-            {(10n ** BigInt(asset.decimals)).toString()} base units. Your external wallet may show a
-            different scaled balance.
-          </p>
-        )}
-        <div className={styles.formGrid}>
-          <label className={styles.field}>
-            <span>Acceptance deadline (UTC)</span>
-            <input
-              type="datetime-local"
-              step="1"
-              required
-              value={acceptBefore}
-              onChange={(event) => setAcceptBefore(event.target.value)}
-            />
-          </label>
-          <label className={styles.field}>
-            <span>Protection expiry (UTC)</span>
-            <input
-              type="datetime-local"
-              step="1"
-              required
-              value={expiresAt}
-              onChange={(event) => setExpiresAt(event.target.value)}
-            />
-          </label>
-        </div>
+        <OfferTermsFields terms={terms} asset={asset} />
         <Details
           ref={restriction}
           title="Restrict to a wallet"
@@ -227,7 +163,7 @@ export function OfferForm({
           status={walletStatus}
           required={payoutRaw}
           requiredLabel="Payout to reserve"
-          onUseBalance={(raw) => setPayout(formatUnits(raw))}
+          onUseBalance={(raw) => terms.setPayout(formatUnits(raw))}
         />
       </fieldset>
       {error && (
