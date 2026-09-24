@@ -22,6 +22,19 @@ docker load --input app.tar
 
 `release.env` selects the loaded image by content ID, so a mutable tag cannot silently choose another application. The application rejects a mainnet manifest whose program hash differs from its embedded release fingerprint. Reproducibility here means pinned inputs and identifiable artifacts; independent bit-for-bit SBF reproduction is a separate verification step.
 
+### Optional WalletConnect pairing
+
+Installed Solana Wallet Standard wallets, including Phantom, connect through the shared provider chooser. On mainnet, an absent Phantom has an installation link. WalletConnect adds QR pairing with compatible Solana mainnet wallets when the frontend is built with `VITE_WALLETCONNECT_PROJECT_ID`. Obtain a project ID from the [Reown dashboard](https://dashboard.reown.com/) and configure the application's allowed origins according to the [relay allowlist documentation](https://docs.reown.com/walletkit/ios/cloud/relay).
+
+```sh
+VITE_WALLETCONNECT_PROJECT_ID=YOUR_PUBLIC_PROJECT_ID \
+  ./tools/release/build artifacts/release
+```
+
+The release script passes this optional value to Docker's frontend build argument. For a frontend-only artifact, supply the same environment variable to `npm run build:live`. It is a public project identifier embedded in browser JavaScript, not a secret or a runtime Compose setting. Changing it requires a new frontend artifact. The operator configures the ID; users scan the pairing QR code without entering a project ID. With the variable absent, WalletConnect remains disabled and installed wallets still work. Localnet needs no project ID and exposes its two disposable test wallets instead of WalletConnect pairing.
+
+The Sign SDK loads when WalletConnect is used, including restoration of an existing connection. Its browser relay connection does not require WebSocket forwarding through the application host. Adapter tests use controlled SDK responses; successful pairing with an external wallet must be validated separately for the configured origin.
+
 ## Program deployment and authority
 
 Application startup never deploys or upgrades a program, initializes the protocol, or signs policy changes. The release operator controls hosting and recovery; the program authority separately controls deployment and upgrades, and the protocol authority controls admission policy. These responsibilities may belong to one operator, but their private keys never enter the application container or deployment directory.

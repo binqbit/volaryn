@@ -16,7 +16,7 @@ Restarts preserve balances and agreements. An offer's deadlines continue to pass
 
 ## Reserve, activate, and exercise
 
-1. **Inspect the writer's commitment.** Connect **Test Wallet 2**, open **My portfolio → My offers**, and open the funded OPENAI offer. It reserves **20 USDC**, charges a **0.5 USDC** premium, and requires delivery of **1 unscaled OPENAI unit**: exactly **1,000,000,000 base units**. Save its page address. A fresh seeded offer accepts activation for one hour and permits exercise for two hours after initialization; use the exact dates on the page.
+1. **Inspect the writer's commitment.** Open **Connect wallet**, choose **Test Wallet 2**, open **My portfolio → My offers**, and open the funded OPENAI offer. It reserves **20 USDC**, charges a **0.5 USDC** premium, and requires delivery of **1 unscaled OPENAI unit**: exactly **1,000,000,000 base units**. Save its page address. A fresh seeded offer accepts activation for one hour and permits exercise for two hours after initialization; use the exact dates on the page.
 
 2. **Switch to the holder.** Disconnect Test Wallet 2, connect **Test Wallet 1**, and open the saved agreement or select OPENAI in **Explore offers**. Review the asset identity, payout, premium, delivery quantity, deadlines, and issuer restrictions. **View wallet** shows the holder's available balances.
 

@@ -35,6 +35,7 @@ COPY frontend/package.json frontend/package.json
 COPY packages/protocol/package.json packages/protocol/package.json
 RUN npm ci
 COPY . .
+ARG VITE_WALLETCONNECT_PROJECT_ID
 RUN npm run check:generated && npm run lint && npm run typecheck && npm test \
     && npm run format:check && npm run build && npm run build:live && npm run check:live
 
