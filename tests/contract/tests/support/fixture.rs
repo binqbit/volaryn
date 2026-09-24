@@ -17,6 +17,7 @@ use solana_signer::Signer;
 use std::path::PathBuf;
 
 pub struct Fixture {
+    pub side: volaryn::OfferSide,
     pub svm: LiteSVM,
     pub authority: Keypair,
     pub writer: Keypair,
@@ -36,6 +37,19 @@ pub struct Fixture {
 impl Fixture {
     pub fn new(kind: AssetFixture) -> Self {
         Self::build(kind, true)
+    }
+
+    pub fn request(kind: AssetFixture) -> Self {
+        let mut fixture = Self::build(kind, true);
+        fixture.side = volaryn::OfferSide::Holder;
+        fixture.agreement = pda(&[
+            b"agreement",
+            signer_pubkey(&fixture.holder).as_ref(),
+            &1u64.to_le_bytes(),
+        ]);
+        fixture.reserve = pda(&[b"reserve", fixture.agreement.as_ref()]);
+        fixture.settlement = pda(&[b"settlement", fixture.agreement.as_ref()]);
+        fixture
     }
 
     pub fn uninitialized() -> Self {
@@ -133,6 +147,7 @@ impl Fixture {
             send(&mut svm, &[ix], &[&authority]).unwrap();
         }
         let mut fixture = Self {
+            side: volaryn::OfferSide::Writer,
             svm,
             authority,
             writer,

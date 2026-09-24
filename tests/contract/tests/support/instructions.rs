@@ -7,13 +7,44 @@ use super::{
 use anchor_lang::prelude::Pubkey;
 use anchor_spl::token_2022::spl_token_2022 as token;
 use solana_instruction::Instruction;
-use volaryn::{OfferTerms, PolicyTerms};
+use volaryn::{AgreementStatus, OfferSide, OfferTerms, PolicyTerms};
 
 impl Fixture {
+    pub fn creator(&self) -> Pubkey {
+        match self.side {
+            OfferSide::Writer => signer_pubkey(&self.writer),
+            OfferSide::Holder => signer_pubkey(&self.holder),
+        }
+    }
+
+    pub fn creator_usdc(&self) -> Pubkey {
+        match self.side {
+            OfferSide::Writer => self.writer_usdc,
+            OfferSide::Holder => self.holder_usdc,
+        }
+    }
+
+    pub fn accept_request_instruction(&self) -> Instruction {
+        instruction(
+            volaryn::accounts::AcceptRequest {
+                writer: signer_pubkey(&self.writer),
+                agreement: self.agreement,
+                policy: self.policy,
+                underlying_mint: self.underlying,
+                usdc_mint: self.usdc,
+                reserve: self.reserve,
+                writer_usdc: self.writer_usdc,
+                usdc_program: anchor_spl::token::ID,
+            },
+            volaryn::instruction::AcceptRequest {},
+        )
+    }
+
     pub fn terms(&self) -> OfferTerms {
         OfferTerms {
             nonce: 1,
-            designated_holder: None,
+            side: self.side,
+            designated_counterparty: None,
             quantity_raw: QUANTITY,
             payout: PAYOUT,
             premium: PREMIUM,
@@ -60,12 +91,12 @@ impl Fixture {
     pub fn create_instruction(&self, terms: OfferTerms) -> Instruction {
         instruction(
             volaryn::accounts::CreateOffer {
-                writer: signer_pubkey(&self.writer),
+                creator: self.creator(),
                 config: self.config,
                 policy: self.policy,
                 underlying_mint: self.underlying,
                 usdc_mint: self.usdc,
-                writer_usdc: self.writer_usdc,
+                creator_usdc: self.creator_usdc(),
                 agreement: self.agreement,
                 reserve: self.reserve,
                 settlement: self.settlement,
@@ -113,12 +144,21 @@ impl Fixture {
     }
 
     pub fn refund_instruction(&self, expired: bool) -> Instruction {
+        let creator_refund = !expired && self.side == OfferSide::Holder;
         let accounts = volaryn::accounts::Refund {
-            writer: signer_pubkey(&self.writer),
+            actor: if creator_refund {
+                signer_pubkey(&self.holder)
+            } else {
+                signer_pubkey(&self.writer)
+            },
             agreement: self.agreement,
             usdc_mint: self.usdc,
             reserve: self.reserve,
-            writer_usdc: self.writer_usdc,
+            actor_usdc: if creator_refund {
+                self.holder_usdc
+            } else {
+                self.writer_usdc
+            },
             usdc_program: anchor_spl::token::ID,
         };
         if expired {
@@ -129,13 +169,23 @@ impl Fixture {
     }
 
     pub fn cleanup_instruction(&self) -> Instruction {
+        let creator_refund =
+            self.side == OfferSide::Holder && self.agreement().status == AgreementStatus::Cancelled;
         instruction(
             volaryn::accounts::CleanupTerminal {
-                writer: signer_pubkey(&self.writer),
+                actor: if creator_refund {
+                    signer_pubkey(&self.holder)
+                } else {
+                    signer_pubkey(&self.writer)
+                },
                 agreement: self.agreement,
                 usdc_mint: self.usdc,
                 reserve: self.reserve,
-                writer_usdc: self.writer_usdc,
+                actor_usdc: if creator_refund {
+                    self.holder_usdc
+                } else {
+                    self.writer_usdc
+                },
                 settlement: self.settlement,
                 underlying_program: token::ID,
                 usdc_program: anchor_spl::token::ID,

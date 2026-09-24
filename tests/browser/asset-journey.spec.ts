@@ -29,7 +29,7 @@ test('a wallet holding opens local-mint offers and URL filters survive paginatio
   const holding = page.getByRole('article', { name: 'OPENAI wallet balance', exact: true });
   await expect(holding.getByRole('link', { name: 'Find protection' })).toHaveAttribute(
     'href',
-    `/offers?mint=${openai.mint}`,
+    `/offers?mint=${openai.mint}&side=writer`,
   );
   await holding.getByRole('link', { name: 'Find protection' }).click();
   const selector = page.getByRole('combobox', { name: 'PreStocks token' });

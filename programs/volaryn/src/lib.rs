@@ -34,6 +34,10 @@ pub mod volaryn {
         instructions::handle_activate(ctx)
     }
 
+    pub fn accept_request(ctx: Context<AcceptRequest>) -> Result<()> {
+        instructions::handle_accept_request(ctx)
+    }
+
     pub fn exercise(ctx: Context<Exercise>) -> Result<()> {
         instructions::handle_exercise(ctx)
     }

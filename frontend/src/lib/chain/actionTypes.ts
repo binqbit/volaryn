@@ -10,7 +10,9 @@ export const operations = [
   'cleanup',
 ] as const;
 export type Operation = (typeof operations)[number];
+export type OfferSide = 'writer' | 'holder';
 export interface OfferTerms {
+  side: OfferSide;
   underlyingMint: string;
   nonce: string;
   quantityRaw: string;
@@ -18,7 +20,7 @@ export interface OfferTerms {
   premium: string;
   acceptBefore: string;
   expiresAt: string;
-  designatedHolder: string | null;
+  designatedCounterparty: string | null;
 }
 export type ActionRequest =
   | { operation: 'create'; terms: OfferTerms; usdcAccount: string }
@@ -30,6 +32,9 @@ export type ActionRequest =
     };
 
 export interface ActionReview {
+  side: OfferSide;
+  actorRole: OfferSide;
+  escrowAmount: string;
   underlyingMint: string;
   underlyingDecimals: number;
   owner: string;
@@ -40,7 +45,7 @@ export interface ActionReview {
   premium: string;
   acceptBefore: string;
   expiresAt: string;
-  designatedHolder: string | null;
+  designatedCounterparty: string | null;
   usdcAccount: string;
   underlyingAccount: string | null;
   estimatedNetReceipt: string;
@@ -55,11 +60,26 @@ export interface ActionPlan {
   review: ActionReview;
 }
 
-export const actionLabels: Record<Operation, string> = {
-  create: 'Create funded offer',
-  activate: 'Activate protection',
-  exercise: 'Exercise protection',
-  cancel: 'Cancel offer',
-  reclaim: 'Reclaim expired reserve',
-  cleanup: 'Recover residual funds',
-};
+export function actionLabel(operation: Operation, side: OfferSide) {
+  return {
+    create: side === 'holder' ? 'Create protection request' : 'Create capital offer',
+    activate: side === 'holder' ? 'Fund protection' : 'Activate protection',
+    exercise: 'Exercise protection',
+    cancel: side === 'holder' ? 'Cancel request' : 'Cancel offer',
+    reclaim: 'Reclaim expired reserve',
+    cleanup: 'Recover residual funds',
+  }[operation];
+}
+
+export function actionRole(request: ActionRequest): OfferSide {
+  if (request.operation === 'create') return request.terms.side;
+  if (request.operation === 'activate')
+    return request.agreement.side === 'holder' ? 'writer' : 'holder';
+  if (request.operation === 'exercise') return 'holder';
+  if (
+    request.operation === 'cancel' ||
+    (request.operation === 'cleanup' && request.agreement.status === 'cancelled')
+  )
+    return request.agreement.side;
+  return 'writer';
+}

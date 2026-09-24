@@ -1,7 +1,7 @@
 import { Link } from 'react-router';
 import type { Deployment } from '../../lib/api/client';
 import { formatUnits, shortAddress } from '../../lib/api/client';
-import { actionLabels } from '../../lib/chain/actionTypes';
+import { actionLabel } from '../../lib/chain/actionTypes';
 import { inFlight, statusLabels, type ActivityItem } from './model';
 import styles from './ActivityList.module.css';
 
@@ -25,7 +25,7 @@ export function ActivityList({
           return (
             <li key={item.signature ?? item.id}>
               <div className={styles.heading}>
-                <strong>{actionLabels[item.operation]}</strong>
+                <strong>{actionLabel(item.operation, item.side)}</strong>
                 <span className={styles.status} data-pending={inFlight(item)}>
                   {statusLabels[item.status]}
                 </span>

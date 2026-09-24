@@ -159,7 +159,7 @@ fn insufficient_premium_cannot_activate_an_offer() {
         .writer_send(fixture.create_instruction(terms))
         .unwrap();
     assert!(fixture.holder_send(fixture.activate_instruction()).is_err());
-    assert_eq!(fixture.agreement().status, AgreementStatus::Funded);
+    assert_eq!(fixture.agreement().status, AgreementStatus::Open);
     assert_eq!(fixture.agreement().holder, None);
     assert_eq!(fixture.amount(fixture.reserve), PAYOUT);
     assert_eq!(fixture.amount(fixture.holder_usdc), HOLDER_USDC);

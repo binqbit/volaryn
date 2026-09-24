@@ -30,7 +30,7 @@ export const VOLARYN_ERROR__UNSUPPORTED_VERSION = 0x1775; // 6005
 export const VOLARYN_ERROR__ACCEPTANCE_CLOSED = 0x1776; // 6006
 /** WrongHolder: The signer is not the authorized holder */
 export const VOLARYN_ERROR__WRONG_HOLDER = 0x1777; // 6007
-/** InsufficientReserve: The reserve does not cover the fixed payout */
+/** InsufficientReserve: The reserve does not cover the required escrow */
 export const VOLARYN_ERROR__INSUFFICIENT_RESERVE = 0x1778; // 6008
 /** Expired: The agreement has expired */
 export const VOLARYN_ERROR__EXPIRED = 0x1779; // 6009
@@ -46,6 +46,12 @@ export const VOLARYN_ERROR__ARITHMETIC_OVERFLOW = 0x177d; // 6013
 export const VOLARYN_ERROR__INVALID_SETTLEMENT_CURRENCY = 0x177e; // 6014
 /** WriterCannotBeHolder: The writer cannot be the protection holder */
 export const VOLARYN_ERROR__WRITER_CANNOT_BE_HOLDER = 0x177f; // 6015
+/** WrongOfferSide: This acceptance instruction does not match the offer side */
+export const VOLARYN_ERROR__WRONG_OFFER_SIDE = 0x1780; // 6016
+/** WrongCounterparty: The signer is not the designated counterparty */
+export const VOLARYN_ERROR__WRONG_COUNTERPARTY = 0x1781; // 6017
+/** UnauthorizedActor: The signer is not authorized for this agreement action */
+export const VOLARYN_ERROR__UNAUTHORIZED_ACTOR = 0x1782; // 6018
 
 export type VolarynError =
   | typeof VOLARYN_ERROR__ACCEPTANCE_CLOSED
@@ -59,11 +65,14 @@ export type VolarynError =
   | typeof VOLARYN_ERROR__INVALID_STATE
   | typeof VOLARYN_ERROR__INVALID_TERMS
   | typeof VOLARYN_ERROR__NOT_EXPIRED
+  | typeof VOLARYN_ERROR__UNAUTHORIZED_ACTOR
   | typeof VOLARYN_ERROR__UNAUTHORIZED_INITIALIZER
   | typeof VOLARYN_ERROR__UNSUPPORTED_MINT
   | typeof VOLARYN_ERROR__UNSUPPORTED_VERSION
   | typeof VOLARYN_ERROR__WRITER_CANNOT_BE_HOLDER
-  | typeof VOLARYN_ERROR__WRONG_HOLDER;
+  | typeof VOLARYN_ERROR__WRONG_COUNTERPARTY
+  | typeof VOLARYN_ERROR__WRONG_HOLDER
+  | typeof VOLARYN_ERROR__WRONG_OFFER_SIDE;
 
 let volarynErrorMessages: Record<VolarynError, string> | undefined;
 if (process.env["NODE_ENV"] !== "production") {
@@ -73,17 +82,20 @@ if (process.env["NODE_ENV"] !== "production") {
     [VOLARYN_ERROR__EXPIRED]: `The agreement has expired`,
     [VOLARYN_ERROR__INELIGIBLE_ASSET]: `The asset policy is disabled, stale, or does not admit this expiry`,
     [VOLARYN_ERROR__INSUFFICIENT_DELIVERY]: `One holder-owned source account must cover the full gross quantity`,
-    [VOLARYN_ERROR__INSUFFICIENT_RESERVE]: `The reserve does not cover the fixed payout`,
+    [VOLARYN_ERROR__INSUFFICIENT_RESERVE]: `The reserve does not cover the required escrow`,
     [VOLARYN_ERROR__INVALID_SETTLEMENT_ACCOUNT]: `The settlement account has unsafe authorities or extensions`,
     [VOLARYN_ERROR__INVALID_SETTLEMENT_CURRENCY]: `The settlement currency must use the configured six-decimal SPL mint`,
     [VOLARYN_ERROR__INVALID_STATE]: `The agreement is in the wrong state`,
     [VOLARYN_ERROR__INVALID_TERMS]: `Amounts must be positive and deadlines must be ordered`,
     [VOLARYN_ERROR__NOT_EXPIRED]: `The agreement has not expired`,
+    [VOLARYN_ERROR__UNAUTHORIZED_ACTOR]: `The signer is not authorized for this agreement action`,
     [VOLARYN_ERROR__UNAUTHORIZED_INITIALIZER]: `Only the deployment upgrade authority can initialize the protocol`,
     [VOLARYN_ERROR__UNSUPPORTED_MINT]: `The mint has unsupported extensions or is paused`,
     [VOLARYN_ERROR__UNSUPPORTED_VERSION]: `The agreement version is unsupported`,
     [VOLARYN_ERROR__WRITER_CANNOT_BE_HOLDER]: `The writer cannot be the protection holder`,
+    [VOLARYN_ERROR__WRONG_COUNTERPARTY]: `The signer is not the designated counterparty`,
     [VOLARYN_ERROR__WRONG_HOLDER]: `The signer is not the authorized holder`,
+    [VOLARYN_ERROR__WRONG_OFFER_SIDE]: `This acceptance instruction does not match the offer side`,
   };
 }
 

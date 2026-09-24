@@ -316,7 +316,7 @@ export function App({ deployment }: { deployment: Deployment }) {
       )}
       <footer>
         <span>Volaryn.</span>
-        <p>Fully funded exit rights. Your choice to exercise.</p>
+        <p>Protection starts with a fully reserved payout. Your choice to exercise.</p>
         <Link to="/offers">Explore offers ↗</Link>
       </footer>
     </div>

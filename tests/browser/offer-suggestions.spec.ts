@@ -12,6 +12,7 @@ const utcInput = (seconds: number) => new Date(seconds * 1000).toISOString().sli
 async function openForm(page: Page) {
   await page.goto('/offers/new');
   await switchWallet(page, 'writer');
+  await page.getByRole('button', { name: 'Provide protection', exact: true }).click();
   await selectAsset(page, 'OPENAI');
   const form = page.getByRole('form', { name: 'Create an offer' });
   return form;

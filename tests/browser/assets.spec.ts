@@ -86,6 +86,7 @@ test('creation and signing review identify the selected PreStocks replica and wa
   });
   await page.goto('/offers/new');
   await connectWallet(page, 'Test Wallet 2');
+  await page.getByRole('button', { name: 'Provide protection', exact: true }).click();
   await selectAsset(page, 'ANTHROPIC');
   await page.getByLabel('Gross quantity (unscaled tokens)', { exact: true }).fill('0.000000001');
   await page.getByRole('button', { name: 'Review funded offer' }).click();

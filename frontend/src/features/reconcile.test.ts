@@ -9,6 +9,7 @@ import {
 } from '@solana/kit';
 import {
   AgreementStatus,
+  OfferSide,
   getAgreementEncoder,
   protocolAddresses,
   VOLARYN_PROGRAM_ADDRESS,
@@ -23,14 +24,28 @@ async function fixture({
   status = AgreementStatus.Active as AgreementStatus,
   activated = true,
   holder = owner as Address,
-  version = 1,
+  writer = other as Address,
+  side = 'writer' as 'writer' | 'holder',
+  version = 2,
   program = VOLARYN_PROGRAM_ADDRESS as Address,
   history = null as unknown,
   height = 101,
   operation = 'activate' as Operation,
 } = {}) {
-  const accounts = await protocolAddresses(owner, owner, 1n);
+  const creator = side === 'holder' ? holder : writer;
+  const accounts = await protocolAddresses(owner, creator, 1n);
   const pending: PendingTransaction = {
+    side,
+    actorRole:
+      operation === 'activate'
+        ? side === 'holder'
+          ? 'writer'
+          : 'holder'
+        : operation === 'create' || operation === 'cancel'
+          ? side
+          : operation === 'exercise'
+            ? 'holder'
+            : 'writer',
     signature: '1'.repeat(64),
     lastValidBlockHeight: '100',
     owner,
@@ -40,10 +55,12 @@ async function fixture({
   const bytes = getAgreementEncoder().encode({
     version,
     bump: 1,
-    writer: owner,
+    creator,
+    side: side === 'holder' ? OfferSide.Holder : OfferSide.Writer,
+    writer: status === AgreementStatus.Open && side === 'holder' ? none() : some(writer),
     nonce: 1n,
-    designatedHolder: none(),
-    holder: some(holder),
+    designatedCounterparty: none(),
+    holder: status === AgreementStatus.Open && side === 'writer' ? none() : some(holder),
     underlyingMint: owner,
     underlyingProgram: other,
     underlyingDecimals: 6,
@@ -107,7 +124,7 @@ async function fixture({
 
 describe('expired action reconciliation', () => {
   it.each([
-    { status: AgreementStatus.Funded, activated: false, expected: 'expired' },
+    { status: AgreementStatus.Open, activated: false, expected: 'expired' },
     { status: AgreementStatus.Cancelled, activated: false, expected: 'expired' },
     { status: AgreementStatus.Active, expected: 'reconciled' },
     { status: AgreementStatus.Exercised, expected: 'reconciled' },
@@ -120,7 +137,7 @@ describe('expired action reconciliation', () => {
     { status: AgreementStatus.Active, expected: 'expired' },
     { status: AgreementStatus.Expired, expected: 'expired' },
     { status: AgreementStatus.Exercised, expected: 'reconciled' },
-    { status: AgreementStatus.Funded, expected: 'unresolved' },
+    { status: AgreementStatus.Open, expected: 'unresolved' },
     { status: AgreementStatus.Exercised, holder: other, expected: 'unresolved' },
   ])(
     'reconciles exercise only for the original holder: $status',
@@ -138,7 +155,7 @@ describe('expired action reconciliation', () => {
     expect(provisional.reads()).toBe(0);
   });
   it('rejects unsupported versions and wrong program ownership', async () => {
-    for (const options of [{ version: 2 }, { program: other }]) {
+    for (const options of [{ version: 3 }, { program: other }]) {
       const { rpc, pending } = await fixture(options);
       await expect(observeAction(rpc, pending)).rejects.toThrow(
         'Agreement identity is unsupported',
@@ -155,13 +172,14 @@ describe('writer action reconciliation', () => {
     { operation: 'reclaim' as const, status: AgreementStatus.Active, expected: 'expired' },
     { operation: 'cleanup' as const, status: AgreementStatus.Exercised, expected: 'unresolved' },
   ])('checks $operation against terminal chain state $status', async ({ expected, ...options }) => {
-    const { rpc, pending } = await fixture(options);
+    const { rpc, pending } = await fixture({ ...options, writer: owner, holder: other });
     expect(await observeAction(rpc, pending)).toBe(expected);
   });
   it('reconciles creation only when immutable terms match the saved request', async () => {
-    const { rpc, pending } = await fixture({ operation: 'create' });
+    const { rpc, pending } = await fixture({ operation: 'create', writer: owner, holder: other });
     expect(await observeAction(rpc, pending)).toBe('unresolved');
     pending.createdTerms = {
+      side: 'writer',
       nonce: '1',
       underlyingMint: owner,
       quantityRaw: '10',
@@ -169,13 +187,74 @@ describe('writer action reconciliation', () => {
       premium: '1',
       acceptBefore: '1000',
       expiresAt: '2000',
-      designatedHolder: null,
+      designatedCounterparty: null,
     };
     expect(await observeAction(rpc, pending)).toBe('reconciled');
     pending.createdTerms.underlyingMint = other;
     expect(await observeAction(rpc, pending)).toBe('unresolved');
     pending.createdTerms.underlyingMint = owner;
     pending.createdTerms.payout = '21';
+    expect(await observeAction(rpc, pending)).toBe('unresolved');
+  });
+});
+
+describe('holder-origin recovery', () => {
+  it.each([
+    { status: AgreementStatus.Open, activated: false, expected: 'expired' },
+    { status: AgreementStatus.Cancelled, activated: false, expected: 'expired' },
+    { status: AgreementStatus.Active, expected: 'reconciled' },
+    { status: AgreementStatus.Exercised, expected: 'reconciled' },
+    { status: AgreementStatus.Expired, expected: 'reconciled' },
+  ])(
+    'proves acceptance from the assigned provider in state $status',
+    async ({ expected, ...options }) => {
+      const { rpc, pending } = await fixture({
+        ...options,
+        side: 'holder',
+        writer: owner,
+        holder: other,
+      });
+      expect(pending.actorRole).toBe('writer');
+      expect(await observeAction(rpc, pending)).toBe(expected);
+    },
+  );
+
+  it('does not attribute another provider’s acceptance to the requester', async () => {
+    const { rpc, pending } = await fixture({ side: 'holder', holder: owner, writer: other });
+    expect(await observeAction(rpc, pending)).toBe('expired');
+  });
+
+  it('recovers a requester cancellation without assigning a writer', async () => {
+    const { rpc, pending } = await fixture({
+      side: 'holder',
+      status: AgreementStatus.Cancelled,
+      operation: 'cancel',
+      activated: false,
+    });
+    expect(pending.actorRole).toBe('holder');
+    expect(await observeAction(rpc, pending)).toBe('reconciled');
+  });
+
+  it('proves holder creation using immutable creator, side and complete terms', async () => {
+    const { rpc, pending } = await fixture({
+      side: 'holder',
+      status: AgreementStatus.Open,
+      activated: false,
+      operation: 'create',
+    });
+    pending.createdTerms = {
+      side: 'holder',
+      nonce: '1',
+      underlyingMint: owner,
+      quantityRaw: '10',
+      payout: '20',
+      premium: '1',
+      acceptBefore: '1000',
+      expiresAt: '2000',
+      designatedCounterparty: null,
+    };
+    expect(await observeAction(rpc, pending)).toBe('reconciled');
+    pending.createdTerms.side = 'writer';
     expect(await observeAction(rpc, pending)).toBe('unresolved');
   });
 });

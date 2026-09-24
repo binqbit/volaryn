@@ -16,7 +16,7 @@ pub struct Exercise<'info> {
     pub holder: Signer<'info>,
     #[account(
         mut,
-        seeds = [b"agreement", agreement.writer.as_ref(), &agreement.nonce.to_le_bytes()],
+        seeds = [b"agreement", agreement.creator.as_ref(), &agreement.nonce.to_le_bytes()],
         bump = agreement.bump
     )]
     pub agreement: Box<Account<'info, Agreement>>,
@@ -69,6 +69,7 @@ pub fn handle_exercise(ctx: Context<Exercise>) -> Result<()> {
         agreement.holder == Some(ctx.accounts.holder.key()),
         VolarynError::WrongHolder
     );
+    let writer = agreement.writer.ok_or(VolarynError::InvalidState)?;
     let now = Clock::get()?.unix_timestamp;
     require!(now < agreement.expires_at, VolarynError::Expired);
     require!(
@@ -105,7 +106,7 @@ pub fn handle_exercise(ctx: Context<Exercise>) -> Result<()> {
         .ok_or(VolarynError::ArithmeticOverflow)?;
     let nonce = agreement.nonce.to_le_bytes();
     let bump = [agreement.bump];
-    let seeds: &[&[u8]] = &[b"agreement", agreement.writer.as_ref(), &nonce, &bump];
+    let seeds: &[&[u8]] = &[b"agreement", agreement.creator.as_ref(), &nonce, &bump];
     token::transfer(
         &ctx.accounts.usdc_program.to_account_info(),
         &ctx.accounts.reserve.to_account_info(),
@@ -120,7 +121,7 @@ pub fn handle_exercise(ctx: Context<Exercise>) -> Result<()> {
         &ctx.accounts.underlying_program.to_account_info(),
         &ctx.accounts.settlement.to_account_info(),
         &agreement.to_account_info(),
-        &agreement.writer,
+        &writer,
         &[seeds],
     )?;
     let agreement = &mut ctx.accounts.agreement;

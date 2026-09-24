@@ -10,14 +10,14 @@ import { VOLARYN_PROGRAM_ADDRESS } from './generated';
 const text = new TextEncoder();
 const encode = getAddressEncoder();
 
-export async function protocolAddresses(mint: Address, writer: Address, nonce: bigint) {
+export async function protocolAddresses(mint: Address, creator: Address, nonce: bigint) {
   const pda = async (seeds: readonly Uint8Array[]) =>
     (
       await getProgramDerivedAddress({ programAddress: VOLARYN_PROGRAM_ADDRESS, seeds: [...seeds] })
     )[0];
   const agreement = await pda([
     text.encode('agreement'),
-    new Uint8Array(encode.encode(writer)),
+    new Uint8Array(encode.encode(creator)),
     new Uint8Array(getU64Encoder().encode(nonce)),
   ]);
   return {

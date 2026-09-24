@@ -8,6 +8,7 @@ use crate::{
     adapters::activity as store,
     application::Application,
     domain::{now, AppError},
+    observations::{AgreementView, OfferSide},
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -40,6 +41,7 @@ pub enum Status {
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct Terms {
+    pub side: OfferSide,
     pub underlying_mint: String,
     pub nonce: String,
     pub quantity_raw: String,
@@ -47,7 +49,7 @@ pub struct Terms {
     pub premium: String,
     pub accept_before: String,
     pub expires_at: String,
-    pub designated_holder: Option<String>,
+    pub designated_counterparty: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
@@ -58,6 +60,8 @@ pub struct Activity {
     pub owner: String,
     pub agreement: String,
     pub operation: Operation,
+    pub side: OfferSide,
+    pub actor_role: OfferSide,
     pub created_terms: Option<Terms>,
     pub last_valid_block_height: String,
     pub status: Status,
@@ -92,30 +96,29 @@ impl Application {
         if store::find(&self.pool, &intent.signature).await?.is_some() {
             return Ok(());
         }
+        let (side, actor_role, mint) = if let Some(terms) = &intent.created_terms {
+            (terms.side, terms.side, terms.underlying_mint.clone())
+        } else {
+            let (_, agreements) = self
+                .chain
+                .agreement_batch(&self.deployment, std::slice::from_ref(&intent.agreement), 0)
+                .await?;
+            let agreement = agreements.first().ok_or(AppError::NotFound)?;
+            (
+                agreement.side,
+                actor_role(&intent, agreement)?,
+                agreement.underlying_mint.clone(),
+            )
+        };
         if self.deployment.mode == "mainnet"
             && matches!(intent.operation, Operation::Create | Operation::Activate)
-        {
-            let mint = if let Some(terms) = &intent.created_terms {
-                terms.underlying_mint.clone()
-            } else {
-                let (_, agreements) = self
-                    .chain
-                    .agreement_batch(&self.deployment, std::slice::from_ref(&intent.agreement), 0)
-                    .await?;
-                agreements
-                    .first()
-                    .ok_or(AppError::NotFound)?
-                    .underlying_mint
-                    .clone()
-            };
-            if !self
+            && !self
                 .chain
                 .admission(&self.deployment, &mint)
                 .await?
                 .new_commitments
-            {
-                return Err(AppError::Invalid);
-            }
+        {
+            return Err(AppError::Invalid);
         }
         // Establish a server-observed upper lifetime bound, never a client-supplied height.
         let valid = self
@@ -187,6 +190,8 @@ impl Application {
                 owner: intent.owner,
                 agreement: intent.agreement,
                 operation: intent.operation,
+                side,
+                actor_role,
                 created_terms: intent.created_terms,
                 last_valid_block_height: height.to_string(),
                 status: Status::Pending,
@@ -219,4 +224,44 @@ impl Application {
         self.ensure_chain().await?;
         reconcile::refresh(&self.chain, &self.pool, &self.deployment).await
     }
+}
+
+fn actor_role(intent: &decode::Intent, agreement: &AgreementView) -> Result<OfferSide, AppError> {
+    let owner = intent.owner.as_str();
+    let role = match intent.operation {
+        Operation::Create => return Err(AppError::Invalid),
+        Operation::Activate => {
+            let role = agreement.side.counterparty();
+            if intent.accepting_role != Some(role)
+                || owner == agreement.creator
+                || agreement
+                    .designated_counterparty
+                    .as_deref()
+                    .is_some_and(|key| key != owner)
+            {
+                return Err(AppError::Invalid);
+            }
+            let assigned = match role {
+                OfferSide::Writer => agreement.writer.as_deref(),
+                OfferSide::Holder => agreement.holder.as_deref(),
+            };
+            if assigned.is_some_and(|key| key != owner) {
+                return Err(AppError::Invalid);
+            }
+            role
+        }
+        Operation::Cancel if owner == agreement.creator => agreement.side,
+        Operation::Exercise if agreement.holder.as_deref() == Some(owner) => OfferSide::Holder,
+        Operation::Reclaim if agreement.writer.as_deref() == Some(owner) => OfferSide::Writer,
+        Operation::Cleanup if agreement.status == "cancelled" && owner == agreement.creator => {
+            agreement.side
+        }
+        Operation::Cleanup
+            if agreement.status != "cancelled" && agreement.writer.as_deref() == Some(owner) =>
+        {
+            OfferSide::Writer
+        }
+        _ => return Err(AppError::Invalid),
+    };
+    Ok(role)
 }

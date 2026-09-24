@@ -5,7 +5,11 @@ mod support;
 #[path = "support/agreement.rs"]
 mod agreement;
 
-use volaryn_backend::adapters::store;
+use volaryn_backend::{
+    activity::{Activity, Operation, Status, Terms},
+    adapters::{activity, store},
+    observations::OfferSide,
+};
 
 #[tokio::test]
 async fn migrations_preserve_identity_and_exact_amounts_across_restart() {
@@ -33,6 +37,40 @@ async fn migrations_preserve_identity_and_exact_amounts_across_restart() {
     store::upsert(&pool, &[agreement], u64::MAX, 1)
         .await
         .unwrap();
+    for side in [OfferSide::Writer, OfferSide::Holder] {
+        activity::insert(
+            &pool,
+            &Activity {
+                id: String::new(),
+                signature: format!("{}-creation", side.as_str()),
+                owner: format!("{}-creator", side.as_str()),
+                agreement: format!("{}-agreement", side.as_str()),
+                operation: Operation::Create,
+                side,
+                actor_role: side,
+                created_terms: Some(Terms {
+                    side,
+                    underlying_mint: "mint".into(),
+                    nonce: u64::MAX.to_string(),
+                    quantity_raw: u64::MAX.to_string(),
+                    payout: u64::MAX.to_string(),
+                    premium: "1".into(),
+                    accept_before: "100".into(),
+                    expires_at: "200".into(),
+                    designated_counterparty: None,
+                }),
+                last_valid_block_height: u64::MAX.to_string(),
+                status: Status::Pending,
+                created_at: 1,
+                updated_at: 1,
+            },
+        )
+        .await
+        .unwrap();
+    }
+    activity::update(&pool, "holder-creation", Status::Finalized)
+        .await
+        .unwrap();
     pool.close().await;
     let pool = store::open(database.options.clone(), &deployment)
         .await
@@ -43,6 +81,26 @@ async fn migrations_preserve_identity_and_exact_amounts_across_restart() {
         .items;
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].quantity_raw, "18446744073709551615");
+    for side in [OfferSide::Writer, OfferSide::Holder] {
+        let receipt = activity::find(&pool, &format!("{}-creation", side.as_str()))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(receipt.side, side);
+        assert_eq!(receipt.actor_role, side);
+        assert_eq!(receipt.last_valid_block_height, u64::MAX.to_string());
+        let terms = receipt.created_terms.unwrap();
+        assert_eq!(terms.side, side);
+        assert_eq!(terms.payout, u64::MAX.to_string());
+        assert_eq!(
+            receipt.status,
+            if side == OfferSide::Holder {
+                Status::Finalized
+            } else {
+                Status::Pending
+            }
+        );
+    }
     let (slot,): (String,) = sqlx::query_as("SELECT finalized_slot::TEXT FROM reconciliation")
         .fetch_one(&pool)
         .await

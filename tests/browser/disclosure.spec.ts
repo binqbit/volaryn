@@ -83,11 +83,12 @@ test('creation shows wallet information directly while holder restrictions remai
   ];
   await page.goto('/offers/new');
   await connectWallet(page, 'Test Wallet 2');
+  await page.getByRole('button', { name: 'Provide protection', exact: true }).click();
   await selectAsset(page, 'OPENAI');
   const form = page.getByRole('form', { name: 'Create an offer' });
   const wallet = page.getByRole('region', { name: 'Your wallet' });
   const restriction = form.locator('summary').filter({ hasText: 'Restrict to a wallet' });
-  const designated = form.getByLabel('Designated holder (optional)');
+  const designated = form.getByLabel('Designated counterparty (optional)');
   await expect(designated).not.toBeVisible();
   await expect(form.getByLabel('Acceptance deadline (UTC)')).toBeVisible();
   await expect(form.getByLabel('Protection expiry (UTC)')).toBeVisible();

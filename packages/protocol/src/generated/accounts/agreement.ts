@@ -49,8 +49,12 @@ import {
 import {
   getAgreementStatusDecoder,
   getAgreementStatusEncoder,
+  getOfferSideDecoder,
+  getOfferSideEncoder,
   type AgreementStatus,
   type AgreementStatusArgs,
+  type OfferSide,
+  type OfferSideArgs,
 } from "../types";
 
 export const AGREEMENT_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([
@@ -65,9 +69,11 @@ export type Agreement = {
   discriminator: ReadonlyUint8Array;
   version: number;
   bump: number;
-  writer: Address;
+  creator: Address;
+  side: OfferSide;
   nonce: bigint;
-  designatedHolder: Option<Address>;
+  designatedCounterparty: Option<Address>;
+  writer: Option<Address>;
   holder: Option<Address>;
   underlyingMint: Address;
   underlyingProgram: Address;
@@ -91,9 +97,11 @@ export type Agreement = {
 export type AgreementArgs = {
   version: number;
   bump: number;
-  writer: Address;
+  creator: Address;
+  side: OfferSideArgs;
   nonce: number | bigint;
-  designatedHolder: OptionOrNullable<Address>;
+  designatedCounterparty: OptionOrNullable<Address>;
+  writer: OptionOrNullable<Address>;
   holder: OptionOrNullable<Address>;
   underlyingMint: Address;
   underlyingProgram: Address;
@@ -121,9 +129,11 @@ export function getAgreementEncoder(): Encoder<AgreementArgs> {
       ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
       ["version", getU8Encoder()],
       ["bump", getU8Encoder()],
-      ["writer", getAddressEncoder()],
+      ["creator", getAddressEncoder()],
+      ["side", getOfferSideEncoder()],
       ["nonce", getU64Encoder()],
-      ["designatedHolder", getOptionEncoder(getAddressEncoder())],
+      ["designatedCounterparty", getOptionEncoder(getAddressEncoder())],
+      ["writer", getOptionEncoder(getAddressEncoder())],
       ["holder", getOptionEncoder(getAddressEncoder())],
       ["underlyingMint", getAddressEncoder()],
       ["underlyingProgram", getAddressEncoder()],
@@ -152,9 +162,11 @@ export function getAgreementDecoder(): Decoder<Agreement> {
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
     ["version", getU8Decoder()],
     ["bump", getU8Decoder()],
-    ["writer", getAddressDecoder()],
+    ["creator", getAddressDecoder()],
+    ["side", getOfferSideDecoder()],
     ["nonce", getU64Decoder()],
-    ["designatedHolder", getOptionDecoder(getAddressDecoder())],
+    ["designatedCounterparty", getOptionDecoder(getAddressDecoder())],
+    ["writer", getOptionDecoder(getAddressDecoder())],
     ["holder", getOptionDecoder(getAddressDecoder())],
     ["underlyingMint", getAddressDecoder()],
     ["underlyingProgram", getAddressDecoder()],

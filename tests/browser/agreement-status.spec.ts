@@ -17,6 +17,8 @@ test('activation distinguishes pending, finality and the holder’s next action'
     signature: '1'.repeat(64),
     owner: d.localnet!.holder,
     agreement: state.agreement.address,
+    side: 'writer',
+    actorRole: 'holder',
     operation: 'activate',
     createdTerms: null,
     lastValidBlockHeight: '1000',
@@ -129,7 +131,7 @@ for (const scenario of [
       ...state.agreement,
       status: scenario.status,
       holder: scenario.status === 'cancelled' ? null : d.localnet!.holder,
-      designatedHolder: d.localnet!.holder,
+      designatedCounterparty: d.localnet!.holder,
     };
     for (const role of ['writer', 'holder'] as const) {
       state.wallets[d.localnet![role]]!.accounts = [
@@ -183,13 +185,13 @@ test('expiry, reserved offers and public viewing never imply ownership of someon
   state.wallets[d.localnet!.writer]!.accounts = [
     account(d.usdcMint, d.localnet!.writerUsdc, '100000000'),
   ];
-  state.agreement = { ...state.agreement, designatedHolder: d.authority };
+  state.agreement = { ...state.agreement, designatedCounterparty: d.authority };
   await page.goto(`/agreements/${state.agreement.address}`);
   await expect(page.getByLabel('Your agreement role')).toHaveText('Public agreement');
   await switchWallet(page, 'holder');
   await expect(page.getByLabel('Your agreement role')).toHaveText('Your role: viewer');
   await expect(page.getByRole('button', { name: 'Activate protection' })).toHaveCount(0);
-  state.agreement = { ...state.agreement, designatedHolder: d.localnet!.holder };
+  state.agreement = { ...state.agreement, designatedCounterparty: d.localnet!.holder };
   await page.reload();
   await expect(page.getByLabel('Your agreement role')).toHaveText(
     'Reserved for you · not activated',

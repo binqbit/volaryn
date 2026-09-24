@@ -36,6 +36,7 @@ for (const width of [1440, 375, 320]) {
     const navigation = page.getByRole('navigation', { name: 'Main navigation' });
     await navigation.getByRole('link', { name: 'Create offer', exact: true }).click();
     await connectWallet(page, 'Test Wallet 2');
+    await page.getByRole('button', { name: 'Provide protection', exact: true }).click();
     await selectAsset(page, 'OPENAI');
     const balance = page.getByRole('group', { name: 'USDC balance', exact: true });
     await expect(balance).toHaveCount(1);
@@ -123,6 +124,7 @@ test('desktop wallet fits on entry and stays pinned while the form and holdings 
   ];
   await page.goto('/offers/new');
   await connectWallet(page, 'Test Wallet 2');
+  await page.getByRole('button', { name: 'Provide protection', exact: true }).click();
   const wallet = page.getByRole('region', { name: 'Your wallet', exact: true });
   const holdings = wallet.getByRole('region', { name: 'PreStocks demo balances', exact: true });
   await expect(wallet).toHaveAttribute('data-bounded', 'true');

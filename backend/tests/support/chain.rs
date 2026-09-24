@@ -26,6 +26,7 @@ impl Ledger {
         let mut accounts = BTreeMap::new();
         let mut addresses = Vec::new();
         let writer = Pubkey::new_unique();
+        let holder = Pubkey::new_unique();
         for nonce in 0..count {
             let (key, bump) = Pubkey::find_program_address(
                 &[b"agreement", writer.as_ref(), &nonce.to_le_bytes()],
@@ -33,12 +34,14 @@ impl Ledger {
             );
             let active = nonce == 0;
             let agreement = Agreement {
-                version: 1,
+                version: 2,
                 bump,
-                writer,
+                creator: writer,
+                side: volaryn::state::OfferSide::Writer,
+                writer: Some(writer),
                 nonce,
-                designated_holder: None,
-                holder: Some(writer),
+                designated_counterparty: None,
+                holder: Some(holder),
                 underlying_mint: Pubkey::new_from_array([6; 32]),
                 underlying_program: anchor_spl::token_2022::ID,
                 underlying_decimals: 9,

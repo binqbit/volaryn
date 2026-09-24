@@ -6,7 +6,7 @@ use crate::support::{
 use anchor_lang::prelude::Pubkey;
 use solana_instruction::Instruction;
 use solana_signer::Signer;
-use volaryn::AgreementStatus;
+use volaryn::{AgreementStatus, OfferSide};
 
 #[derive(Clone, Copy, Debug)]
 enum Actor {
@@ -131,7 +131,7 @@ fn creation_rejects_unowned_funding_wrong_programs_and_mismatched_pdas_atomicall
     ix.accounts[0].is_signer = false;
     reject_unchanged(&mut fixture, ix, Actor::Holder, &[]);
     fixture.create();
-    assert_eq!(fixture.agreement().status, AgreementStatus::Funded);
+    assert_eq!(fixture.agreement().status, AgreementStatus::Open);
 }
 
 #[test]
@@ -231,59 +231,74 @@ fn refunds_and_terminal_cleanup_cannot_be_taken_over_or_redirected() {
 
 #[test]
 fn illegal_lifecycle_transitions_and_terminal_replays_preserve_all_accounts() {
-    use AgreementStatus::{Active, Cancelled, Exercised, Expired, Funded};
-    for status in [Funded, Active, Exercised, Cancelled, Expired] {
-        let mut fixture = Fixture::new(AssetFixture::Plain);
-        fixture.create();
-        if matches!(status, Active | Exercised | Expired) {
-            fixture.activate();
-        }
-        match status {
-            Exercised => {
-                fixture.holder_send(fixture.exercise_instruction()).unwrap();
+    use AgreementStatus::{Active, Cancelled, Exercised, Expired, Open};
+    for side in [OfferSide::Writer, OfferSide::Holder] {
+        for status in [Open, Active, Exercised, Cancelled, Expired] {
+            let mut fixture = match side {
+                OfferSide::Writer => Fixture::new(AssetFixture::Plain),
+                OfferSide::Holder => Fixture::request(AssetFixture::Plain),
+            };
+            fixture.create();
+            if matches!(status, Active | Exercised | Expired) {
+                fixture.activate();
             }
-            Cancelled | Expired => {
-                if status == Expired {
-                    fixture.time(NOW + 200);
+            match status {
+                Exercised => {
+                    fixture.holder_send(fixture.exercise_instruction()).unwrap();
                 }
-                fixture
-                    .writer_send(fixture.refund_instruction(status == Expired))
-                    .unwrap();
+                Cancelled | Expired => {
+                    if status == Expired {
+                        fixture.time(NOW + 200);
+                    }
+                    let ix = fixture.refund_instruction(status == Expired);
+                    if status == Cancelled && side == OfferSide::Holder {
+                        fixture.holder_send(ix).unwrap();
+                    } else {
+                        fixture.writer_send(ix).unwrap();
+                    }
+                }
+                _ => {}
             }
-            _ => {}
-        }
-        assert_eq!(fixture.agreement().status, status);
-        let actions = [
-            (
-                fixture.activate_instruction(),
-                Actor::Holder,
-                status != Funded,
-            ),
-            (
-                fixture.exercise_instruction(),
-                Actor::Holder,
-                status != Active,
-            ),
-            (
-                fixture.refund_instruction(false),
-                Actor::Writer,
-                status != Funded,
-            ),
-            (fixture.refund_instruction(true), Actor::Writer, true),
-            (
-                fixture.cleanup_instruction(),
-                Actor::Writer,
-                matches!(status, Funded | Active),
-            ),
-            (
-                fixture.create_instruction(fixture.terms()),
-                Actor::Writer,
-                true,
-            ),
-        ];
-        for (ix, actor, invalid) in actions {
-            if invalid {
-                reject_unchanged(&mut fixture, ix, actor, &[]);
+            assert_eq!(fixture.agreement().status, status);
+            let creator = if side == OfferSide::Holder {
+                Actor::Holder
+            } else {
+                Actor::Writer
+            };
+            let cleanup_actor = if status == Cancelled {
+                creator
+            } else {
+                Actor::Writer
+            };
+            let actions = [
+                (
+                    fixture.activate_instruction(),
+                    Actor::Holder,
+                    status != Open || side != OfferSide::Writer,
+                ),
+                (
+                    fixture.accept_request_instruction(),
+                    Actor::Writer,
+                    status != Open || side != OfferSide::Holder,
+                ),
+                (
+                    fixture.exercise_instruction(),
+                    Actor::Holder,
+                    status != Active,
+                ),
+                (fixture.refund_instruction(false), creator, status != Open),
+                (fixture.refund_instruction(true), Actor::Writer, true),
+                (
+                    fixture.cleanup_instruction(),
+                    cleanup_actor,
+                    matches!(status, Open | Active),
+                ),
+                (fixture.create_instruction(fixture.terms()), creator, true),
+            ];
+            for (ix, actor, invalid) in actions {
+                if invalid {
+                    reject_unchanged(&mut fixture, ix, actor, &[]);
+                }
             }
         }
     }

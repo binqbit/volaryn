@@ -1,5 +1,5 @@
 use super::{Operation, Terms};
-use crate::domain::AppError;
+use crate::{domain::AppError, observations::OfferSide};
 use anchor_lang::{prelude::Pubkey, AnchorDeserialize, Discriminator};
 use base64::{engine::general_purpose::STANDARD, Engine};
 use bincode::Options;
@@ -11,6 +11,7 @@ pub(super) struct Intent {
     pub owner: String,
     pub agreement: String,
     pub operation: Operation,
+    pub accepting_role: Option<OfferSide>,
     pub created_terms: Option<Terms>,
     pub blockhash: String,
 }
@@ -62,7 +63,9 @@ pub(super) fn decode(params: &Value) -> Result<Option<Intent>, AppError> {
         let (operation, position) =
             if data.starts_with(volaryn::instruction::CreateOffer::DISCRIMINATOR) {
                 (Operation::Create, 6)
-            } else if data == volaryn::instruction::Activate::DISCRIMINATOR {
+            } else if data == volaryn::instruction::Activate::DISCRIMINATOR
+                || data == volaryn::instruction::AcceptRequest::DISCRIMINATOR
+            {
                 (Operation::Activate, 1)
             } else if data == volaryn::instruction::Exercise::DISCRIMINATOR {
                 (Operation::Exercise, 1)
@@ -87,9 +90,9 @@ pub(super) fn decode(params: &Value) -> Result<Option<Intent>, AppError> {
         let created_terms = if operation == Operation::Create {
             let terms = volaryn::state::OfferTerms::try_from_slice(&data[8..])
                 .map_err(|_| AppError::Invalid)?;
-            let writer = owner.parse::<Pubkey>().map_err(|_| AppError::Invalid)?;
+            let creator = owner.parse::<Pubkey>().map_err(|_| AppError::Invalid)?;
             let expected = Pubkey::find_program_address(
-                &[b"agreement", writer.as_ref(), &terms.nonce.to_le_bytes()],
+                &[b"agreement", creator.as_ref(), &terms.nonce.to_le_bytes()],
                 &volaryn::ID,
             )
             .0;
@@ -98,6 +101,7 @@ pub(super) fn decode(params: &Value) -> Result<Option<Intent>, AppError> {
                 return Err(AppError::Invalid);
             }
             Some(Terms {
+                side: terms.side.into(),
                 underlying_mint: key(*instruction.accounts.get(3).ok_or(AppError::Invalid)?)?,
                 nonce: terms.nonce.to_string(),
                 quantity_raw: terms.quantity_raw.to_string(),
@@ -105,7 +109,7 @@ pub(super) fn decode(params: &Value) -> Result<Option<Intent>, AppError> {
                 premium: terms.premium.to_string(),
                 accept_before: terms.accept_before.to_string(),
                 expires_at: terms.expires_at.to_string(),
-                designated_holder: terms.designated_holder.map(|key| key.to_string()),
+                designated_counterparty: terms.designated_counterparty.map(|key| key.to_string()),
             })
         } else {
             None
@@ -115,6 +119,13 @@ pub(super) fn decode(params: &Value) -> Result<Option<Intent>, AppError> {
             owner,
             agreement,
             operation,
+            accepting_role: if data == volaryn::instruction::Activate::DISCRIMINATOR {
+                Some(OfferSide::Holder)
+            } else if data == volaryn::instruction::AcceptRequest::DISCRIMINATOR {
+                Some(OfferSide::Writer)
+            } else {
+                None
+            },
             created_terms,
             blockhash: message.recent_blockhash.to_string(),
         });

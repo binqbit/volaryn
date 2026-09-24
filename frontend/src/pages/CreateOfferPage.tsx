@@ -27,18 +27,19 @@ export function CreateOfferPage({
       </Link>
       <div className={styles.pageHeading}>
         <div>
-          <p className={styles.eyebrow}>PROVIDE CAPITAL</p>
+          <p className={styles.eyebrow}>SET YOUR TERMS</p>
           <h1>Create an offer</h1>
-          <p>Offer to buy tokens at a fixed payout. Earn a premium for reserving the USDC.</p>
+          <p>Request a funded exit for your tokens, or provide the capital for another holder.</p>
         </div>
       </div>
       {!owner ? (
         <div className={styles.emptyState}>
           <h2>Connect a wallet to create an offer</h2>
           <p>
-            You need USDC for the full payout and SOL for transaction fees.
+            Request protection with an escrowed USDC premium, or provide the full payout. Both need
+            SOL for transaction fees.
             {import.meta.env.MODE === 'localnet' &&
-              ' For the local demonstration, choose Test Wallet 2.'}
+              ' For a local protection request, choose Test Wallet 1.'}
           </p>
           <ConnectWalletButton className={styles.outlineButton}>
             Choose a wallet
@@ -63,9 +64,9 @@ export function CreateOfferPage({
         </div>
       )}
       <p className={styles.note}>
-        You can cancel before acceptance. After activation, the payout stays reserved until the
-        holder exercises or protection expires. Manage your commitments in{' '}
-        <Link to="/portfolio/written">My offers</Link>.
+        You can cancel before acceptance to recover your deposit. After activation, the premium
+        belongs to the provider and the payout stays reserved until exercise or expiry. Track both
+        sides in <Link to="/portfolio">My portfolio</Link>.
       </p>
     </>
   );

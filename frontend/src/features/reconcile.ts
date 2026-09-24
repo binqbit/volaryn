@@ -1,6 +1,7 @@
 import { address, isSome, unwrapOption, signature, type Rpc, type SolanaRpcApi } from '@solana/kit';
 import {
   AgreementStatus,
+  OfferSide,
   fetchMaybeAgreement,
   observeTransaction,
   protocolAddresses,
@@ -30,17 +31,18 @@ export async function observeAction(rpc: Rpc<SolanaRpcApi>, pending: PendingTran
   const agreement = account.data;
   const expected = await protocolAddresses(
     agreement.underlyingMint,
-    agreement.writer,
+    agreement.creator,
     agreement.nonce,
   );
   if (
     account.programAddress !== VOLARYN_PROGRAM_ADDRESS ||
-    agreement.version !== 1 ||
+    agreement.version !== 2 ||
+    (agreement.side === OfferSide.Holder ? 'holder' : 'writer') !== pending.side ||
     expected.agreement !== pending.agreement
   )
     throw new Error('Agreement identity is unsupported');
 
-  if (agreement.writer === pending.owner) {
+  if (agreement.creator === pending.owner) {
     if (pending.operation === 'create') {
       const terms = pending.createdTerms;
       if (!terms) return 'unresolved';
@@ -56,32 +58,40 @@ export async function observeAction(rpc: Rpc<SolanaRpcApi>, pending: PendingTran
         (key) =>
           agreement[key as keyof typeof agreement]?.toString() === terms[key as keyof typeof terms],
       );
-      return matches && unwrapOption(agreement.designatedHolder) === terms.designatedHolder
+      return matches &&
+        terms.side === pending.side &&
+        pending.actorRole === terms.side &&
+        unwrapOption(agreement.designatedCounterparty) === terms.designatedCounterparty
         ? 'reconciled'
         : 'unresolved';
     }
-    if (pending.operation === 'cancel') {
+    if (pending.operation === 'cancel' && pending.actorRole === pending.side) {
       if (agreement.status === AgreementStatus.Cancelled) return 'reconciled';
       return 'expired';
     }
+  }
+  if (unwrapOption(agreement.writer) === pending.owner && pending.actorRole === 'writer') {
     if (pending.operation === 'reclaim') {
       if (agreement.status === AgreementStatus.Expired) return 'reconciled';
       return 'expired';
     }
-    // Cleanup is repeatable and can recover later donations. Current balances
-    // cannot prove whether an earlier cleanup executed; retain unknown outcomes.
-    if (pending.operation === 'cleanup') return 'unresolved';
   }
 
-  // Version 1 never transfers holders or reverses activation/settlement. These
+  // Cleanup is repeatable; an account snapshot cannot prove an earlier recovery.
+  if (pending.operation === 'cleanup') return 'unresolved';
+
+  // Version 2 never transfers parties or reverses activation/settlement. These
   // facts prove the effect, not inclusion of this particular signature.
   if (pending.operation === 'activate') {
+    const acceptingRole = pending.side === 'holder' ? 'writer' : 'holder';
+    if (pending.actorRole !== acceptingRole) return 'unresolved';
     if (!isSome(agreement.activatedAt)) return 'expired';
-    if (isSome(agreement.holder))
-      return agreement.holder.value === pending.owner ? 'reconciled' : 'expired';
+    const participant = unwrapOption(agreement[acceptingRole]);
+    if (participant) return participant === pending.owner ? 'reconciled' : 'expired';
   }
   if (
     pending.operation === 'exercise' &&
+    pending.actorRole === 'holder' &&
     isSome(agreement.holder) &&
     agreement.holder.value === pending.owner
   ) {

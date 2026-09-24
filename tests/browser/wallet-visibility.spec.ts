@@ -103,9 +103,9 @@ test('public agreement ownership and reserved offers never imply personal protec
 
   agreement = {
     ...agreement,
-    status: 'funded',
+    status: 'open',
     holder: null,
-    designatedHolder: config.localnet!.writer,
+    designatedCounterparty: config.localnet!.writer,
   };
   await page.waitForResponse('**/api/agreements/*');
   await expect(

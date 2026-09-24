@@ -54,11 +54,11 @@ export function getCleanupTerminalDiscriminatorBytes(): ReadonlyUint8Array {
 
 export type CleanupTerminalInstruction<
   TProgram extends string = typeof VOLARYN_PROGRAM_ADDRESS,
-  TAccountWriter extends string | AccountMeta<string> = string,
+  TAccountActor extends string | AccountMeta<string> = string,
   TAccountAgreement extends string | AccountMeta<string> = string,
   TAccountUsdcMint extends string | AccountMeta<string> = string,
   TAccountReserve extends string | AccountMeta<string> = string,
-  TAccountWriterUsdc extends string | AccountMeta<string> = string,
+  TAccountActorUsdc extends string | AccountMeta<string> = string,
   TAccountSettlement extends string | AccountMeta<string> = string,
   TAccountUnderlyingProgram extends string | AccountMeta<string> =
     "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb",
@@ -69,10 +69,10 @@ export type CleanupTerminalInstruction<
   InstructionWithData<ReadonlyUint8Array> &
   InstructionWithAccounts<
     [
-      TAccountWriter extends string
-        ? ReadonlySignerAccount<TAccountWriter> &
-            AccountSignerMeta<TAccountWriter>
-        : TAccountWriter,
+      TAccountActor extends string
+        ? ReadonlySignerAccount<TAccountActor> &
+            AccountSignerMeta<TAccountActor>
+        : TAccountActor,
       TAccountAgreement extends string
         ? ReadonlyAccount<TAccountAgreement>
         : TAccountAgreement,
@@ -82,9 +82,9 @@ export type CleanupTerminalInstruction<
       TAccountReserve extends string
         ? WritableAccount<TAccountReserve>
         : TAccountReserve,
-      TAccountWriterUsdc extends string
-        ? WritableAccount<TAccountWriterUsdc>
-        : TAccountWriterUsdc,
+      TAccountActorUsdc extends string
+        ? WritableAccount<TAccountActorUsdc>
+        : TAccountActorUsdc,
       TAccountSettlement extends string
         ? WritableAccount<TAccountSettlement>
         : TAccountSettlement,
@@ -128,43 +128,43 @@ export function getCleanupTerminalInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type CleanupTerminalAsyncInput<
-  TAccountWriter extends InstructionSignerInput = InstructionSignerInput,
+  TAccountActor extends InstructionSignerInput = InstructionSignerInput,
   TAccountAgreement extends InstructionAccountInput = InstructionAccountInput,
   TAccountUsdcMint extends InstructionAccountInput = InstructionAccountInput,
   TAccountReserve extends InstructionAccountInput = InstructionAccountInput,
-  TAccountWriterUsdc extends InstructionAccountInput = InstructionAccountInput,
+  TAccountActorUsdc extends InstructionAccountInput = InstructionAccountInput,
   TAccountSettlement extends InstructionAccountInput = InstructionAccountInput,
   TAccountUnderlyingProgram extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountUsdcProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  writer: TAccountWriter;
+  actor: TAccountActor;
   agreement: TAccountAgreement;
   usdcMint: TAccountUsdcMint;
   reserve?: TAccountReserve;
-  writerUsdc: TAccountWriterUsdc;
+  actorUsdc: TAccountActorUsdc;
   settlement?: TAccountSettlement;
   underlyingProgram?: TAccountUnderlyingProgram;
   usdcProgram?: TAccountUsdcProgram;
 };
 
 export async function getCleanupTerminalInstructionAsync<
-  TAccountWriter extends InstructionSignerInput,
+  TAccountActor extends InstructionSignerInput,
   TAccountAgreement extends InstructionAccountInput,
   TAccountUsdcMint extends InstructionAccountInput,
   TAccountReserve extends InstructionAccountInput,
-  TAccountWriterUsdc extends InstructionAccountInput,
+  TAccountActorUsdc extends InstructionAccountInput,
   TAccountSettlement extends InstructionAccountInput,
   TAccountUnderlyingProgram extends InstructionAccountInput,
   TAccountUsdcProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof VOLARYN_PROGRAM_ADDRESS,
 >(
   input: CleanupTerminalAsyncInput<
-    TAccountWriter,
+    TAccountActor,
     TAccountAgreement,
     TAccountUsdcMint,
     TAccountReserve,
-    TAccountWriterUsdc,
+    TAccountActorUsdc,
     TAccountSettlement,
     TAccountUnderlyingProgram,
     TAccountUsdcProgram
@@ -174,8 +174,8 @@ export async function getCleanupTerminalInstructionAsync<
   CleanupTerminalInstruction<
     TProgramAddress,
     ResolvedInstructionAccountMeta<
-      TAccountWriter,
-      InstructionAccountInputAddress<TAccountWriter>
+      TAccountActor,
+      InstructionAccountInputAddress<TAccountActor>
     >,
     ResolvedInstructionAccountMeta<
       TAccountAgreement,
@@ -190,8 +190,8 @@ export async function getCleanupTerminalInstructionAsync<
       InstructionAccountInputAddress<TAccountReserve>
     >,
     ResolvedInstructionAccountMeta<
-      TAccountWriterUsdc,
-      InstructionAccountInputAddress<TAccountWriterUsdc>
+      TAccountActorUsdc,
+      InstructionAccountInputAddress<TAccountActorUsdc>
     >,
     ResolvedInstructionAccountMeta<
       TAccountSettlement,
@@ -215,7 +215,7 @@ export async function getCleanupTerminalInstructionAsync<
 
   // Original accounts.
   const originalAccounts = {
-    writer: { value: input.writer ?? null, isSigner: true, isWritable: false },
+    actor: { value: input.actor ?? null, isSigner: true, isWritable: false },
     agreement: {
       value: input.agreement ?? null,
       isSigner: false,
@@ -231,8 +231,8 @@ export async function getCleanupTerminalInstructionAsync<
       isSigner: false,
       isWritable: true,
     },
-    writerUsdc: {
-      value: input.writerUsdc ?? null,
+    actorUsdc: {
+      value: input.actorUsdc ?? null,
       isSigner: false,
       isWritable: true,
     },
@@ -291,11 +291,11 @@ export async function getCleanupTerminalInstructionAsync<
 
   return Object.freeze({
     accounts: [
-      getAccountMeta("writer", accounts.writer),
+      getAccountMeta("actor", accounts.actor),
       getAccountMeta("agreement", accounts.agreement),
       getAccountMeta("usdcMint", accounts.usdcMint),
       getAccountMeta("reserve", accounts.reserve),
-      getAccountMeta("writerUsdc", accounts.writerUsdc),
+      getAccountMeta("actorUsdc", accounts.actorUsdc),
       getAccountMeta("settlement", accounts.settlement),
       getAccountMeta("underlyingProgram", accounts.underlyingProgram),
       getAccountMeta("usdcProgram", accounts.usdcProgram),
@@ -305,8 +305,8 @@ export async function getCleanupTerminalInstructionAsync<
   } as CleanupTerminalInstruction<
     TProgramAddress,
     ResolvedInstructionAccountMeta<
-      TAccountWriter,
-      InstructionAccountInputAddress<TAccountWriter>
+      TAccountActor,
+      InstructionAccountInputAddress<TAccountActor>
     >,
     ResolvedInstructionAccountMeta<
       TAccountAgreement,
@@ -321,8 +321,8 @@ export async function getCleanupTerminalInstructionAsync<
       InstructionAccountInputAddress<TAccountReserve>
     >,
     ResolvedInstructionAccountMeta<
-      TAccountWriterUsdc,
-      InstructionAccountInputAddress<TAccountWriterUsdc>
+      TAccountActorUsdc,
+      InstructionAccountInputAddress<TAccountActorUsdc>
     >,
     ResolvedInstructionAccountMeta<
       TAccountSettlement,
@@ -340,43 +340,43 @@ export async function getCleanupTerminalInstructionAsync<
 }
 
 export type CleanupTerminalInput<
-  TAccountWriter extends InstructionSignerInput = InstructionSignerInput,
+  TAccountActor extends InstructionSignerInput = InstructionSignerInput,
   TAccountAgreement extends InstructionAccountInput = InstructionAccountInput,
   TAccountUsdcMint extends InstructionAccountInput = InstructionAccountInput,
   TAccountReserve extends InstructionAccountInput = InstructionAccountInput,
-  TAccountWriterUsdc extends InstructionAccountInput = InstructionAccountInput,
+  TAccountActorUsdc extends InstructionAccountInput = InstructionAccountInput,
   TAccountSettlement extends InstructionAccountInput = InstructionAccountInput,
   TAccountUnderlyingProgram extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountUsdcProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  writer: TAccountWriter;
+  actor: TAccountActor;
   agreement: TAccountAgreement;
   usdcMint: TAccountUsdcMint;
   reserve: TAccountReserve;
-  writerUsdc: TAccountWriterUsdc;
+  actorUsdc: TAccountActorUsdc;
   settlement: TAccountSettlement;
   underlyingProgram?: TAccountUnderlyingProgram;
   usdcProgram?: TAccountUsdcProgram;
 };
 
 export function getCleanupTerminalInstruction<
-  TAccountWriter extends InstructionSignerInput,
+  TAccountActor extends InstructionSignerInput,
   TAccountAgreement extends InstructionAccountInput,
   TAccountUsdcMint extends InstructionAccountInput,
   TAccountReserve extends InstructionAccountInput,
-  TAccountWriterUsdc extends InstructionAccountInput,
+  TAccountActorUsdc extends InstructionAccountInput,
   TAccountSettlement extends InstructionAccountInput,
   TAccountUnderlyingProgram extends InstructionAccountInput,
   TAccountUsdcProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof VOLARYN_PROGRAM_ADDRESS,
 >(
   input: CleanupTerminalInput<
-    TAccountWriter,
+    TAccountActor,
     TAccountAgreement,
     TAccountUsdcMint,
     TAccountReserve,
-    TAccountWriterUsdc,
+    TAccountActorUsdc,
     TAccountSettlement,
     TAccountUnderlyingProgram,
     TAccountUsdcProgram
@@ -385,8 +385,8 @@ export function getCleanupTerminalInstruction<
 ): CleanupTerminalInstruction<
   TProgramAddress,
   ResolvedInstructionAccountMeta<
-    TAccountWriter,
-    InstructionAccountInputAddress<TAccountWriter>
+    TAccountActor,
+    InstructionAccountInputAddress<TAccountActor>
   >,
   ResolvedInstructionAccountMeta<
     TAccountAgreement,
@@ -401,8 +401,8 @@ export function getCleanupTerminalInstruction<
     InstructionAccountInputAddress<TAccountReserve>
   >,
   ResolvedInstructionAccountMeta<
-    TAccountWriterUsdc,
-    InstructionAccountInputAddress<TAccountWriterUsdc>
+    TAccountActorUsdc,
+    InstructionAccountInputAddress<TAccountActorUsdc>
   >,
   ResolvedInstructionAccountMeta<
     TAccountSettlement,
@@ -425,7 +425,7 @@ export function getCleanupTerminalInstruction<
 
   // Original accounts.
   const originalAccounts = {
-    writer: { value: input.writer ?? null, isSigner: true, isWritable: false },
+    actor: { value: input.actor ?? null, isSigner: true, isWritable: false },
     agreement: {
       value: input.agreement ?? null,
       isSigner: false,
@@ -441,8 +441,8 @@ export function getCleanupTerminalInstruction<
       isSigner: false,
       isWritable: true,
     },
-    writerUsdc: {
-      value: input.writerUsdc ?? null,
+    actorUsdc: {
+      value: input.actorUsdc ?? null,
       isSigner: false,
       isWritable: true,
     },
@@ -479,11 +479,11 @@ export function getCleanupTerminalInstruction<
 
   return Object.freeze({
     accounts: [
-      getAccountMeta("writer", accounts.writer),
+      getAccountMeta("actor", accounts.actor),
       getAccountMeta("agreement", accounts.agreement),
       getAccountMeta("usdcMint", accounts.usdcMint),
       getAccountMeta("reserve", accounts.reserve),
-      getAccountMeta("writerUsdc", accounts.writerUsdc),
+      getAccountMeta("actorUsdc", accounts.actorUsdc),
       getAccountMeta("settlement", accounts.settlement),
       getAccountMeta("underlyingProgram", accounts.underlyingProgram),
       getAccountMeta("usdcProgram", accounts.usdcProgram),
@@ -493,8 +493,8 @@ export function getCleanupTerminalInstruction<
   } as CleanupTerminalInstruction<
     TProgramAddress,
     ResolvedInstructionAccountMeta<
-      TAccountWriter,
-      InstructionAccountInputAddress<TAccountWriter>
+      TAccountActor,
+      InstructionAccountInputAddress<TAccountActor>
     >,
     ResolvedInstructionAccountMeta<
       TAccountAgreement,
@@ -509,8 +509,8 @@ export function getCleanupTerminalInstruction<
       InstructionAccountInputAddress<TAccountReserve>
     >,
     ResolvedInstructionAccountMeta<
-      TAccountWriterUsdc,
-      InstructionAccountInputAddress<TAccountWriterUsdc>
+      TAccountActorUsdc,
+      InstructionAccountInputAddress<TAccountActorUsdc>
     >,
     ResolvedInstructionAccountMeta<
       TAccountSettlement,
@@ -533,11 +533,11 @@ export type ParsedCleanupTerminalInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    writer: TAccountMetas[0];
+    actor: TAccountMetas[0];
     agreement: TAccountMetas[1];
     usdcMint: TAccountMetas[2];
     reserve: TAccountMetas[3];
-    writerUsdc: TAccountMetas[4];
+    actorUsdc: TAccountMetas[4];
     settlement: TAccountMetas[5];
     underlyingProgram: TAccountMetas[6];
     usdcProgram: TAccountMetas[7];
@@ -571,11 +571,11 @@ export function parseCleanupTerminalInstruction<
   return {
     programAddress: instruction.programAddress,
     accounts: {
-      writer: getNextAccount(),
+      actor: getNextAccount(),
       agreement: getNextAccount(),
       usdcMint: getNextAccount(),
       reserve: getNextAccount(),
-      writerUsdc: getNextAccount(),
+      actorUsdc: getNextAccount(),
       settlement: getNextAccount(),
       underlyingProgram: getNextAccount(),
       usdcProgram: getNextAccount(),

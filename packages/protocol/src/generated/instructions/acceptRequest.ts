@@ -43,23 +43,25 @@ import {
 import { findReservePda } from "../pdas";
 import { VOLARYN_PROGRAM_ADDRESS } from "../programs";
 
-export const RECLAIM_EXPIRED_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array(
-  [125, 185, 48, 75, 0, 71, 93, 98],
-);
+export const ACCEPT_REQUEST_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([
+  4, 60, 28, 227, 25, 199, 246, 124,
+]);
 
-export function getReclaimExpiredDiscriminatorBytes(): ReadonlyUint8Array {
+export function getAcceptRequestDiscriminatorBytes(): ReadonlyUint8Array {
   return fixEncoderSize(getBytesEncoder(), 8).encode(
-    RECLAIM_EXPIRED_DISCRIMINATOR,
+    ACCEPT_REQUEST_DISCRIMINATOR,
   );
 }
 
-export type ReclaimExpiredInstruction<
+export type AcceptRequestInstruction<
   TProgram extends string = typeof VOLARYN_PROGRAM_ADDRESS,
-  TAccountActor extends string | AccountMeta<string> = string,
+  TAccountWriter extends string | AccountMeta<string> = string,
   TAccountAgreement extends string | AccountMeta<string> = string,
+  TAccountPolicy extends string | AccountMeta<string> = string,
+  TAccountUnderlyingMint extends string | AccountMeta<string> = string,
   TAccountUsdcMint extends string | AccountMeta<string> = string,
   TAccountReserve extends string | AccountMeta<string> = string,
-  TAccountActorUsdc extends string | AccountMeta<string> = string,
+  TAccountWriterUsdc extends string | AccountMeta<string> = string,
   TAccountUsdcProgram extends string | AccountMeta<string> =
     "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -67,22 +69,28 @@ export type ReclaimExpiredInstruction<
   InstructionWithData<ReadonlyUint8Array> &
   InstructionWithAccounts<
     [
-      TAccountActor extends string
-        ? ReadonlySignerAccount<TAccountActor> &
-            AccountSignerMeta<TAccountActor>
-        : TAccountActor,
+      TAccountWriter extends string
+        ? ReadonlySignerAccount<TAccountWriter> &
+            AccountSignerMeta<TAccountWriter>
+        : TAccountWriter,
       TAccountAgreement extends string
         ? WritableAccount<TAccountAgreement>
         : TAccountAgreement,
+      TAccountPolicy extends string
+        ? ReadonlyAccount<TAccountPolicy>
+        : TAccountPolicy,
+      TAccountUnderlyingMint extends string
+        ? ReadonlyAccount<TAccountUnderlyingMint>
+        : TAccountUnderlyingMint,
       TAccountUsdcMint extends string
         ? ReadonlyAccount<TAccountUsdcMint>
         : TAccountUsdcMint,
       TAccountReserve extends string
         ? WritableAccount<TAccountReserve>
         : TAccountReserve,
-      TAccountActorUsdc extends string
-        ? WritableAccount<TAccountActorUsdc>
-        : TAccountActorUsdc,
+      TAccountWriterUsdc extends string
+        ? WritableAccount<TAccountWriterUsdc>
+        : TAccountWriterUsdc,
       TAccountUsdcProgram extends string
         ? ReadonlyAccount<TAccountUsdcProgram>
         : TAccountUsdcProgram,
@@ -90,79 +98,96 @@ export type ReclaimExpiredInstruction<
     ]
   >;
 
-export type ReclaimExpiredInstructionData = {
+export type AcceptRequestInstructionData = {
   discriminator: ReadonlyUint8Array;
 };
 
-export type ReclaimExpiredInstructionDataArgs = {};
+export type AcceptRequestInstructionDataArgs = {};
 
-export function getReclaimExpiredInstructionDataEncoder(): FixedSizeEncoder<ReclaimExpiredInstructionDataArgs> {
+export function getAcceptRequestInstructionDataEncoder(): FixedSizeEncoder<AcceptRequestInstructionDataArgs> {
   return transformEncoder(
     getStructEncoder([["discriminator", fixEncoderSize(getBytesEncoder(), 8)]]),
-    (value) => ({ ...value, discriminator: RECLAIM_EXPIRED_DISCRIMINATOR }),
+    (value) => ({ ...value, discriminator: ACCEPT_REQUEST_DISCRIMINATOR }),
   );
 }
 
-export function getReclaimExpiredInstructionDataDecoder(): FixedSizeDecoder<ReclaimExpiredInstructionData> {
+export function getAcceptRequestInstructionDataDecoder(): FixedSizeDecoder<AcceptRequestInstructionData> {
   return getStructDecoder([
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
   ]);
 }
 
-export function getReclaimExpiredInstructionDataCodec(): FixedSizeCodec<
-  ReclaimExpiredInstructionDataArgs,
-  ReclaimExpiredInstructionData
+export function getAcceptRequestInstructionDataCodec(): FixedSizeCodec<
+  AcceptRequestInstructionDataArgs,
+  AcceptRequestInstructionData
 > {
   return combineCodec(
-    getReclaimExpiredInstructionDataEncoder(),
-    getReclaimExpiredInstructionDataDecoder(),
+    getAcceptRequestInstructionDataEncoder(),
+    getAcceptRequestInstructionDataDecoder(),
   );
 }
 
-export type ReclaimExpiredAsyncInput<
-  TAccountActor extends InstructionSignerInput = InstructionSignerInput,
+export type AcceptRequestAsyncInput<
+  TAccountWriter extends InstructionSignerInput = InstructionSignerInput,
   TAccountAgreement extends InstructionAccountInput = InstructionAccountInput,
+  TAccountPolicy extends InstructionAccountInput = InstructionAccountInput,
+  TAccountUnderlyingMint extends InstructionAccountInput =
+    InstructionAccountInput,
   TAccountUsdcMint extends InstructionAccountInput = InstructionAccountInput,
   TAccountReserve extends InstructionAccountInput = InstructionAccountInput,
-  TAccountActorUsdc extends InstructionAccountInput = InstructionAccountInput,
+  TAccountWriterUsdc extends InstructionAccountInput = InstructionAccountInput,
   TAccountUsdcProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  actor: TAccountActor;
+  writer: TAccountWriter;
   agreement: TAccountAgreement;
+  policy: TAccountPolicy;
+  underlyingMint: TAccountUnderlyingMint;
   usdcMint: TAccountUsdcMint;
   reserve?: TAccountReserve;
-  actorUsdc: TAccountActorUsdc;
+  writerUsdc: TAccountWriterUsdc;
   usdcProgram?: TAccountUsdcProgram;
 };
 
-export async function getReclaimExpiredInstructionAsync<
-  TAccountActor extends InstructionSignerInput,
+export async function getAcceptRequestInstructionAsync<
+  TAccountWriter extends InstructionSignerInput,
   TAccountAgreement extends InstructionAccountInput,
+  TAccountPolicy extends InstructionAccountInput,
+  TAccountUnderlyingMint extends InstructionAccountInput,
   TAccountUsdcMint extends InstructionAccountInput,
   TAccountReserve extends InstructionAccountInput,
-  TAccountActorUsdc extends InstructionAccountInput,
+  TAccountWriterUsdc extends InstructionAccountInput,
   TAccountUsdcProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof VOLARYN_PROGRAM_ADDRESS,
 >(
-  input: ReclaimExpiredAsyncInput<
-    TAccountActor,
+  input: AcceptRequestAsyncInput<
+    TAccountWriter,
     TAccountAgreement,
+    TAccountPolicy,
+    TAccountUnderlyingMint,
     TAccountUsdcMint,
     TAccountReserve,
-    TAccountActorUsdc,
+    TAccountWriterUsdc,
     TAccountUsdcProgram
   >,
   config?: { programAddress?: TProgramAddress },
 ): Promise<
-  ReclaimExpiredInstruction<
+  AcceptRequestInstruction<
     TProgramAddress,
     ResolvedInstructionAccountMeta<
-      TAccountActor,
-      InstructionAccountInputAddress<TAccountActor>
+      TAccountWriter,
+      InstructionAccountInputAddress<TAccountWriter>
     >,
     ResolvedInstructionAccountMeta<
       TAccountAgreement,
       InstructionAccountInputAddress<TAccountAgreement>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPolicy,
+      InstructionAccountInputAddress<TAccountPolicy>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUnderlyingMint,
+      InstructionAccountInputAddress<TAccountUnderlyingMint>
     >,
     ResolvedInstructionAccountMeta<
       TAccountUsdcMint,
@@ -173,8 +198,8 @@ export async function getReclaimExpiredInstructionAsync<
       InstructionAccountInputAddress<TAccountReserve>
     >,
     ResolvedInstructionAccountMeta<
-      TAccountActorUsdc,
-      InstructionAccountInputAddress<TAccountActorUsdc>
+      TAccountWriterUsdc,
+      InstructionAccountInputAddress<TAccountWriterUsdc>
     >,
     ResolvedInstructionAccountMeta<
       TAccountUsdcProgram,
@@ -190,11 +215,17 @@ export async function getReclaimExpiredInstructionAsync<
 
   // Original accounts.
   const originalAccounts = {
-    actor: { value: input.actor ?? null, isSigner: true, isWritable: false },
+    writer: { value: input.writer ?? null, isSigner: true, isWritable: false },
     agreement: {
       value: input.agreement ?? null,
       isSigner: false,
       isWritable: true,
+    },
+    policy: { value: input.policy ?? null, isSigner: false, isWritable: false },
+    underlyingMint: {
+      value: input.underlyingMint ?? null,
+      isSigner: false,
+      isWritable: false,
     },
     usdcMint: {
       value: input.usdcMint ?? null,
@@ -206,8 +237,8 @@ export async function getReclaimExpiredInstructionAsync<
       isSigner: false,
       isWritable: true,
     },
-    actorUsdc: {
-      value: input.actorUsdc ?? null,
+    writerUsdc: {
+      value: input.writerUsdc ?? null,
       isSigner: false,
       isWritable: true,
     },
@@ -241,24 +272,34 @@ export async function getReclaimExpiredInstructionAsync<
 
   return Object.freeze({
     accounts: [
-      getAccountMeta("actor", accounts.actor),
+      getAccountMeta("writer", accounts.writer),
       getAccountMeta("agreement", accounts.agreement),
+      getAccountMeta("policy", accounts.policy),
+      getAccountMeta("underlyingMint", accounts.underlyingMint),
       getAccountMeta("usdcMint", accounts.usdcMint),
       getAccountMeta("reserve", accounts.reserve),
-      getAccountMeta("actorUsdc", accounts.actorUsdc),
+      getAccountMeta("writerUsdc", accounts.writerUsdc),
       getAccountMeta("usdcProgram", accounts.usdcProgram),
     ],
-    data: getReclaimExpiredInstructionDataEncoder().encode({}),
+    data: getAcceptRequestInstructionDataEncoder().encode({}),
     programAddress,
-  } as ReclaimExpiredInstruction<
+  } as AcceptRequestInstruction<
     TProgramAddress,
     ResolvedInstructionAccountMeta<
-      TAccountActor,
-      InstructionAccountInputAddress<TAccountActor>
+      TAccountWriter,
+      InstructionAccountInputAddress<TAccountWriter>
     >,
     ResolvedInstructionAccountMeta<
       TAccountAgreement,
       InstructionAccountInputAddress<TAccountAgreement>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPolicy,
+      InstructionAccountInputAddress<TAccountPolicy>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUnderlyingMint,
+      InstructionAccountInputAddress<TAccountUnderlyingMint>
     >,
     ResolvedInstructionAccountMeta<
       TAccountUsdcMint,
@@ -269,8 +310,8 @@ export async function getReclaimExpiredInstructionAsync<
       InstructionAccountInputAddress<TAccountReserve>
     >,
     ResolvedInstructionAccountMeta<
-      TAccountActorUsdc,
-      InstructionAccountInputAddress<TAccountActorUsdc>
+      TAccountWriterUsdc,
+      InstructionAccountInputAddress<TAccountWriterUsdc>
     >,
     ResolvedInstructionAccountMeta<
       TAccountUsdcProgram,
@@ -279,49 +320,66 @@ export async function getReclaimExpiredInstructionAsync<
   >);
 }
 
-export type ReclaimExpiredInput<
-  TAccountActor extends InstructionSignerInput = InstructionSignerInput,
+export type AcceptRequestInput<
+  TAccountWriter extends InstructionSignerInput = InstructionSignerInput,
   TAccountAgreement extends InstructionAccountInput = InstructionAccountInput,
+  TAccountPolicy extends InstructionAccountInput = InstructionAccountInput,
+  TAccountUnderlyingMint extends InstructionAccountInput =
+    InstructionAccountInput,
   TAccountUsdcMint extends InstructionAccountInput = InstructionAccountInput,
   TAccountReserve extends InstructionAccountInput = InstructionAccountInput,
-  TAccountActorUsdc extends InstructionAccountInput = InstructionAccountInput,
+  TAccountWriterUsdc extends InstructionAccountInput = InstructionAccountInput,
   TAccountUsdcProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  actor: TAccountActor;
+  writer: TAccountWriter;
   agreement: TAccountAgreement;
+  policy: TAccountPolicy;
+  underlyingMint: TAccountUnderlyingMint;
   usdcMint: TAccountUsdcMint;
   reserve: TAccountReserve;
-  actorUsdc: TAccountActorUsdc;
+  writerUsdc: TAccountWriterUsdc;
   usdcProgram?: TAccountUsdcProgram;
 };
 
-export function getReclaimExpiredInstruction<
-  TAccountActor extends InstructionSignerInput,
+export function getAcceptRequestInstruction<
+  TAccountWriter extends InstructionSignerInput,
   TAccountAgreement extends InstructionAccountInput,
+  TAccountPolicy extends InstructionAccountInput,
+  TAccountUnderlyingMint extends InstructionAccountInput,
   TAccountUsdcMint extends InstructionAccountInput,
   TAccountReserve extends InstructionAccountInput,
-  TAccountActorUsdc extends InstructionAccountInput,
+  TAccountWriterUsdc extends InstructionAccountInput,
   TAccountUsdcProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof VOLARYN_PROGRAM_ADDRESS,
 >(
-  input: ReclaimExpiredInput<
-    TAccountActor,
+  input: AcceptRequestInput<
+    TAccountWriter,
     TAccountAgreement,
+    TAccountPolicy,
+    TAccountUnderlyingMint,
     TAccountUsdcMint,
     TAccountReserve,
-    TAccountActorUsdc,
+    TAccountWriterUsdc,
     TAccountUsdcProgram
   >,
   config?: { programAddress?: TProgramAddress },
-): ReclaimExpiredInstruction<
+): AcceptRequestInstruction<
   TProgramAddress,
   ResolvedInstructionAccountMeta<
-    TAccountActor,
-    InstructionAccountInputAddress<TAccountActor>
+    TAccountWriter,
+    InstructionAccountInputAddress<TAccountWriter>
   >,
   ResolvedInstructionAccountMeta<
     TAccountAgreement,
     InstructionAccountInputAddress<TAccountAgreement>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountPolicy,
+    InstructionAccountInputAddress<TAccountPolicy>
+  >,
+  ResolvedInstructionAccountMeta<
+    TAccountUnderlyingMint,
+    InstructionAccountInputAddress<TAccountUnderlyingMint>
   >,
   ResolvedInstructionAccountMeta<
     TAccountUsdcMint,
@@ -332,8 +390,8 @@ export function getReclaimExpiredInstruction<
     InstructionAccountInputAddress<TAccountReserve>
   >,
   ResolvedInstructionAccountMeta<
-    TAccountActorUsdc,
-    InstructionAccountInputAddress<TAccountActorUsdc>
+    TAccountWriterUsdc,
+    InstructionAccountInputAddress<TAccountWriterUsdc>
   >,
   ResolvedInstructionAccountMeta<
     TAccountUsdcProgram,
@@ -348,11 +406,17 @@ export function getReclaimExpiredInstruction<
 
   // Original accounts.
   const originalAccounts = {
-    actor: { value: input.actor ?? null, isSigner: true, isWritable: false },
+    writer: { value: input.writer ?? null, isSigner: true, isWritable: false },
     agreement: {
       value: input.agreement ?? null,
       isSigner: false,
       isWritable: true,
+    },
+    policy: { value: input.policy ?? null, isSigner: false, isWritable: false },
+    underlyingMint: {
+      value: input.underlyingMint ?? null,
+      isSigner: false,
+      isWritable: false,
     },
     usdcMint: {
       value: input.usdcMint ?? null,
@@ -364,8 +428,8 @@ export function getReclaimExpiredInstruction<
       isSigner: false,
       isWritable: true,
     },
-    actorUsdc: {
-      value: input.actorUsdc ?? null,
+    writerUsdc: {
+      value: input.writerUsdc ?? null,
       isSigner: false,
       isWritable: true,
     },
@@ -388,24 +452,34 @@ export function getReclaimExpiredInstruction<
 
   return Object.freeze({
     accounts: [
-      getAccountMeta("actor", accounts.actor),
+      getAccountMeta("writer", accounts.writer),
       getAccountMeta("agreement", accounts.agreement),
+      getAccountMeta("policy", accounts.policy),
+      getAccountMeta("underlyingMint", accounts.underlyingMint),
       getAccountMeta("usdcMint", accounts.usdcMint),
       getAccountMeta("reserve", accounts.reserve),
-      getAccountMeta("actorUsdc", accounts.actorUsdc),
+      getAccountMeta("writerUsdc", accounts.writerUsdc),
       getAccountMeta("usdcProgram", accounts.usdcProgram),
     ],
-    data: getReclaimExpiredInstructionDataEncoder().encode({}),
+    data: getAcceptRequestInstructionDataEncoder().encode({}),
     programAddress,
-  } as ReclaimExpiredInstruction<
+  } as AcceptRequestInstruction<
     TProgramAddress,
     ResolvedInstructionAccountMeta<
-      TAccountActor,
-      InstructionAccountInputAddress<TAccountActor>
+      TAccountWriter,
+      InstructionAccountInputAddress<TAccountWriter>
     >,
     ResolvedInstructionAccountMeta<
       TAccountAgreement,
       InstructionAccountInputAddress<TAccountAgreement>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountPolicy,
+      InstructionAccountInputAddress<TAccountPolicy>
+    >,
+    ResolvedInstructionAccountMeta<
+      TAccountUnderlyingMint,
+      InstructionAccountInputAddress<TAccountUnderlyingMint>
     >,
     ResolvedInstructionAccountMeta<
       TAccountUsdcMint,
@@ -416,8 +490,8 @@ export function getReclaimExpiredInstruction<
       InstructionAccountInputAddress<TAccountReserve>
     >,
     ResolvedInstructionAccountMeta<
-      TAccountActorUsdc,
-      InstructionAccountInputAddress<TAccountActorUsdc>
+      TAccountWriterUsdc,
+      InstructionAccountInputAddress<TAccountWriterUsdc>
     >,
     ResolvedInstructionAccountMeta<
       TAccountUsdcProgram,
@@ -426,36 +500,38 @@ export function getReclaimExpiredInstruction<
   >);
 }
 
-export type ParsedReclaimExpiredInstruction<
+export type ParsedAcceptRequestInstruction<
   TProgram extends string = typeof VOLARYN_PROGRAM_ADDRESS,
   TAccountMetas extends readonly AccountMeta[] = readonly AccountMeta[],
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    actor: TAccountMetas[0];
+    writer: TAccountMetas[0];
     agreement: TAccountMetas[1];
-    usdcMint: TAccountMetas[2];
-    reserve: TAccountMetas[3];
-    actorUsdc: TAccountMetas[4];
-    usdcProgram: TAccountMetas[5];
+    policy: TAccountMetas[2];
+    underlyingMint: TAccountMetas[3];
+    usdcMint: TAccountMetas[4];
+    reserve: TAccountMetas[5];
+    writerUsdc: TAccountMetas[6];
+    usdcProgram: TAccountMetas[7];
   };
-  data: ReclaimExpiredInstructionData;
+  data: AcceptRequestInstructionData;
 };
 
-export function parseReclaimExpiredInstruction<
+export function parseAcceptRequestInstruction<
   TProgram extends string,
   TAccountMetas extends readonly AccountMeta[],
 >(
   instruction: Instruction<TProgram> &
     InstructionWithAccounts<TAccountMetas> &
     InstructionWithData<ReadonlyUint8Array>,
-): ParsedReclaimExpiredInstruction<TProgram, TAccountMetas> {
-  if (instruction.accounts.length < 6) {
+): ParsedAcceptRequestInstruction<TProgram, TAccountMetas> {
+  if (instruction.accounts.length < 8) {
     throw new SolanaError(
       SOLANA_ERROR__PROGRAM_CLIENTS__INSUFFICIENT_ACCOUNT_METAS,
       {
         actualAccountMetas: instruction.accounts.length,
-        expectedAccountMetas: 6,
+        expectedAccountMetas: 8,
       },
     );
   }
@@ -468,13 +544,15 @@ export function parseReclaimExpiredInstruction<
   return {
     programAddress: instruction.programAddress,
     accounts: {
-      actor: getNextAccount(),
+      writer: getNextAccount(),
       agreement: getNextAccount(),
+      policy: getNextAccount(),
+      underlyingMint: getNextAccount(),
       usdcMint: getNextAccount(),
       reserve: getNextAccount(),
-      actorUsdc: getNextAccount(),
+      writerUsdc: getNextAccount(),
       usdcProgram: getNextAccount(),
     },
-    data: getReclaimExpiredInstructionDataDecoder().decode(instruction.data),
+    data: getAcceptRequestInstructionDataDecoder().decode(instruction.data),
   };
 }

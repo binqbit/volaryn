@@ -3,22 +3,24 @@ use crate::domain::{now, AppError};
 use sqlx::{types::Json, PgPool};
 
 const RECEIPT: &str = "jsonb_build_object('id', id::TEXT, 'signature', signature, 'owner', owner,
-    'agreement', agreement, 'operation', operation, 'createdTerms', created_terms,
+    'agreement', agreement, 'operation', operation, 'side', side, 'actorRole', actor_role, 'createdTerms', created_terms,
     'lastValidBlockHeight', last_valid_block_height::TEXT, 'status', status,
     'createdAt', created_at, 'updatedAt', updated_at)";
 
 pub async fn insert(pool: &PgPool, activity: &Activity) -> Result<(), AppError> {
     let operation = serde_json::to_value(&activity.operation).map_err(|_| AppError::Storage)?;
     sqlx::query(
-        "INSERT INTO activity (signature, owner, agreement, operation, created_terms,
+        "INSERT INTO activity (signature, owner, agreement, operation, side, actor_role, created_terms,
                               last_valid_block_height, status, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6::TEXT::NUMERIC, 'pending', $7, $7)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8::TEXT::NUMERIC, 'pending', $9, $9)
          ON CONFLICT (signature) DO NOTHING",
     )
     .bind(&activity.signature)
     .bind(&activity.owner)
     .bind(&activity.agreement)
     .bind(operation.as_str().ok_or(AppError::Storage)?)
+    .bind(activity.side.as_str())
+    .bind(activity.actor_role.as_str())
     .bind(activity.created_terms.as_ref().map(Json))
     .bind(&activity.last_valid_block_height)
     .bind(activity.created_at)

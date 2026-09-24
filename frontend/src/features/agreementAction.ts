@@ -22,24 +22,30 @@ export function agreementAction(
   const { operation, status } = attempt;
   // A later agreement state supersedes feedback about an earlier operation.
   if (
-    ((operation === 'activate' || operation === 'cancel') && agreement.status !== 'funded') ||
+    ((operation === 'activate' || operation === 'cancel') && agreement.status !== 'open') ||
     ((operation === 'exercise' || operation === 'reclaim') && agreement.status !== 'active') ||
-    (operation === 'cleanup' && ['funded', 'active'].includes(agreement.status))
+    (operation === 'cleanup' && ['open', 'active'].includes(agreement.status))
   )
     return undefined;
   const complete = status === 'finalized' || status === 'reconciled';
   // Residual recovery is repeatable; its completed attempt does not disable later recovery.
   if (complete && operation === 'cleanup') return undefined;
+  const operationLabels =
+    operation === 'activate' && agreement.side === 'holder'
+      ? ['Funding protection…', 'Protection funded']
+      : operation === 'cancel' && agreement.side === 'holder'
+        ? ['Cancelling request…', 'Request cancelled']
+        : labels[operation];
   const label = complete
-    ? labels[operation][1]
+    ? operationLabels[1]
     : status === 'preparing'
       ? 'Preparing transaction…'
       : status === 'awaiting-signature'
         ? 'Waiting for wallet approval…'
         : status === 'pending'
-          ? labels[operation][0]
+          ? operationLabels[0]
           : status === 'provisional'
-            ? `${labels[operation][0]} Awaiting finality`
+            ? `${operationLabels[0]} Awaiting finality`
             : status === 'unresolved'
               ? 'Checking transaction status…'
               : undefined;

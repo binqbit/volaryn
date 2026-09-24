@@ -12,7 +12,7 @@ use serde_json::{json, Value};
 use solana_rpc_client::{nonblocking::rpc_client::RpcClient, rpc_client::RpcClientConfig};
 use solana_rpc_client_api::request::RpcRequest;
 use std::{collections::BTreeSet, str::FromStr};
-use volaryn::state::{Agreement, AgreementStatus};
+use volaryn::state::{Agreement, AgreementStatus, OfferSide, AGREEMENT_VERSION};
 
 pub struct Chain {
     client: RpcClient,
@@ -39,6 +39,58 @@ fn token_amount(account: &Value, mint: &str, owner: &str, program: &str) -> Resu
 
 pub(super) fn pda(seeds: &[&[u8]]) -> Pubkey {
     Pubkey::find_program_address(seeds, &volaryn::ID).0
+}
+
+/// Account identity and role shape are shared by projection and receipt recovery.
+pub(crate) fn agreement_account(
+    account: &Value,
+    address: &str,
+    deployment: &Deployment,
+) -> Result<Agreement, AppError> {
+    if account.is_null() {
+        return Err(AppError::NotFound);
+    }
+    if account["owner"] != deployment.program_id {
+        return Err(AppError::Identity);
+    }
+    let bytes = data(account)?;
+    let agreement =
+        Agreement::try_deserialize(&mut bytes.as_slice()).map_err(|_| AppError::Chain)?;
+    let (expected, bump) = Pubkey::find_program_address(
+        &[
+            b"agreement",
+            agreement.creator.as_ref(),
+            &agreement.nonce.to_le_bytes(),
+        ],
+        &volaryn::ID,
+    );
+    let (origin, counterparty) = match agreement.side {
+        OfferSide::Writer => (agreement.writer, agreement.holder),
+        OfferSide::Holder => (agreement.holder, agreement.writer),
+    };
+    let matched = !matches!(
+        agreement.status,
+        AgreementStatus::Open | AgreementStatus::Cancelled
+    );
+    if agreement.version != AGREEMENT_VERSION
+        || address != expected.to_string()
+        || agreement.bump != bump
+        || agreement.usdc_mint.to_string() != deployment.usdc_mint
+        || agreement.usdc_program != anchor_spl::token::ID
+        || origin != Some(agreement.creator)
+        || counterparty.is_some() != matched
+        || agreement.activated_at.is_some() != matched
+        || counterparty == Some(agreement.creator)
+        || agreement.designated_counterparty == Some(agreement.creator)
+        || counterparty.is_some_and(|actor| {
+            agreement
+                .designated_counterparty
+                .is_some_and(|key| key != actor)
+        })
+    {
+        return Err(AppError::Identity);
+    }
+    Ok(agreement)
 }
 
 impl Chain {
@@ -135,28 +187,8 @@ impl Chain {
             .iter()
             .zip(accounts.as_chunks::<2>().0)
             .map(|(address, pair)| {
-                if pair[0].is_null() {
-                    return Err(AppError::NotFound);
-                }
-                if pair[0]["owner"] != deployment.program_id {
-                    return Err(AppError::Identity);
-                }
-                let bytes = data(&pair[0])?;
-                let agreement = Agreement::try_deserialize(&mut bytes.as_slice())
-                    .map_err(|_| AppError::Chain)?;
+                let agreement = agreement_account(&pair[0], address, deployment)?;
                 let key = Pubkey::from_str(address).map_err(|_| AppError::Invalid)?;
-                let expected = pda(&[
-                    b"agreement",
-                    agreement.writer.as_ref(),
-                    &agreement.nonce.to_le_bytes(),
-                ]);
-                if agreement.version != 1
-                    || agreement.usdc_mint.to_string() != deployment.usdc_mint
-                    || agreement.usdc_program != anchor_spl::token::ID
-                    || key != expected
-                {
-                    return Err(AppError::Identity);
-                }
                 let amount = token_amount(
                     &pair[1],
                     &deployment.usdc_mint,
@@ -166,9 +198,13 @@ impl Chain {
                 Ok(AgreementView {
                     address: address.clone(),
                     version: agreement.version,
-                    writer: agreement.writer.to_string(),
+                    creator: agreement.creator.to_string(),
+                    side: agreement.side.into(),
+                    writer: agreement.writer.map(|key| key.to_string()),
                     holder: agreement.holder.map(|key| key.to_string()),
-                    designated_holder: agreement.designated_holder.map(|key| key.to_string()),
+                    designated_counterparty: agreement
+                        .designated_counterparty
+                        .map(|key| key.to_string()),
                     underlying_mint: agreement.underlying_mint.to_string(),
                     underlying_program: agreement.underlying_program.to_string(),
                     underlying_decimals: agreement.underlying_decimals,
@@ -179,7 +215,7 @@ impl Chain {
                     accept_before: agreement.accept_before.to_string(),
                     expires_at: agreement.expires_at.to_string(),
                     status: match agreement.status {
-                        AgreementStatus::Funded => "funded",
+                        AgreementStatus::Open => "open",
                         AgreementStatus::Active => "active",
                         AgreementStatus::Exercised => "exercised",
                         AgreementStatus::Cancelled => "cancelled",

@@ -55,11 +55,11 @@ export function getCancelOfferDiscriminatorBytes(): ReadonlyUint8Array {
 
 export type CancelOfferInstruction<
   TProgram extends string = typeof VOLARYN_PROGRAM_ADDRESS,
-  TAccountWriter extends string | AccountMeta<string> = string,
+  TAccountActor extends string | AccountMeta<string> = string,
   TAccountAgreement extends string | AccountMeta<string> = string,
   TAccountUsdcMint extends string | AccountMeta<string> = string,
   TAccountReserve extends string | AccountMeta<string> = string,
-  TAccountWriterUsdc extends string | AccountMeta<string> = string,
+  TAccountActorUsdc extends string | AccountMeta<string> = string,
   TAccountUsdcProgram extends string | AccountMeta<string> =
     "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
   TRemainingAccounts extends readonly AccountMeta<string>[] = [],
@@ -67,10 +67,10 @@ export type CancelOfferInstruction<
   InstructionWithData<ReadonlyUint8Array> &
   InstructionWithAccounts<
     [
-      TAccountWriter extends string
-        ? ReadonlySignerAccount<TAccountWriter> &
-            AccountSignerMeta<TAccountWriter>
-        : TAccountWriter,
+      TAccountActor extends string
+        ? ReadonlySignerAccount<TAccountActor> &
+            AccountSignerMeta<TAccountActor>
+        : TAccountActor,
       TAccountAgreement extends string
         ? WritableAccount<TAccountAgreement>
         : TAccountAgreement,
@@ -80,9 +80,9 @@ export type CancelOfferInstruction<
       TAccountReserve extends string
         ? WritableAccount<TAccountReserve>
         : TAccountReserve,
-      TAccountWriterUsdc extends string
-        ? WritableAccount<TAccountWriterUsdc>
-        : TAccountWriterUsdc,
+      TAccountActorUsdc extends string
+        ? WritableAccount<TAccountActorUsdc>
+        : TAccountActorUsdc,
       TAccountUsdcProgram extends string
         ? ReadonlyAccount<TAccountUsdcProgram>
         : TAccountUsdcProgram,
@@ -118,36 +118,36 @@ export function getCancelOfferInstructionDataCodec(): FixedSizeCodec<
 }
 
 export type CancelOfferAsyncInput<
-  TAccountWriter extends InstructionSignerInput = InstructionSignerInput,
+  TAccountActor extends InstructionSignerInput = InstructionSignerInput,
   TAccountAgreement extends InstructionAccountInput = InstructionAccountInput,
   TAccountUsdcMint extends InstructionAccountInput = InstructionAccountInput,
   TAccountReserve extends InstructionAccountInput = InstructionAccountInput,
-  TAccountWriterUsdc extends InstructionAccountInput = InstructionAccountInput,
+  TAccountActorUsdc extends InstructionAccountInput = InstructionAccountInput,
   TAccountUsdcProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  writer: TAccountWriter;
+  actor: TAccountActor;
   agreement: TAccountAgreement;
   usdcMint: TAccountUsdcMint;
   reserve?: TAccountReserve;
-  writerUsdc: TAccountWriterUsdc;
+  actorUsdc: TAccountActorUsdc;
   usdcProgram?: TAccountUsdcProgram;
 };
 
 export async function getCancelOfferInstructionAsync<
-  TAccountWriter extends InstructionSignerInput,
+  TAccountActor extends InstructionSignerInput,
   TAccountAgreement extends InstructionAccountInput,
   TAccountUsdcMint extends InstructionAccountInput,
   TAccountReserve extends InstructionAccountInput,
-  TAccountWriterUsdc extends InstructionAccountInput,
+  TAccountActorUsdc extends InstructionAccountInput,
   TAccountUsdcProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof VOLARYN_PROGRAM_ADDRESS,
 >(
   input: CancelOfferAsyncInput<
-    TAccountWriter,
+    TAccountActor,
     TAccountAgreement,
     TAccountUsdcMint,
     TAccountReserve,
-    TAccountWriterUsdc,
+    TAccountActorUsdc,
     TAccountUsdcProgram
   >,
   config?: { programAddress?: TProgramAddress },
@@ -155,8 +155,8 @@ export async function getCancelOfferInstructionAsync<
   CancelOfferInstruction<
     TProgramAddress,
     ResolvedInstructionAccountMeta<
-      TAccountWriter,
-      InstructionAccountInputAddress<TAccountWriter>
+      TAccountActor,
+      InstructionAccountInputAddress<TAccountActor>
     >,
     ResolvedInstructionAccountMeta<
       TAccountAgreement,
@@ -171,8 +171,8 @@ export async function getCancelOfferInstructionAsync<
       InstructionAccountInputAddress<TAccountReserve>
     >,
     ResolvedInstructionAccountMeta<
-      TAccountWriterUsdc,
-      InstructionAccountInputAddress<TAccountWriterUsdc>
+      TAccountActorUsdc,
+      InstructionAccountInputAddress<TAccountActorUsdc>
     >,
     ResolvedInstructionAccountMeta<
       TAccountUsdcProgram,
@@ -188,7 +188,7 @@ export async function getCancelOfferInstructionAsync<
 
   // Original accounts.
   const originalAccounts = {
-    writer: { value: input.writer ?? null, isSigner: true, isWritable: false },
+    actor: { value: input.actor ?? null, isSigner: true, isWritable: false },
     agreement: {
       value: input.agreement ?? null,
       isSigner: false,
@@ -204,8 +204,8 @@ export async function getCancelOfferInstructionAsync<
       isSigner: false,
       isWritable: true,
     },
-    writerUsdc: {
-      value: input.writerUsdc ?? null,
+    actorUsdc: {
+      value: input.actorUsdc ?? null,
       isSigner: false,
       isWritable: true,
     },
@@ -239,11 +239,11 @@ export async function getCancelOfferInstructionAsync<
 
   return Object.freeze({
     accounts: [
-      getAccountMeta("writer", accounts.writer),
+      getAccountMeta("actor", accounts.actor),
       getAccountMeta("agreement", accounts.agreement),
       getAccountMeta("usdcMint", accounts.usdcMint),
       getAccountMeta("reserve", accounts.reserve),
-      getAccountMeta("writerUsdc", accounts.writerUsdc),
+      getAccountMeta("actorUsdc", accounts.actorUsdc),
       getAccountMeta("usdcProgram", accounts.usdcProgram),
     ],
     data: getCancelOfferInstructionDataEncoder().encode({}),
@@ -251,8 +251,8 @@ export async function getCancelOfferInstructionAsync<
   } as CancelOfferInstruction<
     TProgramAddress,
     ResolvedInstructionAccountMeta<
-      TAccountWriter,
-      InstructionAccountInputAddress<TAccountWriter>
+      TAccountActor,
+      InstructionAccountInputAddress<TAccountActor>
     >,
     ResolvedInstructionAccountMeta<
       TAccountAgreement,
@@ -267,8 +267,8 @@ export async function getCancelOfferInstructionAsync<
       InstructionAccountInputAddress<TAccountReserve>
     >,
     ResolvedInstructionAccountMeta<
-      TAccountWriterUsdc,
-      InstructionAccountInputAddress<TAccountWriterUsdc>
+      TAccountActorUsdc,
+      InstructionAccountInputAddress<TAccountActorUsdc>
     >,
     ResolvedInstructionAccountMeta<
       TAccountUsdcProgram,
@@ -278,44 +278,44 @@ export async function getCancelOfferInstructionAsync<
 }
 
 export type CancelOfferInput<
-  TAccountWriter extends InstructionSignerInput = InstructionSignerInput,
+  TAccountActor extends InstructionSignerInput = InstructionSignerInput,
   TAccountAgreement extends InstructionAccountInput = InstructionAccountInput,
   TAccountUsdcMint extends InstructionAccountInput = InstructionAccountInput,
   TAccountReserve extends InstructionAccountInput = InstructionAccountInput,
-  TAccountWriterUsdc extends InstructionAccountInput = InstructionAccountInput,
+  TAccountActorUsdc extends InstructionAccountInput = InstructionAccountInput,
   TAccountUsdcProgram extends InstructionAccountInput = InstructionAccountInput,
 > = {
-  writer: TAccountWriter;
+  actor: TAccountActor;
   agreement: TAccountAgreement;
   usdcMint: TAccountUsdcMint;
   reserve: TAccountReserve;
-  writerUsdc: TAccountWriterUsdc;
+  actorUsdc: TAccountActorUsdc;
   usdcProgram?: TAccountUsdcProgram;
 };
 
 export function getCancelOfferInstruction<
-  TAccountWriter extends InstructionSignerInput,
+  TAccountActor extends InstructionSignerInput,
   TAccountAgreement extends InstructionAccountInput,
   TAccountUsdcMint extends InstructionAccountInput,
   TAccountReserve extends InstructionAccountInput,
-  TAccountWriterUsdc extends InstructionAccountInput,
+  TAccountActorUsdc extends InstructionAccountInput,
   TAccountUsdcProgram extends InstructionAccountInput,
   TProgramAddress extends Address = typeof VOLARYN_PROGRAM_ADDRESS,
 >(
   input: CancelOfferInput<
-    TAccountWriter,
+    TAccountActor,
     TAccountAgreement,
     TAccountUsdcMint,
     TAccountReserve,
-    TAccountWriterUsdc,
+    TAccountActorUsdc,
     TAccountUsdcProgram
   >,
   config?: { programAddress?: TProgramAddress },
 ): CancelOfferInstruction<
   TProgramAddress,
   ResolvedInstructionAccountMeta<
-    TAccountWriter,
-    InstructionAccountInputAddress<TAccountWriter>
+    TAccountActor,
+    InstructionAccountInputAddress<TAccountActor>
   >,
   ResolvedInstructionAccountMeta<
     TAccountAgreement,
@@ -330,8 +330,8 @@ export function getCancelOfferInstruction<
     InstructionAccountInputAddress<TAccountReserve>
   >,
   ResolvedInstructionAccountMeta<
-    TAccountWriterUsdc,
-    InstructionAccountInputAddress<TAccountWriterUsdc>
+    TAccountActorUsdc,
+    InstructionAccountInputAddress<TAccountActorUsdc>
   >,
   ResolvedInstructionAccountMeta<
     TAccountUsdcProgram,
@@ -346,7 +346,7 @@ export function getCancelOfferInstruction<
 
   // Original accounts.
   const originalAccounts = {
-    writer: { value: input.writer ?? null, isSigner: true, isWritable: false },
+    actor: { value: input.actor ?? null, isSigner: true, isWritable: false },
     agreement: {
       value: input.agreement ?? null,
       isSigner: false,
@@ -362,8 +362,8 @@ export function getCancelOfferInstruction<
       isSigner: false,
       isWritable: true,
     },
-    writerUsdc: {
-      value: input.writerUsdc ?? null,
+    actorUsdc: {
+      value: input.actorUsdc ?? null,
       isSigner: false,
       isWritable: true,
     },
@@ -386,11 +386,11 @@ export function getCancelOfferInstruction<
 
   return Object.freeze({
     accounts: [
-      getAccountMeta("writer", accounts.writer),
+      getAccountMeta("actor", accounts.actor),
       getAccountMeta("agreement", accounts.agreement),
       getAccountMeta("usdcMint", accounts.usdcMint),
       getAccountMeta("reserve", accounts.reserve),
-      getAccountMeta("writerUsdc", accounts.writerUsdc),
+      getAccountMeta("actorUsdc", accounts.actorUsdc),
       getAccountMeta("usdcProgram", accounts.usdcProgram),
     ],
     data: getCancelOfferInstructionDataEncoder().encode({}),
@@ -398,8 +398,8 @@ export function getCancelOfferInstruction<
   } as CancelOfferInstruction<
     TProgramAddress,
     ResolvedInstructionAccountMeta<
-      TAccountWriter,
-      InstructionAccountInputAddress<TAccountWriter>
+      TAccountActor,
+      InstructionAccountInputAddress<TAccountActor>
     >,
     ResolvedInstructionAccountMeta<
       TAccountAgreement,
@@ -414,8 +414,8 @@ export function getCancelOfferInstruction<
       InstructionAccountInputAddress<TAccountReserve>
     >,
     ResolvedInstructionAccountMeta<
-      TAccountWriterUsdc,
-      InstructionAccountInputAddress<TAccountWriterUsdc>
+      TAccountActorUsdc,
+      InstructionAccountInputAddress<TAccountActorUsdc>
     >,
     ResolvedInstructionAccountMeta<
       TAccountUsdcProgram,
@@ -430,11 +430,11 @@ export type ParsedCancelOfferInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    writer: TAccountMetas[0];
+    actor: TAccountMetas[0];
     agreement: TAccountMetas[1];
     usdcMint: TAccountMetas[2];
     reserve: TAccountMetas[3];
-    writerUsdc: TAccountMetas[4];
+    actorUsdc: TAccountMetas[4];
     usdcProgram: TAccountMetas[5];
   };
   data: CancelOfferInstructionData;
@@ -466,11 +466,11 @@ export function parseCancelOfferInstruction<
   return {
     programAddress: instruction.programAddress,
     accounts: {
-      writer: getNextAccount(),
+      actor: getNextAccount(),
       agreement: getNextAccount(),
       usdcMint: getNextAccount(),
       reserve: getNextAccount(),
-      writerUsdc: getNextAccount(),
+      actorUsdc: getNextAccount(),
       usdcProgram: getNextAccount(),
     },
     data: getCancelOfferInstructionDataDecoder().decode(instruction.data),

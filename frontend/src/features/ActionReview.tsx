@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { formatUnits, shortAddress, type Asset } from '../lib/api/client';
-import { actionLabels, type ActionReview as Review } from '../lib/chain/actionTypes';
+import { actionLabel, type ActionReview as Review } from '../lib/chain/actionTypes';
 import { AssetIdentity } from './AssetIdentity';
 import { Details } from './Details';
 import styles from '../App.module.css';
@@ -43,17 +43,23 @@ export function ActionReview({
       }}
     >
       <p className={styles.eyebrow}>REVIEW BEFORE SIGNING</p>
-      <h2 id="review-title">{actionLabels[review.operation]}</h2>
+      <h2 id="review-title">{actionLabel(review.operation, review.side)}</h2>
       <p className={styles.note}>
         {review.operation === 'create'
-          ? 'The full payout will leave your selected USDC account and be locked in this offer.'
+          ? review.side === 'holder'
+            ? 'The premium leaves your selected USDC account and is escrowed until a provider funds the full payout. No protection is active yet; your tokens stay in your wallet.'
+            : 'The full payout will leave your selected USDC account and be locked in this offer.'
           : review.operation === 'activate'
-            ? 'You pay the premium now. Your underlying tokens stay in your wallet until you choose to exercise.'
+            ? review.side === 'holder'
+              ? 'You deposit the full payout and receive the escrowed premium atomically. The requester’s protection becomes active; your payout stays reserved until exercise or expiry.'
+              : 'You pay the premium now. Your underlying tokens stay in your wallet until you choose to exercise.'
             : review.operation === 'exercise'
               ? 'The full gross quantity leaves your selected account and the reserved USDC payout is delivered atomically.'
               : review.operation === 'cleanup'
                 ? 'Recover any residual USDC and hand off an unused settlement account. This does not close the agreement record.'
-                : 'Return the reserved payout to your selected USDC account. This is allowed only by the current agreement state.'}
+                : review.operation === 'cancel' && review.side === 'holder'
+                  ? 'Return the escrowed premium to your selected USDC account. No protection was activated.'
+                  : 'Return the reserved payout to your selected USDC account. This is allowed only by the current agreement state.'}
       </p>
       <AssetIdentity assets={assets} mint={review.underlyingMint} openContextInNewTab inline />
       <dl className={styles.terms}>
@@ -66,22 +72,23 @@ export function ActionReview({
           <dd>{review.quantityRaw} base units</dd>
         </div>
         <div>
-          <dt>Contractual USDC payout</dt>
+          <dt>Agreed USDC payout</dt>
           <dd>{formatUnits(review.payout)} USDC</dd>
         </div>
         {review.reserveAmount !== null && (
           <div>
-            <dt>USDC currently in reserve</dt>
+            <dt>
+              {review.side === 'holder' && ['activate', 'cancel'].includes(review.operation)
+                ? 'Premium currently escrowed'
+                : 'USDC currently in reserve'}
+            </dt>
             <dd>{formatUnits(review.reserveAmount)} USDC</dd>
           </div>
         )}
         {['cancel', 'reclaim', 'cleanup'].includes(review.operation) && (
           <div>
             <dt>USDC returned by this action</dt>
-            <dd>
-              {formatUnits(review.operation === 'cleanup' ? review.reserveAmount! : review.payout)}{' '}
-              USDC
-            </dd>
+            <dd>{formatUnits(review.escrowAmount)} USDC</dd>
           </div>
         )}
         <div>
@@ -121,7 +128,8 @@ export function ActionReview({
       </dl>
       {review.operation === 'create' && (
         <p className={styles.note}>
-          Eligible holder: <code>{review.designatedHolder ?? 'Any eligible wallet'}</code>
+          Eligible counterparty:{' '}
+          <code>{review.designatedCounterparty ?? 'Any eligible wallet'}</code>
         </p>
       )}
       <Details title="Transaction accounts" hint={`Wallet ${shortAddress(review.owner)}`}>

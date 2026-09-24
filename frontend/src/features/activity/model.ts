@@ -1,4 +1,4 @@
-import type { Operation, OfferTerms } from '../../lib/chain/actionTypes';
+import type { Operation, OfferTerms, OfferSide } from '../../lib/chain/actionTypes';
 import type { PendingTransaction } from '../pending';
 
 export const attemptStatuses = [
@@ -16,6 +16,8 @@ export const attemptStatuses = [
 ] as const;
 export type AttemptStatus = (typeof attemptStatuses)[number];
 export interface ActivityItem {
+  side: OfferSide;
+  actorRole: OfferSide;
   id: string;
   owner: string;
   agreement: string;
@@ -39,6 +41,8 @@ export function inFlight(item: ActivityItem) {
 export function asPending(item: ActivityItem): PendingTransaction | null {
   if (!item.signature || !item.lastValidBlockHeight || !inFlight(item)) return null;
   return {
+    side: item.side,
+    actorRole: item.actorRole,
     signature: item.signature,
     lastValidBlockHeight: item.lastValidBlockHeight,
     owner: item.owner,
@@ -86,14 +90,7 @@ export function portfolioOperations(
   role: 'all' | 'writer' | 'holder',
   awaitingDiscovery: string[] = [],
 ) {
-  const relevant = items.filter((item) =>
-    (role === 'all'
-      ? ['create', 'cancel', 'reclaim', 'cleanup', 'activate', 'exercise']
-      : role === 'writer'
-        ? ['create', 'cancel', 'reclaim', 'cleanup']
-        : ['activate', 'exercise']
-    ).includes(item.operation),
-  );
+  const relevant = items.filter((item) => role === 'all' || item.actorRole === role);
   // Discovery presence comes from the activity API, independent of portfolio pages/filters.
   // Include server receipts and attempts observed in flight, without reviving old local history.
   return relevant.filter(

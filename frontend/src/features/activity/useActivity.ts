@@ -23,7 +23,10 @@ export function useActivity(key: string, owner: string | undefined, before?: str
       const convert = (item: (typeof result.data.items)[number]): ActivityItem => ({
         ...item,
         createdTerms: item.createdTerms
-          ? { ...item.createdTerms, designatedHolder: item.createdTerms.designatedHolder ?? null }
+          ? {
+              ...item.createdTerms,
+              designatedCounterparty: item.createdTerms.designatedCounterparty ?? null,
+            }
           : undefined,
         source: 'server',
         createdAt: item.createdAt * 1000,

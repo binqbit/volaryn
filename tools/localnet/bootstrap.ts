@@ -5,6 +5,7 @@ import { parseArgs } from 'node:util';
 import { createSolanaRpc, lamports, type Instruction } from '@solana/kit';
 import {
   VOLARYN_PROGRAM_ADDRESS,
+  OfferSide,
   getCreateAssetPolicyInstruction,
   getUpdateAssetPolicyInstruction,
   getCreateOfferInstruction,
@@ -223,12 +224,13 @@ for (const [index, { mint, asset }] of assets.slice(0, 2).entries()) {
       [
         getCreateOfferInstruction({
           ...addresses,
-          writer: keys.writer,
+          creator: keys.writer,
           underlyingMint: mint.address,
           usdcMint: keys.usdc.address,
-          writerUsdc: keys.writerUsdc.address,
+          creatorUsdc: keys.writerUsdc.address,
           nonce,
-          designatedHolder: keys.holder.address,
+          side: OfferSide.Writer,
+          designatedCounterparty: keys.holder.address,
           quantityRaw: fixtureUnits(recipe.quantityRaw, asset.decimals),
           payout: BigInt(recipe.payout),
           premium: BigInt(recipe.premium),

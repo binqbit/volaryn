@@ -12,11 +12,10 @@ use anchor_spl::{
 
 #[derive(Accounts)]
 pub struct CleanupTerminal<'info> {
-    pub writer: Signer<'info>,
+    pub actor: Signer<'info>,
     #[account(
-        seeds = [b"agreement", writer.key().as_ref(), &agreement.nonce.to_le_bytes()],
-        bump = agreement.bump,
-        has_one = writer
+        seeds = [b"agreement", agreement.creator.as_ref(), &agreement.nonce.to_le_bytes()],
+        bump = agreement.bump
     )]
     pub agreement: Box<Account<'info, Agreement>>,
     #[account(address = agreement.usdc_mint, owner = usdc_program.key())]
@@ -33,10 +32,10 @@ pub struct CleanupTerminal<'info> {
     #[account(
         mut,
         token::mint = usdc_mint,
-        token::authority = writer,
+        token::authority = actor,
         token::token_program = usdc_program
     )]
-    pub writer_usdc: InterfaceAccount<'info, TokenAccount>,
+    pub actor_usdc: InterfaceAccount<'info, TokenAccount>,
     /// CHECK: Fixed PDA; authority and mint are decoded before handoff. Exercised accounts belong to the writer.
     #[account(mut, seeds = [b"settlement", agreement.key().as_ref()], bump)]
     pub settlement: UncheckedAccount<'info>,
@@ -60,22 +59,32 @@ pub fn handle_cleanup_terminal(ctx: Context<CleanupTerminal>) -> Result<()> {
         ),
         VolarynError::InvalidState
     );
+    let beneficiary = if agreement.status == AgreementStatus::Cancelled {
+        agreement.creator
+    } else {
+        agreement.writer.ok_or(VolarynError::InvalidState)?
+    };
+    require_keys_eq!(
+        ctx.accounts.actor.key(),
+        beneficiary,
+        VolarynError::UnauthorizedActor
+    );
     let nonce = agreement.nonce.to_le_bytes();
     let bump = [agreement.bump];
-    let seeds: &[&[u8]] = &[b"agreement", agreement.writer.as_ref(), &nonce, &bump];
+    let seeds: &[&[u8]] = &[b"agreement", agreement.creator.as_ref(), &nonce, &bump];
     if ctx.accounts.reserve.amount > 0 {
         token::transfer(
             &ctx.accounts.usdc_program.to_account_info(),
             &ctx.accounts.reserve.to_account_info(),
             &ctx.accounts.usdc_mint.to_account_info(),
-            &ctx.accounts.writer_usdc.to_account_info(),
+            &ctx.accounts.actor_usdc.to_account_info(),
             &agreement.to_account_info(),
             ctx.accounts.reserve.amount,
             ctx.accounts.usdc_mint.decimals,
             &[seeds],
         )?;
     }
-    // After handoff the writer may close the account. Late reserve donations remain recoverable.
+    // After handoff the beneficiary may close the account. Late reserve donations remain recoverable.
     let closed = ctx.accounts.settlement.data_is_empty()
         && ctx.accounts.settlement.owner == &anchor_lang::system_program::ID;
     if agreement.status != AgreementStatus::Exercised && !closed {
@@ -96,13 +105,13 @@ pub fn handle_cleanup_terminal(ctx: Context<CleanupTerminal>) -> Result<()> {
                 &ctx.accounts.underlying_program.to_account_info(),
                 &ctx.accounts.settlement.to_account_info(),
                 &agreement.to_account_info(),
-                &agreement.writer,
+                &beneficiary,
                 &[seeds],
             )?;
         } else {
             require_keys_eq!(
                 authority,
-                agreement.writer,
+                beneficiary,
                 VolarynError::InvalidSettlementAccount
             );
         }

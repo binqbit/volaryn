@@ -1,8 +1,8 @@
 import type { Agreement } from '../lib/api/client';
 
 export function agreementLifecycle(agreement: Agreement, now: bigint | undefined) {
-  if (agreement.status === 'funded') {
-    if (now === undefined) return { label: 'Funded · checking deadline', open: false };
+  if (agreement.status === 'open') {
+    if (now === undefined) return { label: 'Open · checking deadline', open: false };
     return now >= BigInt(agreement.acceptBefore)
       ? { label: 'Acceptance ended', open: false }
       : { label: 'Available', open: true };

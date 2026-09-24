@@ -197,6 +197,8 @@ export function useTransaction(
             );
           saveActivity(key, {
             id: attempt,
+            side: reviewed.side,
+            actorRole: reviewed.actorRole,
             owner,
             agreement: reviewed.agreement,
             operation: request.operation,
@@ -236,6 +238,8 @@ export function useTransaction(
           if (client.wallet.getState().connected?.account.address !== owner)
             throw new Error('Wallet changed before submission');
           const record: Pending = {
+            side: plan.review.side,
+            actorRole: plan.review.actorRole,
             signature: prepared.signature,
             lastValidBlockHeight: prepared.lastValidBlockHeight,
             owner,

@@ -1,11 +1,12 @@
 use super::{Activity, Operation, Status, Terms};
 use crate::{
-    adapters::{activity as store, chain::Chain},
+    adapters::{
+        activity as store,
+        chain::{agreement_account, Chain},
+    },
     domain::AppError,
-    observations::Deployment,
+    observations::{Deployment, OfferSide},
 };
-use anchor_lang::{prelude::Pubkey, AccountDeserialize};
-use base64::{engine::general_purpose::STANDARD, Engine};
 use serde_json::json;
 use solana_rpc_client_api::request::RpcRequest;
 use sqlx::PgPool;
@@ -95,42 +96,35 @@ async fn effect(
             Status::Unresolved
         });
     }
-    let account = &response["value"];
-    if account["owner"] != deployment.program_id {
-        return Err(AppError::Identity);
-    }
-    let bytes = STANDARD
-        .decode(account["data"][0].as_str().ok_or(AppError::Chain)?)
-        .map_err(|_| AppError::Chain)?;
-    let agreement =
-        Agreement::try_deserialize(&mut bytes.as_slice()).map_err(|_| AppError::Chain)?;
-    let expected = Pubkey::find_program_address(
-        &[
-            b"agreement",
-            agreement.writer.as_ref(),
-            &agreement.nonce.to_le_bytes(),
-        ],
-        &volaryn::ID,
-    )
-    .0;
-    if agreement.version != 1
-        || expected.to_string() != entry.agreement
-        || agreement.usdc_mint.to_string() != deployment.usdc_mint
-    {
-        return Err(AppError::Identity);
-    }
+    let agreement = agreement_account(&response["value"], &entry.agreement, deployment)?;
     Ok(effect_status(entry, &agreement))
 }
 
-/// These proofs depend on version 1's immutable terms, fixed holder and irreversible settlement.
+/// Proofs require immutable creator/terms, fixed matched roles and irreversible settlement.
 pub(super) fn effect_status(entry: &Activity, agreement: &Agreement) -> Status {
-    let writer = agreement.writer.to_string() == entry.owner;
+    let side = OfferSide::from(agreement.side);
+    let creator = agreement.creator.to_string() == entry.owner;
+    let writer = agreement
+        .writer
+        .is_some_and(|key| key.to_string() == entry.owner);
     let holder = agreement
         .holder
         .is_some_and(|key| key.to_string() == entry.owner);
+    let expected_role = match entry.operation {
+        Operation::Create | Operation::Cancel => side,
+        Operation::Activate => side.counterparty(),
+        Operation::Exercise => OfferSide::Holder,
+        Operation::Reclaim => OfferSide::Writer,
+        Operation::Cleanup if agreement.status == AgreementStatus::Cancelled => side,
+        Operation::Cleanup => OfferSide::Writer,
+    };
+    if entry.side != side || entry.actor_role != expected_role {
+        return Status::Unresolved;
+    }
     let happened = match entry.operation {
-        Operation::Create if writer => {
+        Operation::Create if creator => {
             let terms = Terms {
+                side,
                 underlying_mint: agreement.underlying_mint.to_string(),
                 nonce: agreement.nonce.to_string(),
                 quantity_raw: agreement.quantity_raw.to_string(),
@@ -138,7 +132,9 @@ pub(super) fn effect_status(entry: &Activity, agreement: &Agreement) -> Status {
                 premium: agreement.premium.to_string(),
                 accept_before: agreement.accept_before.to_string(),
                 expires_at: agreement.expires_at.to_string(),
-                designated_holder: agreement.designated_holder.map(|key| key.to_string()),
+                designated_counterparty: agreement
+                    .designated_counterparty
+                    .map(|key| key.to_string()),
             };
             return if entry.created_terms.as_ref() == Some(&terms) {
                 Status::Reconciled
@@ -146,15 +142,18 @@ pub(super) fn effect_status(entry: &Activity, agreement: &Agreement) -> Status {
                 Status::Unresolved
             };
         }
-        Operation::Cancel if writer => agreement.status == AgreementStatus::Cancelled,
+        Operation::Cancel if creator => agreement.status == AgreementStatus::Cancelled,
         Operation::Reclaim if writer => agreement.status == AgreementStatus::Expired,
         Operation::Activate => {
             if agreement.activated_at.is_none() {
                 false
-            } else if agreement.holder.is_none() {
+            } else if agreement.holder.is_none() || agreement.writer.is_none() {
                 return Status::Unresolved;
             } else {
-                holder
+                match side.counterparty() {
+                    OfferSide::Writer => writer,
+                    OfferSide::Holder => holder,
+                }
             }
         }
         Operation::Exercise if holder => agreement.status == AgreementStatus::Exercised,

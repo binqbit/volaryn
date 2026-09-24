@@ -44,6 +44,7 @@ test('wide offer form tooltips open beside the information icon for pointer and 
   const { state } = await balanceFixture(page);
   await page.goto('/offers/new');
   await connectWallet(page, 'Test Wallet 2');
+  await page.getByRole('button', { name: 'Provide protection', exact: true }).click();
   await selectAsset(page, 'OPENAI');
   const form = page.getByRole('form', { name: 'Create an offer' });
   await expect(form.getByRole('button', { name: 'Asset date limits', exact: true })).toBeVisible();
@@ -168,6 +169,7 @@ test('token identity opens without moving form fields and navigates without leav
   await page.route('**/api/assets/official', (route) => route.fulfill({ json: officialCatalog() }));
   await page.goto('/offers/new');
   await connectWallet(page, 'Test Wallet 2');
+  await page.getByRole('button', { name: 'Provide protection', exact: true }).click();
   await selectAsset(page, 'OPENAI');
   const form = page.getByRole('form', { name: 'Create an offer' });
   const premium = form.getByLabel('Premium (USDC)', { exact: true });

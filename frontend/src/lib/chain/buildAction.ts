@@ -20,12 +20,14 @@ import {
 } from '@solana-program/token-2022';
 import {
   AgreementStatus,
+  OfferSide,
   estimateFee,
   fetchAgreement,
   fetchAssetPolicy,
   fetchMaybeAgreement,
   getAgreementEncoder,
   getActivateInstruction,
+  getAcceptRequestInstruction,
   getCancelOfferInstruction,
   getCleanupTerminalInstruction,
   getCreateOfferInstruction,
@@ -36,7 +38,7 @@ import {
 } from '@volaryn/protocol';
 import { api, amount, type Deployment } from '../api/client';
 import type { AppClient } from './client';
-import type { ActionPlan, ActionRequest } from './actionTypes';
+import { actionRole, type ActionPlan, type ActionRequest } from './actionTypes';
 import { mintTerms } from './mint';
 
 export async function chainTime(client: AppClient) {
@@ -65,10 +67,10 @@ export async function buildAction(
   request: ActionRequest,
   signer: TransactionSigner,
 ): Promise<ActionPlan> {
-  if (request.operation === 'create' && request.terms.designatedHolder === signer.address)
-    throw new Error('The designated holder must be a different wallet from the writer');
-  if (request.operation === 'activate' && request.agreement.writer === signer.address)
-    throw new Error('You cannot activate your own offer');
+  if (request.operation === 'create' && request.terms.designatedCounterparty === signer.address)
+    throw new Error('The designated counterparty must be a different wallet from the creator');
+  if (request.operation === 'activate' && request.agreement.creator === signer.address)
+    throw new Error('You cannot accept your own offer');
   const { rpc } = client;
   if ((await rpc.getGenesisHash().send()) !== deployment.genesisHash)
     throw new Error('Wrong network: the ledger identity changed');
@@ -101,6 +103,8 @@ export async function buildAction(
     throw new Error('Select an unfrozen USDC account belonging to this wallet');
   const creating = request.operation === 'create';
   const terms = creating ? request.terms : request.agreement;
+  const side = terms.side;
+  const chainSide = side === 'holder' ? OfferSide.Holder : OfferSide.Writer;
   const quantity = amount(terms.quantityRaw);
   const payout = amount(terms.payout);
   const premium = amount(terms.premium);
@@ -148,8 +152,12 @@ export async function buildAction(
       throw new Error(
         'This offer identity already exists; refresh its agreement before creating another',
       );
-    if (usdc.amount < payout)
-      throw new Error('The selected USDC account cannot fund the full payout');
+    if (usdc.amount < (side === 'holder' ? premium : payout))
+      throw new Error(
+        side === 'holder'
+          ? 'The selected USDC account cannot escrow the full premium'
+          : 'The selected USDC account cannot fund the full payout',
+      );
     const policy = await fetchAssetPolicy(rpc, addresses.policy, { commitment: 'confirmed' });
     if (
       policy.programAddress !== VOLARYN_PROGRAM_ADDRESS ||
@@ -169,12 +177,15 @@ export async function buildAction(
       );
     instruction = getCreateOfferInstruction({
       ...addresses,
-      writer: signer,
-      writerUsdc: usdcAddress,
+      creator: signer,
+      creatorUsdc: usdcAddress,
       underlyingMint: mintAddress,
       usdcMint,
       nonce,
-      designatedHolder: terms.designatedHolder ? address(terms.designatedHolder) : null,
+      side: chainSide,
+      designatedCounterparty: terms.designatedCounterparty
+        ? address(terms.designatedCounterparty)
+        : null,
       quantityRaw: quantity,
       payout,
       premium,
@@ -183,11 +194,13 @@ export async function buildAction(
     });
     // Anchor allocates maximum option sizes, even when initial values are None.
     const space = getAgreementEncoder().encode({
-      version: 1,
+      version: 2,
       bump: 0,
-      writer: signer.address,
+      creator: signer.address,
+      side: chainSide,
+      writer: some(signer.address),
       nonce,
-      designatedHolder: some(signer.address),
+      designatedCounterparty: some(signer.address),
       holder: some(signer.address),
       underlyingMint: mintAddress,
       underlyingProgram: TOKEN_2022_PROGRAM_ADDRESS,
@@ -204,7 +217,7 @@ export async function buildAction(
       activatedAt: some(now),
       settledAt: some(now),
       netReceived: 0n,
-      status: AgreementStatus.Funded,
+      status: AgreementStatus.Open,
     }).length;
     const rents = await Promise.all(
       [space, getTokenSize(), mint.accountSize].map((size) =>
@@ -217,10 +230,10 @@ export async function buildAction(
       commitment: 'confirmed',
     });
     const agreement = account.data;
-    addresses = await protocolAddresses(mintAddress, agreement.writer, agreement.nonce);
+    addresses = await protocolAddresses(mintAddress, agreement.creator, agreement.nonce);
     if (
       account.programAddress !== VOLARYN_PROGRAM_ADDRESS ||
-      agreement.version !== 1 ||
+      agreement.version !== 2 ||
       addresses.agreement !== request.agreement.address ||
       agreement.underlyingMint !== mintAddress ||
       agreement.usdcMint !== usdcMint ||
@@ -235,8 +248,9 @@ export async function buildAction(
       agreement.premium !== premium ||
       agreement.acceptBefore !== acceptBefore ||
       agreement.expiresAt !== expiresAt ||
-      agreement.writer !== request.agreement.writer ||
-      unwrapOption(agreement.designatedHolder) !== (terms.designatedHolder ?? null)
+      agreement.creator !== request.agreement.creator ||
+      agreement.side !== chainSide ||
+      unwrapOption(agreement.designatedCounterparty) !== (terms.designatedCounterparty ?? null)
     )
       throw new Error('Agreement terms changed; refresh before signing');
     const { data: reserve, programAddress } = await fetchToken(rpc, addresses.reserve, {
@@ -250,12 +264,17 @@ export async function buildAction(
     )
       throw new Error('The reserve is unavailable');
     reserveAmount = reserve.amount.toString();
-    if (request.operation !== 'cleanup' && reserve.amount < payout)
-      throw new Error('The full payout is not available in reserve');
-    const writerInput = { ...addresses, writer: signer, writerUsdc: usdcAddress, usdcMint };
+    const requiredReserve =
+      agreement.status === AgreementStatus.Open && side === 'holder' ? premium : payout;
+    if (request.operation !== 'cleanup' && reserve.amount < requiredReserve)
+      throw new Error(
+        agreement.status === AgreementStatus.Open && side === 'holder'
+          ? 'The full premium is not available in escrow'
+          : 'The full payout is not available in reserve',
+      );
+    const refundInput = { ...addresses, actor: signer, actorUsdc: usdcAddress, usdcMint };
     if (request.operation === 'activate') {
-      if (agreement.writer === signer.address)
-        throw new Error('You cannot activate your own offer');
+      if (agreement.creator === signer.address) throw new Error('You cannot accept your own offer');
       const { data: policy, programAddress: policyProgram } = await fetchAssetPolicy(
         rpc,
         addresses.policy,
@@ -268,26 +287,40 @@ export async function buildAction(
         policy.mint !== mintAddress ||
         policy.tokenProgram !== TOKEN_2022_PROGRAM_ADDRESS ||
         policy.decimals !== mint.decimals ||
-        agreement.status !== AgreementStatus.Funded ||
+        agreement.status !== AgreementStatus.Open ||
         now >= acceptBefore ||
         !policy.enabled ||
         now >= policy.reviewedUntil ||
         expiresAt > policy.maxExpiry
       )
         throw new Error('This offer is no longer available for activation');
-      const designated = unwrapOption(agreement.designatedHolder);
+      const designated = unwrapOption(agreement.designatedCounterparty);
       if (designated && designated !== signer.address)
         throw new Error('This offer is reserved for another wallet');
-      if (usdc.amount < premium)
-        throw new Error('The selected USDC account cannot pay the premium');
-      instruction = getActivateInstruction({
-        ...addresses,
-        holder: signer,
-        holderUsdc: usdcAddress,
-        writerUsdc: await writerDestination(client, usdcMint, agreement.writer),
-        underlyingMint: mintAddress,
-        usdcMint,
-      });
+      if (side === 'holder') {
+        if (usdc.amount < payout)
+          throw new Error('The selected USDC account cannot fund the full payout');
+        instruction = getAcceptRequestInstruction({
+          ...addresses,
+          writer: signer,
+          writerUsdc: usdcAddress,
+          underlyingMint: mintAddress,
+          usdcMint,
+        });
+      } else {
+        if (usdc.amount < premium)
+          throw new Error('The selected USDC account cannot pay the premium');
+        const writer = unwrapOption(agreement.writer);
+        if (!writer) throw new Error('The capital offer has no writer');
+        instruction = getActivateInstruction({
+          ...addresses,
+          holder: signer,
+          holderUsdc: usdcAddress,
+          writerUsdc: await writerDestination(client, usdcMint, writer),
+          underlyingMint: mintAddress,
+          usdcMint,
+        });
+      }
     } else if (request.operation === 'exercise') {
       if (
         agreement.status !== AgreementStatus.Active ||
@@ -320,16 +353,20 @@ export async function buildAction(
         usdcMint,
       });
     } else {
-      if (agreement.writer !== signer.address)
-        throw new Error('Only the writer can manage this reserve');
+      const refundOwner =
+        request.operation === 'cancel' || agreement.status === AgreementStatus.Cancelled
+          ? agreement.creator
+          : unwrapOption(agreement.writer);
+      if (refundOwner !== signer.address)
+        throw new Error('Only the entitled wallet can manage this reserve');
       if (request.operation === 'cancel') {
-        if (agreement.status !== AgreementStatus.Funded)
+        if (agreement.status !== AgreementStatus.Open)
           throw new Error('Only an unaccepted offer can be cancelled');
-        instruction = getCancelOfferInstruction(writerInput);
+        instruction = getCancelOfferInstruction(refundInput);
       } else if (request.operation === 'reclaim') {
         if (agreement.status !== AgreementStatus.Active || now < expiresAt)
           throw new Error('An active reserve cannot be withdrawn before expiry');
-        instruction = getReclaimExpiredInstruction(writerInput);
+        instruction = getReclaimExpiredInstruction(refundInput);
       } else {
         if (
           ![AgreementStatus.Exercised, AgreementStatus.Cancelled, AgreementStatus.Expired].includes(
@@ -337,7 +374,7 @@ export async function buildAction(
           )
         )
           throw new Error('Residual recovery requires a terminal agreement');
-        instruction = getCleanupTerminalInstruction(writerInput);
+        instruction = getCleanupTerminalInstruction(refundInput);
       }
     }
   }
@@ -348,6 +385,15 @@ export async function buildAction(
   return {
     instructions,
     review: {
+      side,
+      actorRole: actionRole(request),
+      escrowAmount:
+        request.operation === 'cleanup'
+          ? reserveAmount!
+          : (side === 'holder' && (creating || (!creating && request.agreement.status === 'open'))
+              ? premium
+              : payout
+            ).toString(),
       underlyingMint: mintAddress,
       underlyingDecimals: mint.decimals,
       owner: signer.address,
@@ -358,7 +404,7 @@ export async function buildAction(
       premium: premium.toString(),
       acceptBefore: acceptBefore.toString(),
       expiresAt: expiresAt.toString(),
-      designatedHolder: terms.designatedHolder ?? null,
+      designatedCounterparty: terms.designatedCounterparty ?? null,
       usdcAccount: usdcAddress,
       underlyingAccount,
       estimatedNetReceipt: mint.netReceipt.toString(),

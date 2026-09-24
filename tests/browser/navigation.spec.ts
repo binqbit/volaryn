@@ -25,7 +25,7 @@ test('home explains the product and gives clear entry points without loading off
   await page.setViewportSize({ width: 375, height: 844 });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   await page.screenshot({ path: info.outputPath('home-mobile.png'), fullPage: true });
-  await page.getByRole('link', { name: 'Create an offer', exact: false }).click();
+  await page.getByRole('link', { name: 'Request protection', exact: false }).first().click();
   await expect(page).toHaveURL(/\/offers\/new$/);
   await expect(
     page.getByRole('heading', { name: 'Connect a wallet to create an offer' }),
@@ -53,9 +53,9 @@ test('offer cards lead to full terms and portfolio lists remain wallet scoped', 
   if (!original) throw new Error('Missing fixture agreement');
   const offer: Agreement = {
     ...original,
-    status: 'funded',
+    status: 'open',
     holder: null,
-    designatedHolder: null,
+    designatedCounterparty: null,
     acceptBefore: '4102444700',
     expiresAt: '4102444800',
   };
@@ -120,7 +120,7 @@ test('offer cards lead to full terms and portfolio lists remain wallet scoped', 
     .getByRole('navigation', { name: 'Portfolio views' })
     .getByRole('link', { name: 'My offers', exact: true })
     .click();
-  await expect(page.getByRole('heading', { name: 'No offers created yet' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'No capital commitments yet' })).toBeVisible();
   expect(portfolioQueries.at(-1)?.searchParams.get('writer')).toBe(config.localnet!.holder);
   await page.getByRole('button', { name: 'Disconnect', exact: true }).click();
   await expect(page.getByRole('article')).toHaveCount(0);
@@ -129,6 +129,7 @@ test('offer cards lead to full terms and portfolio lists remain wallet scoped', 
   ).toBeVisible();
   await navigation.getByRole('link', { name: 'Create offer', exact: true }).click();
   await connectWallet(page, 'Test Wallet 2');
+  await page.getByRole('button', { name: 'Provide protection', exact: true }).click();
   await expect(page.getByRole('form', { name: 'Create an offer' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Review funded offer' })).toBeDisabled();
   await selectAsset(page, 'OPENAI');

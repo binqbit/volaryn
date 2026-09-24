@@ -37,6 +37,7 @@ export function OfferFilters({
       const parse = (value: string) => (value ? parseUnits(value).toString() : undefined);
       onChange({
         mode: 'offers',
+        side: value.side,
         mint: value.mint,
         quantityRaw:
           quantity && asset ? parseUnits(quantity, asset.decimals).toString() : undefined,
@@ -115,7 +116,7 @@ export function OfferFilters({
             setPayout('');
             setPremium('');
             setError('');
-            onChange({ mode: 'offers' });
+            onChange({ mode: 'offers', side: value.side });
           }}
         >
           Reset filters

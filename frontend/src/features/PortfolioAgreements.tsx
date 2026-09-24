@@ -41,8 +41,8 @@ export function PortfolioAgreements({
           {role === 'all'
             ? 'All your agreements'
             : role === 'writer'
-              ? 'Offers you created'
-              : 'Protection you purchased'}
+              ? 'Your capital commitments'
+              : 'Your protection and requests'}
         </h2>
         <label className={styles.field}>
           <span>Agreement status</span>
@@ -122,9 +122,10 @@ function PortfolioResults({
     activity.awaitingDiscovery,
   );
   const capital = portfolio.data?.agreements
-    .filter(
-      (item) => item.writer === owner && (item.status === 'funded' || item.status === 'active'),
-    )
+    .filter((item) => item.writer === owner && (item.status === 'open' || item.status === 'active'))
+    .reduce((sum, item) => sum + BigInt(item.reserveAmount), 0n);
+  const premiums = portfolio.data?.agreements
+    .filter((item) => item.creator === owner && item.side === 'holder' && item.status === 'open')
     .reduce((sum, item) => sum + BigInt(item.reserveAmount), 0n);
   return (
     <>
@@ -141,8 +142,14 @@ function PortfolioResults({
       )}
       {role !== 'holder' && capital !== undefined && capital > 0n && (
         <p className={styles.note}>
-          Reserved in your funded and active offers on this page:{' '}
+          Payout reserved in your open and active capital commitments on this page:{' '}
           <strong>{formatUnits(capital.toString())} USDC</strong>.
+        </p>
+      )}
+      {role !== 'writer' && premiums !== undefined && premiums > 0n && (
+        <p className={styles.note}>
+          Premium escrowed in your unaccepted requests on this page:{' '}
+          <strong>{formatUnits(premiums.toString())} USDC</strong>.
         </p>
       )}
       <AgreementList
@@ -156,14 +163,14 @@ function PortfolioResults({
             : role === 'all'
               ? 'No agreements yet'
               : role === 'writer'
-                ? 'No offers created yet'
-                : 'No protection purchased yet'
+                ? 'No capital commitments yet'
+                : 'No protection or requests yet'
         }
         hideEmpty={!lifecycle && pending.length > 0}
         emptyDescription={
           lifecycle
             ? 'Choose another status or All statuses to see your other agreements.'
-            : 'Your purchased protection and created offers stay in your portfolio throughout their lifecycle.'
+            : 'Your requests, protection and capital commitments stay in your portfolio throughout their lifecycle.'
         }
       />
     </>

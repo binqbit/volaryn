@@ -37,11 +37,17 @@ test('own offers leave discovery on connection and remain in the writer portfoli
   const { state } = await balanceFixture(page);
   const d = state.deployment;
   const own = state.agreement;
-  const other = { ...own, address: d.authority, writer: d.localnet!.holder };
+  const other = {
+    ...own,
+    address: d.authority,
+    creator: d.localnet!.holder,
+    writer: d.localnet!.holder,
+  };
   // Deliberately return both records from discovery to exercise the UI's defensive filter.
   state.offers = [own, other];
   await page.route('**/api/agreements?*', (route) => {
-    const writer = new URL(route.request().url()).searchParams.get('writer');
+    const query = new URL(route.request().url()).searchParams;
+    const writer = query.get('writer') ?? query.get('owner');
     return route.fulfill({ json: state.offers.filter((offer) => offer.writer === writer) });
   });
   await page.goto('/offers');
@@ -51,7 +57,9 @@ test('own offers leave discovery on connection and remain in the writer portfoli
   await expect(otherCard).toBeVisible();
   const discovery = page.waitForRequest((request) => {
     const url = new URL(request.url());
-    return url.pathname === '/api/offers' && url.searchParams.get('eligible_holder') === own.writer;
+    return (
+      url.pathname === '/api/offers' && url.searchParams.get('eligible_counterparty') === own.writer
+    );
   });
   await switchWallet(page, 'writer');
   await discovery;
@@ -59,7 +67,7 @@ test('own offers leave discovery on connection and remain in the writer portfoli
   await expect(otherCard).toBeVisible();
   await page
     .getByText('Your own offers are in', { exact: false })
-    .getByRole('link', { name: 'My offers' })
+    .getByRole('link', { name: 'My portfolio', exact: true })
     .click();
   await expect(ownCard).toBeVisible();
   await expect(otherCard).toHaveCount(0);
@@ -81,16 +89,17 @@ test('self-designation is explained before review or signing, even when the fiel
   ];
   await page.goto('/offers/new');
   await switchWallet(page, 'writer');
+  await page.getByRole('button', { name: 'Provide protection', exact: true }).click();
   await selectAsset(page, 'OPENAI');
   const form = page.getByRole('form', { name: 'Create an offer' });
   const restriction = form.locator('summary').filter({ hasText: 'Restrict to a wallet' });
-  const designated = form.getByLabel('Designated holder (optional)');
+  const designated = form.getByLabel('Designated counterparty (optional)');
   await restriction.click();
   await designated.fill(` ${d.localnet!.writer} `);
   await restriction.click();
   await form.getByRole('button', { name: 'Review funded offer' }).click();
   await expect(form.getByRole('alert')).toHaveText(
-    'The designated holder must be a different wallet from the writer.',
+    'The designated counterparty must be a different wallet from the creator.',
   );
   await expect(designated).toBeVisible();
   await expect(designated).toBeFocused();

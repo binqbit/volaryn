@@ -963,3 +963,47 @@
     grid-template-columns: 1fr;
   }
 }
+.sideSwitch {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  width: fit-content;
+}
+
+.sideSwitch button {
+  padding: 10px 14px;
+  min-height: 44px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.sideSwitch button[aria-pressed='true'] {
+  background: #352655;
+  color: #f0e4ff;
+}
+
+.sideSwitch button:last-child[aria-pressed='true'] {
+  background: #173b34;
+  color: #acffe0;
+}
+
+.sideBadge {
+  display: inline-flex;
+  padding: 5px 9px;
+  border-radius: 7px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  background: #352655;
+  color: #f0e4ff;
+}
+
+.sideBadge[data-side='writer'] {
+  background: #173b34;
+  color: #acffe0;
+}

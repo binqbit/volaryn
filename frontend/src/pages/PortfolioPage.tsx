@@ -28,7 +28,8 @@ export function PortfolioPage({
           <p className={styles.eyebrow}>YOUR WALLET'S ACTIVITY</p>
           <h1>My portfolio</h1>
           <p>
-            Follow your protection, manage the offers you fund, and review completed agreements.
+            Follow your requests and protection, manage capital commitments, and review completed
+            agreements.
           </p>
         </div>
         <Link className={styles.primaryButton} to="/offers/new">

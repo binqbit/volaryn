@@ -7,4 +7,5 @@
  */
 
 export * from "./agreementStatus";
+export * from "./offerSide";
 export * from "./policyTerms";

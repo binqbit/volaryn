@@ -101,7 +101,7 @@ async fn pages_filters_and_targeted_updates_work_beyond_one_thousand_agreements(
     let offers = store::agreements(&pool, &Default::default(), true, Some(100))
         .await
         .unwrap();
-    assert!(offers.items.iter().all(|row| row.status == "funded"));
+    assert!(offers.items.iter().all(|row| row.status == "open"));
     assert!(store::agreements(
         &pool,
         &AgreementQuery {
@@ -129,7 +129,7 @@ async fn pages_filters_and_targeted_updates_work_beyond_one_thousand_agreements(
 }
 
 #[tokio::test]
-async fn offer_matching_uses_exact_amounts_and_designated_holder_eligibility() {
+async fn offer_matching_uses_exact_amounts_and_designated_counterparty_eligibility() {
     let database = database::Database::new().await;
     let pool = store::open(database.options.clone(), &support::deployment())
         .await
@@ -142,10 +142,10 @@ async fn offer_matching_uses_exact_amounts_and_designated_holder_eligibility() {
             row.address = Pubkey::new_unique().to_string();
             row.accept_before = "3700".into();
             if index == 1 {
-                row.designated_holder = Some(holder.clone());
+                row.designated_counterparty = Some(holder.clone());
             }
             if index == 2 {
-                row.designated_holder = Some(other.clone());
+                row.designated_counterparty = Some(other.clone());
             }
             if index == 3 {
                 row.quantity_raw = "9007199254740993".into();
@@ -157,9 +157,10 @@ async fn offer_matching_uses_exact_amounts_and_designated_holder_eligibility() {
                 row.reserve_amount = "0".into();
             }
             if index >= 6 {
-                row.writer = holder.clone();
+                row.creator = holder.clone();
+                row.writer = Some(holder.clone());
                 if index == 7 {
-                    row.designated_holder = Some(holder.clone());
+                    row.designated_counterparty = Some(holder.clone());
                 }
             }
             row
@@ -170,7 +171,7 @@ async fn offer_matching_uses_exact_amounts_and_designated_holder_eligibility() {
         quantity_raw: Some(u64::MAX.to_string()),
         min_payout: Some(u64::MAX.to_string()),
         max_premium: Some("1".into()),
-        eligible_holder: Some(holder.clone()),
+        eligible_counterparty: Some(holder.clone()),
         ..Default::default()
     };
     let page = store::agreements(&pool, &query, true, Some(100))
@@ -229,6 +230,118 @@ async fn offer_matching_uses_exact_amounts_and_designated_holder_eligibility() {
         .page_size()
         .is_err());
     }
+    pool.close().await;
+    database.close().await;
+}
+
+#[tokio::test]
+async fn mixed_offer_origins_filter_before_pagination_and_require_their_own_escrow() {
+    use volaryn_backend::observations::OfferSide;
+    let database = database::Database::new().await;
+    let pool = store::open(database.options.clone(), &support::deployment())
+        .await
+        .unwrap();
+    let actor = Pubkey::new_unique().to_string();
+    let other = Pubkey::new_unique().to_string();
+    let rows: Vec<_> = (0..6)
+        .map(|index| {
+            let mut row = agreement::agreement(10, 100);
+            row.address = Pubkey::new_unique().to_string();
+            row.creator = if index == 5 {
+                actor.clone()
+            } else {
+                other.clone()
+            };
+            row.side = if index == 0 {
+                OfferSide::Writer
+            } else {
+                OfferSide::Holder
+            };
+            row.writer = (row.side == OfferSide::Writer).then(|| row.creator.clone());
+            row.holder = (row.side == OfferSide::Holder).then(|| row.creator.clone());
+            row.accept_before = "101".into();
+            row.payout = "20".into();
+            row.premium = "1".into();
+            row.reserve_amount = match index {
+                0 => "20",
+                2 => "0",
+                _ => "1",
+            }
+            .into();
+            row.designated_counterparty = match index {
+                3 => Some(actor.clone()),
+                4 => Some(Pubkey::new_unique().to_string()),
+                _ => None,
+            };
+            row
+        })
+        .collect();
+    store::upsert(&pool, &rows, 10, 100).await.unwrap();
+    for (side, expected_indices) in [
+        (None, vec![0, 1, 3]),
+        (Some(OfferSide::Writer), vec![0]),
+        (Some(OfferSide::Holder), vec![1, 3]),
+    ] {
+        let mut query = AgreementQuery {
+            side,
+            eligible_counterparty: Some(actor.clone()),
+            limit: Some(1),
+            ..Default::default()
+        };
+        let mut found = Vec::new();
+        loop {
+            let page = store::agreements(&pool, &query, true, Some(100))
+                .await
+                .unwrap();
+            found.extend(page.items.into_iter().map(|row| row.address));
+            query.after = page.next;
+            if query.after.is_none() {
+                break;
+            }
+        }
+        let mut expected: Vec<_> = expected_indices
+            .into_iter()
+            .map(|index| rows[index].address.clone())
+            .collect();
+        expected.sort();
+        assert_eq!(
+            found, expected,
+            "Side, own-offer and counterparty eligibility apply before pagination"
+        );
+    }
+    let owned = store::agreements(
+        &pool,
+        &AgreementQuery {
+            owner: Some(actor.clone()),
+            ..Default::default()
+        },
+        false,
+        None,
+    )
+    .await
+    .unwrap();
+    assert_eq!(owned.items.len(), 1);
+    assert_eq!(owned.items[0].address, rows[5].address);
+    assert!(owned.items[0].writer.is_none());
+    let created = store::agreements(
+        &pool,
+        &AgreementQuery {
+            creator: Some(actor),
+            ..Default::default()
+        },
+        false,
+        None,
+    )
+    .await
+    .unwrap();
+    assert_eq!(created.items[0].address, rows[5].address);
+    assert!(
+        store::agreements(&pool, &Default::default(), true, Some(101))
+            .await
+            .unwrap()
+            .items
+            .is_empty()
+    );
     pool.close().await;
     database.close().await;
 }

@@ -32,6 +32,7 @@ test('a failed offer review brings its error into view without requesting a sign
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/offers/new');
   await connectWallet(page, 'Review test wallet');
+  await page.getByRole('button', { name: 'Provide protection', exact: true }).click();
   await selectAsset(page, 'OPENAI');
   const form = page.getByRole('form', { name: 'Create an offer' });
   await expect(form.getByLabel('Acceptance deadline (UTC)')).not.toHaveValue('');
@@ -57,6 +58,7 @@ test('a failed offer review confirmation focuses its error without signing', asy
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/offers/new');
   await switchWallet(page, 'writer');
+  await page.getByRole('button', { name: 'Provide protection', exact: true }).click();
   await selectAsset(page, 'SPACEX');
   await page.getByRole('button', { name: 'Review funded offer' }).click();
   await expect(page.getByRole('dialog')).toBeVisible();

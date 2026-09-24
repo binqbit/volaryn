@@ -16,6 +16,11 @@ const amountFilters = {
 
 function readFilters(search: URLSearchParams, assets: Asset[]): PortfolioQuery {
   const filters: PortfolioQuery = { mode: 'offers' };
+  const side = search.get('side');
+  if (side !== null) {
+    if (side !== 'holder' && side !== 'writer') throw new Error('Unknown offer side.');
+    filters.side = side;
+  }
   const mint = search.get('mint');
   if (mint) {
     if (!assets.some((asset) => asset.mint === mint))
@@ -50,18 +55,43 @@ export function OffersPage({ deployment, owner }: { deployment: Deployment; owne
           <p className={styles.eyebrow}>THE OFFER MARKET</p>
           <h1>Explore offers</h1>
           <p>
-            Compare funded exit rights. Choose the terms that fit the tokens you want to protect.
+            Match protection requests with capital offers. Each offer has a fixed quantity, premium,
+            payout and deadline.
           </p>
         </div>
         <Link className={styles.primaryButton} to="/offers/new">
           Create offer <span>＋</span>
         </Link>
       </div>
+      <nav className={styles.tabs} aria-label="Offer sides">
+        {(
+          [
+            { side: undefined, label: 'All offers' },
+            { side: 'holder', label: 'Sell requests' },
+            { side: 'writer', label: 'Buy offers' },
+          ] as const
+        ).map((item) => {
+          const params = new URLSearchParams(search);
+          params.delete('after');
+          if (item.side) params.set('side', item.side);
+          else params.delete('side');
+          return (
+            <Link
+              key={item.label}
+              aria-current={filters.side === item.side ? 'page' : undefined}
+              to={`/offers${params.size ? `?${params}` : ''}`}
+            >
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
       <OfferFilters
         assets={deployment.assets}
         value={filters}
         onChange={(value) => {
           const next = new URLSearchParams();
+          if (value.side) next.set('side', value.side);
           if (value.mint) next.set('mint', value.mint);
           for (const [field, parameter] of Object.entries(amountFilters)) {
             const amount = value[field as keyof typeof amountFilters];
@@ -104,12 +134,12 @@ function OfferResults({
     <>
       <div className={styles.listHeading}>
         <h2>Available offers</h2>
-        <span>Fully funded · Fixed terms</span>
+        <span>Fixed terms · Escrowed deposits</span>
       </div>
       {owner && (
         <p className={styles.note}>
-          Your own offers are in <Link to="/portfolio/written">My offers</Link>. You cannot activate
-          them yourself.
+          Your own offers are in <Link to="/portfolio">My portfolio</Link>. You cannot accept them
+          yourself.
         </p>
       )}
       <AgreementList
@@ -118,7 +148,7 @@ function OfferResults({
         owner={owner}
         now={now}
         emptyTitle="No matching offers"
-        emptyDescription="No funded offers match these terms. Try changing the filters."
+        emptyDescription="No offers match these terms. Try changing the filters."
       />
     </>
   );

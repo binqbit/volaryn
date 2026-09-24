@@ -144,11 +144,11 @@ pub async fn agreements(
         let time = || chain_time.ok_or(AppError::Chain);
         match lifecycle {
             AgreementLifecycle::Available => {
-                sql.push(" AND status = 'funded' AND accept_before > ")
+                sql.push(" AND status = 'open' AND accept_before > ")
                     .push_bind(time()?);
             }
             AgreementLifecycle::AcceptanceEnded => {
-                sql.push(" AND status = 'funded' AND accept_before <= ")
+                sql.push(" AND status = 'open' AND accept_before <= ")
                     .push_bind(time()?);
             }
             AgreementLifecycle::Active => {
@@ -169,6 +169,7 @@ pub async fn agreements(
     for (column, value) in [
         ("holder", &query.holder),
         ("writer", &query.writer),
+        ("creator", &query.creator),
         ("underlying_mint", &query.mint),
         ("status", &query.status),
     ] {
@@ -177,9 +178,12 @@ pub async fn agreements(
         }
     }
     if offers_only {
-        sql.push(" AND status = 'funded' AND accept_before > ")
+        sql.push(" AND status = 'open' AND accept_before > ")
             .push_bind(chain_time.ok_or(AppError::Chain)?)
-            .push(" AND (projection ->> 'reserveAmount')::NUMERIC >= (projection ->> 'payout')::NUMERIC");
+            .push(" AND (projection ->> 'reserveAmount')::NUMERIC >= CASE WHEN side = 'holder' THEN (projection ->> 'premium')::NUMERIC ELSE (projection ->> 'payout')::NUMERIC END");
+    }
+    if let Some(side) = query.side {
+        sql.push(" AND side = ").push_bind(side.as_str());
     }
     for (expression, value) in [
         (
@@ -199,10 +203,10 @@ pub async fn agreements(
             sql.push(expression).push_bind(value).push("::NUMERIC");
         }
     }
-    if let Some(holder) = &query.eligible_holder {
-        sql.push(" AND writer <> ").push_bind(holder);
-        sql.push(" AND (projection ->> 'designatedHolder' IS NULL OR projection ->> 'designatedHolder' = ")
-            .push_bind(holder).push(")");
+    if let Some(counterparty) = &query.eligible_counterparty {
+        sql.push(" AND creator <> ").push_bind(counterparty);
+        sql.push(" AND (projection ->> 'designatedCounterparty' IS NULL OR projection ->> 'designatedCounterparty' = ")
+            .push_bind(counterparty).push(")");
     }
     sql.push(" ORDER BY address LIMIT ").push_bind(limit + 1);
     let rows: Vec<(Json<AgreementView>,)> = sql.build_query_as().fetch_all(pool).await?;
@@ -232,7 +236,7 @@ pub async fn agreement(pool: &PgPool, address: &str) -> Result<Option<AgreementV
 pub async fn active_addresses(pool: &PgPool, after: &str) -> Result<Vec<String>, AppError> {
     let rows: Vec<(String,)> = sqlx::query_as(
         "SELECT address FROM agreements
-         WHERE status IN ('funded', 'active') AND address > $1 ORDER BY address LIMIT 200",
+         WHERE status IN ('open', 'active') AND address > $1 ORDER BY address LIMIT 200",
     )
     .bind(after)
     .fetch_all(pool)

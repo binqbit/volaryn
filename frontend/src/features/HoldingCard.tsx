@@ -30,7 +30,10 @@ export function HoldingCard({ asset, accounts }: { asset: Asset; accounts: Token
         </p>
       )}
       <TokenAccounts accounts={accounts} symbol={asset.symbol} />
-      <Link className={styles.protect} to={`/offers?mint=${asset.mint}`}>
+      <Link className={styles.protect} to={`/offers/new?mint=${asset.mint}`}>
+        Request protection <span aria-hidden="true">↗</span>
+      </Link>
+      <Link className={styles.protect} to={`/offers?mint=${asset.mint}&side=writer`}>
         Find protection <span aria-hidden="true">↗</span>
       </Link>
     </article>

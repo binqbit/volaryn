@@ -64,10 +64,12 @@ export async function balanceFixture(page: Page) {
   );
   const agreement: Agreement = {
     address: addresses.agreement,
-    version: 1,
+    version: 2,
+    creator: deployment.localnet!.writer,
+    side: 'writer',
     writer: deployment.localnet!.writer,
     holder: null,
-    designatedHolder: null,
+    designatedCounterparty: null,
     underlyingMint: underlying.mint.address,
     underlyingDecimals: 9,
     underlyingProgram: 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',
@@ -77,7 +79,7 @@ export async function balanceFixture(page: Page) {
     premium: '500000',
     acceptBefore: String(now + 3600),
     expiresAt: String(now + 7200),
-    status: 'funded',
+    status: 'open',
     policyVersion: 1,
     reserve: addresses.reserve,
     reserveAmount: '20000000',

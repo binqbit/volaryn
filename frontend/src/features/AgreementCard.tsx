@@ -3,6 +3,7 @@ import { formatUnits, shortAddress, type Asset, type Agreement } from '../lib/ap
 import { date } from './ActionReview';
 import { agreementLifecycle } from './agreementLifecycle';
 import styles from '../App.module.css';
+import { OfferSideBadge } from './OfferSideBadge';
 
 export function AgreementCard({
   agreement,
@@ -16,11 +17,12 @@ export function AgreementCard({
   now: bigint | undefined;
 }) {
   const asset = assets.find((item) => item.mint === agreement.underlyingMint);
-  const funded = agreement.status === 'funded';
+  const open = agreement.status === 'open';
   const status = agreementLifecycle(agreement, now);
   return (
     <article className={styles.offerCard} aria-label={`Agreement ${agreement.address}`}>
       <div className={styles.cardHeading}>
+        <OfferSideBadge side={agreement.side} />
         <span className={styles.smallTag}>
           {import.meta.env.MODE === 'localnet' ? 'PRESTOCKS · LOCAL DEMO' : 'PRESTOCKS'}
         </span>
@@ -30,7 +32,14 @@ export function AgreementCard({
       </div>
       <h2>
         {asset?.name ?? shortAddress(agreement.underlyingMint)}{' '}
-        <span>{asset?.symbol ?? 'Unlisted asset'} · Funded exit right</span>
+        <span>
+          {asset?.symbol ?? 'Unlisted asset'} ·{' '}
+          {open && agreement.side === 'holder'
+            ? 'Awaiting payout funding'
+            : open
+              ? 'Payout reserved'
+              : 'Fixed exit terms'}
+        </span>
       </h2>
       <div className={styles.cardPayout}>
         <span>Fixed payout</span>
@@ -51,7 +60,7 @@ export function AgreementCard({
           <dt>Protection expires</dt>
           <dd>{date(agreement.expiresAt)}</dd>
         </div>
-        {funded && (
+        {open && (
           <div>
             <dt>Accept before</dt>
             <dd>{date(agreement.acceptBefore)}</dd>
@@ -59,15 +68,21 @@ export function AgreementCard({
         )}
       </dl>
       <p className={styles.cardOwner}>
-        {agreement.writer === owner
-          ? 'Written by your wallet'
-          : agreement.holder === owner
-            ? 'Protection purchased by your wallet'
-            : `Writer ${shortAddress(agreement.writer)}`}
-        {funded && (
+        {agreement.creator === owner && open
+          ? agreement.side === 'holder'
+            ? 'Requested by your wallet · premium escrowed'
+            : 'Written by your wallet'
+          : agreement.writer === owner
+            ? 'Written by your wallet'
+            : agreement.holder === owner
+              ? open || agreement.status === 'cancelled'
+                ? 'Requested by your wallet'
+                : 'Protection purchased by your wallet'
+              : `${agreement.side === 'holder' ? 'Requester' : 'Writer'} ${shortAddress(agreement.creator)}`}
+        {open && (
           <span>
-            {agreement.designatedHolder
-              ? agreement.designatedHolder === owner
+            {agreement.designatedCounterparty
+              ? agreement.designatedCounterparty === owner
                 ? 'Reserved for your wallet'
                 : 'Reserved for a designated wallet'
               : 'Open to eligible wallets'}
@@ -75,7 +90,7 @@ export function AgreementCard({
         )}
       </p>
       <Link className={styles.cardLink} to={`/agreements/${agreement.address}`}>
-        {funded ? 'View offer' : 'View agreement'} <span aria-hidden="true">↗</span>
+        {open ? 'View offer' : 'View agreement'} <span aria-hidden="true">↗</span>
       </Link>
     </article>
   );

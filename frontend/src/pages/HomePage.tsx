@@ -19,8 +19,8 @@ export function HomePage() {
             sell.
           </p>
           <div className={layout.actions}>
-            <Link className={layout.primaryButton} to="/offers">
-              Explore offers <span>↗</span>
+            <Link className={layout.primaryButton} to="/offers/new">
+              Request protection <span>↗</span>
             </Link>
             <a className={layout.outlineButton} href="#how-it-works">
               How it works ↓
@@ -31,7 +31,7 @@ export function HomePage() {
             For tokenized private-market exposure such as OpenAI, SpaceX and Anthropic.{' '}
             {import.meta.env.MODE === 'localnet'
               ? 'Explore local demo replicas or view the official PreStocks catalogue.'
-              : 'Browse funded offers and explore the official PreStocks catalogue.'}
+              : 'Browse requests and capital offers, and explore the official PreStocks catalogue.'}
           </p>
         </div>
         <div className={styles.diagram} role="group" aria-label="PreStocks price floor example">
@@ -81,8 +81,8 @@ export function HomePage() {
             Keep your PreStocks if you want to hold. If you choose to sell before expiry, deliver
             the agreed quantity for the fixed USDC payout, even if its market price has fallen.
           </p>
-          <Link to="/offers">
-            Find protection <span>↗</span>
+          <Link to="/offers/new">
+            Request protection <span>↗</span>
           </Link>
         </div>
         <div className={styles.role}>
@@ -93,11 +93,11 @@ export function HomePage() {
             Back them with USDC.
           </h2>
           <p>
-            Create an offer and reserve its full payout. Receive a premium when a holder accepts,
-            and buy their PreStocks tokens if they exercise.
+            Fund a holder's request or create a buy offer with its full payout reserved. Receive the
+            premium on activation, and buy their PreStocks tokens if they exercise.
           </p>
-          <Link to="/offers/new">
-            Create an offer <span>↗</span>
+          <Link to="/offers?side=holder">
+            Find requests to fund <span>↗</span>
           </Link>
         </div>
       </section>
@@ -106,17 +106,20 @@ export function HomePage() {
         <h2 id="how-title">Clear terms. Your decision.</h2>
         <div className={styles.steps}>
           <div>
-            <b>01 / FIND</b>
-            <h3>Choose a funded offer</h3>
+            <b>01 / REQUEST</b>
+            <h3>Set your exit terms</h3>
             <p>
-              Compare the PreStocks asset, quantity, payout, premium and expiry. The writer has
-              already reserved the payout.
+              Choose the token quantity, payout, premium and expiry. Escrow the premium in a sell
+              request, or accept an existing funded buy offer.
             </p>
           </div>
           <div>
             <b>02 / ACTIVATE</b>
-            <h3>Pay the premium</h3>
-            <p>Review and sign with your wallet. Your PreStocks tokens remain yours to hold.</p>
+            <h3>Wait for full payout funding</h3>
+            <p>
+              A provider accepts your request by reserving the full payout and receives the premium.
+              Protection starts only then; your tokens stay in your wallet.
+            </p>
           </div>
           <div>
             <b>03 / DECIDE</b>
@@ -128,9 +131,10 @@ export function HomePage() {
           </div>
         </div>
         <p className={styles.boundary}>
-          The floor applies to the agreed PreStocks quantity until expiry. You must choose to
-          exercise and deliver the transferable tokens; issuer restrictions can prevent delivery.
-          Sales are never automatic. Premium and network fees reduce your net proceeds.
+          After activation, the floor applies to the agreed PreStocks quantity until expiry. You
+          must choose to exercise and deliver the transferable tokens; issuer restrictions can
+          prevent delivery. Sales are never automatic. Premium and network fees reduce your net
+          proceeds.
         </p>
       </section>
       <section className={styles.start}>

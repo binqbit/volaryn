@@ -20,6 +20,7 @@ test('background wallet refresh preserves layout, focus, inputs and usable contr
   state.wallets[d.localnet!.writer]!.accounts = [fundingAccount];
   await page.goto('/offers/new');
   await connectWallet(page, 'Test Wallet 2');
+  await page.getByRole('button', { name: 'Provide protection', exact: true }).click();
   await selectAsset(page, 'OPENAI');
   const funding = page.getByRole('group', { name: 'Funding USDC account balance' });
   const holdings = page.getByRole('group', { name: 'OPENAI holdings' });

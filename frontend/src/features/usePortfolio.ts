@@ -6,6 +6,7 @@ import type { components } from '../lib/api/schema';
 
 export interface PortfolioQuery {
   mode: 'all' | 'offers' | 'writer' | 'holder';
+  side?: 'writer' | 'holder';
   mint?: string;
   quantityRaw?: string;
   minPayout?: string;
@@ -20,13 +21,14 @@ export function usePortfolio(
   after?: string,
   query: PortfolioQuery = { mode: 'all' },
 ) {
-  const { mode, mint, quantityRaw, minPayout, maxPremium, lifecycle } = query;
+  const { mode, side, mint, quantityRaw, minPayout, maxPremium, lifecycle } = query;
   const identity = JSON.stringify([
     deployment.genesisHash,
     owner,
     selected,
     after,
     mode,
+    side,
     mint,
     quantityRaw,
     minPayout,
@@ -36,13 +38,14 @@ export function usePortfolio(
   const source = useCallback(
     async (signal: AbortSignal) => {
       const params = {
+        side,
         after,
         mint,
         writer: mode === 'writer' ? owner : undefined,
         holder: mode === 'holder' ? owner : undefined,
         owner: mode === 'all' ? owner : undefined,
         lifecycle,
-        eligible_holder: mode === 'offers' ? owner : undefined,
+        eligible_counterparty: mode === 'offers' ? owner : undefined,
         quantity_raw: quantityRaw,
         min_payout: minPayout,
         max_premium: maxPremium,
@@ -65,10 +68,10 @@ export function usePortfolio(
       const observed = Array.isArray(result.data) ? result.data : [result.data];
       const agreements =
         mode === 'offers' && owner && !selected
-          ? observed.filter((agreement) => agreement.writer !== owner)
+          ? observed.filter((agreement) => agreement.creator !== owner)
           : observed;
       for (const value of agreements) {
-        if (value.version !== 1) throw new Error('An agreement version is unsupported');
+        if (value.version !== 2) throw new Error('An agreement version is unsupported');
         for (const raw of [
           value.quantityRaw,
           value.payout,
@@ -81,7 +84,19 @@ export function usePortfolio(
       }
       return { identity, agreements, next: result.response.headers.get('X-Next-Cursor') };
     },
-    [mint, owner, selected, after, mode, quantityRaw, minPayout, maxPremium, lifecycle, identity],
+    [
+      mint,
+      owner,
+      selected,
+      after,
+      mode,
+      side,
+      quantityRaw,
+      minPayout,
+      maxPremium,
+      lifecycle,
+      identity,
+    ],
   );
   const request = useRequest(source, { getAbortSignal: () => AbortSignal.timeout(8000) });
   const { refresh, status } = request;

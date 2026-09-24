@@ -35,6 +35,7 @@ test('issuer scaling is distinguished from unscaled input and the exact reviewed
   });
   await page.goto('/offers/new');
   await connectWallet(page, 'Test Wallet 2');
+  await page.getByRole('button', { name: 'Provide protection', exact: true }).click();
   await selectAsset(page, asset.symbol);
   const holding = page.getByRole('article', { name: 'ANTHROPIC wallet balance' });
   await expect(holding.locator('strong').first()).toHaveText('100');

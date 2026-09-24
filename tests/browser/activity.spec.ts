@@ -17,8 +17,11 @@ test('pending offers restore from the server, survive reload, and become complet
     signature,
     owner: d.localnet!.writer,
     agreement: state.agreement.address,
+    side: 'writer',
+    actorRole: 'writer',
     operation: 'create',
     createdTerms: {
+      side: 'writer',
       underlyingMint: state.agreement.underlyingMint,
       nonce: '91',
       quantityRaw: state.agreement.quantityRaw,
@@ -26,7 +29,7 @@ test('pending offers restore from the server, survive reload, and become complet
       premium: state.agreement.premium,
       acceptBefore: state.agreement.acceptBefore,
       expiresAt: state.agreement.expiresAt,
-      designatedHolder: null,
+      designatedCounterparty: null,
     },
     lastValidBlockHeight: '1000',
     status: finalized ? 'finalized' : 'pending',
@@ -71,9 +74,9 @@ test('pending offers restore from the server, survive reload, and become complet
   await page.goto('/portfolio');
   await connectWallet(page, 'Test Wallet 2');
   const progress = page.getByRole('region', { name: 'Operations in progress' });
-  await expect(progress).toContainText('Create funded offer');
+  await expect(progress).toContainText('Create capital offer');
   await expect(progress).toContainText('Awaiting confirmation');
-  await expect(page.getByRole('heading', { name: 'No offers created yet' })).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'No capital commitments yet' })).toHaveCount(0);
   const key = journalKey(d.genesisHash, d.programId, d.localnet!.writer);
   await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), key)).not.toBeNull();
   await page.reload();
@@ -126,6 +129,8 @@ test('interrupted signing remains visible without inventing a transaction or rec
             id: 'abandoned',
             owner,
             agreement,
+            side: 'writer',
+            actorRole: 'holder',
             operation: 'activate',
             status: 'awaiting-signature',
             createdAt: Date.now(),
@@ -180,6 +185,8 @@ test('an activity outage preserves ongoing confirmation and the saved signature'
     signature: '1'.repeat(64),
     owner: d.localnet!.holder,
     agreement: state.agreement.address,
+    side: 'writer',
+    actorRole: 'holder',
     operation: 'activate',
     createdTerms: null,
     lastValidBlockHeight: '1000',

@@ -18,7 +18,7 @@ pub enum VolarynError {
     AcceptanceClosed,
     #[msg("The signer is not the authorized holder")]
     WrongHolder,
-    #[msg("The reserve does not cover the fixed payout")]
+    #[msg("The reserve does not cover the required escrow")]
     InsufficientReserve,
     #[msg("The agreement has expired")]
     Expired,
@@ -34,4 +34,10 @@ pub enum VolarynError {
     InvalidSettlementCurrency,
     #[msg("The writer cannot be the protection holder")]
     WriterCannotBeHolder,
+    #[msg("This acceptance instruction does not match the offer side")]
+    WrongOfferSide,
+    #[msg("The signer is not the designated counterparty")]
+    WrongCounterparty,
+    #[msg("The signer is not authorized for this agreement action")]
+    UnauthorizedActor,
 }

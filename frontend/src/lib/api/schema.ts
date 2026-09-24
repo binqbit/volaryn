@@ -169,6 +169,7 @@ export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
         Activity: {
+            actorRole: components["schemas"]["OfferSide"];
             agreement: string;
             /** Format: int64 */
             createdAt: number;
@@ -177,6 +178,7 @@ export interface components {
             lastValidBlockHeight: string;
             operation: components["schemas"]["Operation"];
             owner: string;
+            side: components["schemas"]["OfferSide"];
             signature: string;
             status: components["schemas"]["Status"];
             /** Format: int64 */
@@ -203,7 +205,8 @@ export interface components {
         AgreementView: {
             acceptBefore: string;
             address: string;
-            designatedHolder?: string | null;
+            creator: string;
+            designatedCounterparty?: string | null;
             expiresAt: string;
             finalizedSlot: string;
             holder?: string | null;
@@ -218,6 +221,7 @@ export interface components {
             reserve: string;
             reserveAmount: string;
             settlement: string;
+            side: components["schemas"]["OfferSide"];
             status: string;
             /** Format: int32 */
             underlyingDecimals: number;
@@ -226,7 +230,7 @@ export interface components {
             usdcMint: string;
             /** Format: int32 */
             version: number;
-            writer: string;
+            writer?: string | null;
         };
         AssetView: {
             /** Format: int32 */
@@ -302,6 +306,8 @@ export interface components {
             tokenProgram: string;
             transparentTransferSupported: boolean;
         };
+        /** @enum {string} */
+        OfferSide: "writer" | "holder";
         OfficialAsset: {
             chain?: null | components["schemas"]["MintEvidence"];
             eligibility: components["schemas"]["Eligibility"];
@@ -359,12 +365,13 @@ export interface components {
         Status: "pending" | "provisional" | "finalized" | "failed" | "expired" | "reconciled" | "unresolved";
         Terms: {
             acceptBefore: string;
-            designatedHolder?: string | null;
+            designatedCounterparty?: string | null;
             expiresAt: string;
             nonce: string;
             payout: string;
             premium: string;
             quantityRaw: string;
+            side: components["schemas"]["OfferSide"];
             underlyingMint: string;
         };
         WalletTokenAccount: {
@@ -442,6 +449,9 @@ export interface operations {
                 limit?: number;
                 holder?: string;
                 writer?: string;
+                creator?: string;
+                /** @description Origin role of the offer creator; absent selects both origins. */
+                side?: components["schemas"]["OfferSide"];
                 /** @description Agreements written or held by this wallet. Applied before pagination. */
                 owner?: string;
                 mint?: string;
@@ -452,8 +462,8 @@ export interface operations {
                 quantity_raw?: string;
                 min_payout?: string;
                 max_premium?: string;
-                /** @description Include unrestricted offers and offers reserved for this holder, excluding their own offers. */
-                eligible_holder?: string;
+                /** @description Include unrestricted offers and offers reserved for this counterparty, excluding their own offers. */
+                eligible_counterparty?: string;
             };
             header?: never;
             path?: never;
@@ -560,6 +570,9 @@ export interface operations {
                 limit?: number;
                 holder?: string;
                 writer?: string;
+                creator?: string;
+                /** @description Origin role of the offer creator; absent selects both origins. */
+                side?: components["schemas"]["OfferSide"];
                 /** @description Agreements written or held by this wallet. Applied before pagination. */
                 owner?: string;
                 mint?: string;
@@ -570,8 +583,8 @@ export interface operations {
                 quantity_raw?: string;
                 min_payout?: string;
                 max_premium?: string;
-                /** @description Include unrestricted offers and offers reserved for this holder, excluding their own offers. */
-                eligible_holder?: string;
+                /** @description Include unrestricted offers and offers reserved for this counterparty, excluding their own offers. */
+                eligible_counterparty?: string;
             };
             header?: never;
             path?: never;

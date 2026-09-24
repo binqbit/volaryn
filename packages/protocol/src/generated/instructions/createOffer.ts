@@ -57,6 +57,12 @@ import {
   findSettlementPda,
 } from "../pdas";
 import { VOLARYN_PROGRAM_ADDRESS } from "../programs";
+import {
+  getOfferSideDecoder,
+  getOfferSideEncoder,
+  type OfferSide,
+  type OfferSideArgs,
+} from "../types";
 
 export const CREATE_OFFER_DISCRIMINATOR: ReadonlyUint8Array = new Uint8Array([
   237, 233, 192, 168, 248, 7, 249, 241,
@@ -70,12 +76,12 @@ export function getCreateOfferDiscriminatorBytes(): ReadonlyUint8Array {
 
 export type CreateOfferInstruction<
   TProgram extends string = typeof VOLARYN_PROGRAM_ADDRESS,
-  TAccountWriter extends string | AccountMeta<string> = string,
+  TAccountCreator extends string | AccountMeta<string> = string,
   TAccountConfig extends string | AccountMeta<string> = string,
   TAccountPolicy extends string | AccountMeta<string> = string,
   TAccountUnderlyingMint extends string | AccountMeta<string> = string,
   TAccountUsdcMint extends string | AccountMeta<string> = string,
-  TAccountWriterUsdc extends string | AccountMeta<string> = string,
+  TAccountCreatorUsdc extends string | AccountMeta<string> = string,
   TAccountAgreement extends string | AccountMeta<string> = string,
   TAccountReserve extends string | AccountMeta<string> = string,
   TAccountSettlement extends string | AccountMeta<string> = string,
@@ -90,10 +96,10 @@ export type CreateOfferInstruction<
   InstructionWithData<ReadonlyUint8Array> &
   InstructionWithAccounts<
     [
-      TAccountWriter extends string
-        ? WritableSignerAccount<TAccountWriter> &
-            AccountSignerMeta<TAccountWriter>
-        : TAccountWriter,
+      TAccountCreator extends string
+        ? WritableSignerAccount<TAccountCreator> &
+            AccountSignerMeta<TAccountCreator>
+        : TAccountCreator,
       TAccountConfig extends string
         ? ReadonlyAccount<TAccountConfig>
         : TAccountConfig,
@@ -106,9 +112,9 @@ export type CreateOfferInstruction<
       TAccountUsdcMint extends string
         ? ReadonlyAccount<TAccountUsdcMint>
         : TAccountUsdcMint,
-      TAccountWriterUsdc extends string
-        ? WritableAccount<TAccountWriterUsdc>
-        : TAccountWriterUsdc,
+      TAccountCreatorUsdc extends string
+        ? WritableAccount<TAccountCreatorUsdc>
+        : TAccountCreatorUsdc,
       TAccountAgreement extends string
         ? WritableAccount<TAccountAgreement>
         : TAccountAgreement,
@@ -134,7 +140,8 @@ export type CreateOfferInstruction<
 export type CreateOfferInstructionData = {
   discriminator: ReadonlyUint8Array;
   nonce: bigint;
-  designatedHolder: Option<Address>;
+  side: OfferSide;
+  designatedCounterparty: Option<Address>;
   quantityRaw: bigint;
   payout: bigint;
   premium: bigint;
@@ -144,7 +151,8 @@ export type CreateOfferInstructionData = {
 
 export type CreateOfferInstructionDataArgs = {
   nonce: number | bigint;
-  designatedHolder: OptionOrNullable<Address>;
+  side: OfferSideArgs;
+  designatedCounterparty: OptionOrNullable<Address>;
   quantityRaw: number | bigint;
   payout: number | bigint;
   premium: number | bigint;
@@ -157,7 +165,8 @@ export function getCreateOfferInstructionDataEncoder(): Encoder<CreateOfferInstr
     getStructEncoder([
       ["discriminator", fixEncoderSize(getBytesEncoder(), 8)],
       ["nonce", getU64Encoder()],
-      ["designatedHolder", getOptionEncoder(getAddressEncoder())],
+      ["side", getOfferSideEncoder()],
+      ["designatedCounterparty", getOptionEncoder(getAddressEncoder())],
       ["quantityRaw", getU64Encoder()],
       ["payout", getU64Encoder()],
       ["premium", getU64Encoder()],
@@ -172,7 +181,8 @@ export function getCreateOfferInstructionDataDecoder(): Decoder<CreateOfferInstr
   return getStructDecoder([
     ["discriminator", fixDecoderSize(getBytesDecoder(), 8)],
     ["nonce", getU64Decoder()],
-    ["designatedHolder", getOptionDecoder(getAddressDecoder())],
+    ["side", getOfferSideDecoder()],
+    ["designatedCounterparty", getOptionDecoder(getAddressDecoder())],
     ["quantityRaw", getU64Decoder()],
     ["payout", getU64Decoder()],
     ["premium", getU64Decoder()],
@@ -192,13 +202,13 @@ export function getCreateOfferInstructionDataCodec(): Codec<
 }
 
 export type CreateOfferAsyncInput<
-  TAccountWriter extends InstructionSignerInput = InstructionSignerInput,
+  TAccountCreator extends InstructionSignerInput = InstructionSignerInput,
   TAccountConfig extends InstructionAccountInput = InstructionAccountInput,
   TAccountPolicy extends InstructionAccountInput = InstructionAccountInput,
   TAccountUnderlyingMint extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountUsdcMint extends InstructionAccountInput = InstructionAccountInput,
-  TAccountWriterUsdc extends InstructionAccountInput = InstructionAccountInput,
+  TAccountCreatorUsdc extends InstructionAccountInput = InstructionAccountInput,
   TAccountAgreement extends InstructionAccountInput = InstructionAccountInput,
   TAccountReserve extends InstructionAccountInput = InstructionAccountInput,
   TAccountSettlement extends InstructionAccountInput = InstructionAccountInput,
@@ -208,12 +218,12 @@ export type CreateOfferAsyncInput<
   TAccountSystemProgram extends InstructionAccountInput =
     InstructionAccountInput,
 > = {
-  writer: TAccountWriter;
+  creator: TAccountCreator;
   config?: TAccountConfig;
   policy?: TAccountPolicy;
   underlyingMint: TAccountUnderlyingMint;
   usdcMint: TAccountUsdcMint;
-  writerUsdc: TAccountWriterUsdc;
+  creatorUsdc: TAccountCreatorUsdc;
   agreement: TAccountAgreement;
   reserve?: TAccountReserve;
   settlement?: TAccountSettlement;
@@ -221,7 +231,8 @@ export type CreateOfferAsyncInput<
   usdcProgram?: TAccountUsdcProgram;
   systemProgram?: TAccountSystemProgram;
   nonce: CreateOfferInstructionDataArgs["nonce"];
-  designatedHolder: CreateOfferInstructionDataArgs["designatedHolder"];
+  side: CreateOfferInstructionDataArgs["side"];
+  designatedCounterparty: CreateOfferInstructionDataArgs["designatedCounterparty"];
   quantityRaw: CreateOfferInstructionDataArgs["quantityRaw"];
   payout: CreateOfferInstructionDataArgs["payout"];
   premium: CreateOfferInstructionDataArgs["premium"];
@@ -230,12 +241,12 @@ export type CreateOfferAsyncInput<
 };
 
 export async function getCreateOfferInstructionAsync<
-  TAccountWriter extends InstructionSignerInput,
+  TAccountCreator extends InstructionSignerInput,
   TAccountConfig extends InstructionAccountInput,
   TAccountPolicy extends InstructionAccountInput,
   TAccountUnderlyingMint extends InstructionAccountInput,
   TAccountUsdcMint extends InstructionAccountInput,
-  TAccountWriterUsdc extends InstructionAccountInput,
+  TAccountCreatorUsdc extends InstructionAccountInput,
   TAccountAgreement extends InstructionAccountInput,
   TAccountReserve extends InstructionAccountInput,
   TAccountSettlement extends InstructionAccountInput,
@@ -245,12 +256,12 @@ export async function getCreateOfferInstructionAsync<
   TProgramAddress extends Address = typeof VOLARYN_PROGRAM_ADDRESS,
 >(
   input: CreateOfferAsyncInput<
-    TAccountWriter,
+    TAccountCreator,
     TAccountConfig,
     TAccountPolicy,
     TAccountUnderlyingMint,
     TAccountUsdcMint,
-    TAccountWriterUsdc,
+    TAccountCreatorUsdc,
     TAccountAgreement,
     TAccountReserve,
     TAccountSettlement,
@@ -263,8 +274,8 @@ export async function getCreateOfferInstructionAsync<
   CreateOfferInstruction<
     TProgramAddress,
     ResolvedInstructionAccountMeta<
-      TAccountWriter,
-      InstructionAccountInputAddress<TAccountWriter>
+      TAccountCreator,
+      InstructionAccountInputAddress<TAccountCreator>
     >,
     ResolvedInstructionAccountMeta<
       TAccountConfig,
@@ -283,8 +294,8 @@ export async function getCreateOfferInstructionAsync<
       InstructionAccountInputAddress<TAccountUsdcMint>
     >,
     ResolvedInstructionAccountMeta<
-      TAccountWriterUsdc,
-      InstructionAccountInputAddress<TAccountWriterUsdc>
+      TAccountCreatorUsdc,
+      InstructionAccountInputAddress<TAccountCreatorUsdc>
     >,
     ResolvedInstructionAccountMeta<
       TAccountAgreement,
@@ -320,7 +331,7 @@ export async function getCreateOfferInstructionAsync<
 
   // Original accounts.
   const originalAccounts = {
-    writer: { value: input.writer ?? null, isSigner: true, isWritable: true },
+    creator: { value: input.creator ?? null, isSigner: true, isWritable: true },
     config: { value: input.config ?? null, isSigner: false, isWritable: false },
     policy: { value: input.policy ?? null, isSigner: false, isWritable: false },
     underlyingMint: {
@@ -333,8 +344,8 @@ export async function getCreateOfferInstructionAsync<
       isSigner: false,
       isWritable: false,
     },
-    writerUsdc: {
-      value: input.writerUsdc ?? null,
+    creatorUsdc: {
+      value: input.creatorUsdc ?? null,
       isSigner: false,
       isWritable: true,
     },
@@ -429,12 +440,12 @@ export async function getCreateOfferInstructionAsync<
 
   return Object.freeze({
     accounts: [
-      getAccountMeta("writer", accounts.writer),
+      getAccountMeta("creator", accounts.creator),
       getAccountMeta("config", accounts.config),
       getAccountMeta("policy", accounts.policy),
       getAccountMeta("underlyingMint", accounts.underlyingMint),
       getAccountMeta("usdcMint", accounts.usdcMint),
-      getAccountMeta("writerUsdc", accounts.writerUsdc),
+      getAccountMeta("creatorUsdc", accounts.creatorUsdc),
       getAccountMeta("agreement", accounts.agreement),
       getAccountMeta("reserve", accounts.reserve),
       getAccountMeta("settlement", accounts.settlement),
@@ -449,8 +460,8 @@ export async function getCreateOfferInstructionAsync<
   } as CreateOfferInstruction<
     TProgramAddress,
     ResolvedInstructionAccountMeta<
-      TAccountWriter,
-      InstructionAccountInputAddress<TAccountWriter>
+      TAccountCreator,
+      InstructionAccountInputAddress<TAccountCreator>
     >,
     ResolvedInstructionAccountMeta<
       TAccountConfig,
@@ -469,8 +480,8 @@ export async function getCreateOfferInstructionAsync<
       InstructionAccountInputAddress<TAccountUsdcMint>
     >,
     ResolvedInstructionAccountMeta<
-      TAccountWriterUsdc,
-      InstructionAccountInputAddress<TAccountWriterUsdc>
+      TAccountCreatorUsdc,
+      InstructionAccountInputAddress<TAccountCreatorUsdc>
     >,
     ResolvedInstructionAccountMeta<
       TAccountAgreement,
@@ -500,13 +511,13 @@ export async function getCreateOfferInstructionAsync<
 }
 
 export type CreateOfferInput<
-  TAccountWriter extends InstructionSignerInput = InstructionSignerInput,
+  TAccountCreator extends InstructionSignerInput = InstructionSignerInput,
   TAccountConfig extends InstructionAccountInput = InstructionAccountInput,
   TAccountPolicy extends InstructionAccountInput = InstructionAccountInput,
   TAccountUnderlyingMint extends InstructionAccountInput =
     InstructionAccountInput,
   TAccountUsdcMint extends InstructionAccountInput = InstructionAccountInput,
-  TAccountWriterUsdc extends InstructionAccountInput = InstructionAccountInput,
+  TAccountCreatorUsdc extends InstructionAccountInput = InstructionAccountInput,
   TAccountAgreement extends InstructionAccountInput = InstructionAccountInput,
   TAccountReserve extends InstructionAccountInput = InstructionAccountInput,
   TAccountSettlement extends InstructionAccountInput = InstructionAccountInput,
@@ -516,12 +527,12 @@ export type CreateOfferInput<
   TAccountSystemProgram extends InstructionAccountInput =
     InstructionAccountInput,
 > = {
-  writer: TAccountWriter;
+  creator: TAccountCreator;
   config: TAccountConfig;
   policy: TAccountPolicy;
   underlyingMint: TAccountUnderlyingMint;
   usdcMint: TAccountUsdcMint;
-  writerUsdc: TAccountWriterUsdc;
+  creatorUsdc: TAccountCreatorUsdc;
   agreement: TAccountAgreement;
   reserve: TAccountReserve;
   settlement: TAccountSettlement;
@@ -529,7 +540,8 @@ export type CreateOfferInput<
   usdcProgram?: TAccountUsdcProgram;
   systemProgram?: TAccountSystemProgram;
   nonce: CreateOfferInstructionDataArgs["nonce"];
-  designatedHolder: CreateOfferInstructionDataArgs["designatedHolder"];
+  side: CreateOfferInstructionDataArgs["side"];
+  designatedCounterparty: CreateOfferInstructionDataArgs["designatedCounterparty"];
   quantityRaw: CreateOfferInstructionDataArgs["quantityRaw"];
   payout: CreateOfferInstructionDataArgs["payout"];
   premium: CreateOfferInstructionDataArgs["premium"];
@@ -538,12 +550,12 @@ export type CreateOfferInput<
 };
 
 export function getCreateOfferInstruction<
-  TAccountWriter extends InstructionSignerInput,
+  TAccountCreator extends InstructionSignerInput,
   TAccountConfig extends InstructionAccountInput,
   TAccountPolicy extends InstructionAccountInput,
   TAccountUnderlyingMint extends InstructionAccountInput,
   TAccountUsdcMint extends InstructionAccountInput,
-  TAccountWriterUsdc extends InstructionAccountInput,
+  TAccountCreatorUsdc extends InstructionAccountInput,
   TAccountAgreement extends InstructionAccountInput,
   TAccountReserve extends InstructionAccountInput,
   TAccountSettlement extends InstructionAccountInput,
@@ -553,12 +565,12 @@ export function getCreateOfferInstruction<
   TProgramAddress extends Address = typeof VOLARYN_PROGRAM_ADDRESS,
 >(
   input: CreateOfferInput<
-    TAccountWriter,
+    TAccountCreator,
     TAccountConfig,
     TAccountPolicy,
     TAccountUnderlyingMint,
     TAccountUsdcMint,
-    TAccountWriterUsdc,
+    TAccountCreatorUsdc,
     TAccountAgreement,
     TAccountReserve,
     TAccountSettlement,
@@ -570,8 +582,8 @@ export function getCreateOfferInstruction<
 ): CreateOfferInstruction<
   TProgramAddress,
   ResolvedInstructionAccountMeta<
-    TAccountWriter,
-    InstructionAccountInputAddress<TAccountWriter>
+    TAccountCreator,
+    InstructionAccountInputAddress<TAccountCreator>
   >,
   ResolvedInstructionAccountMeta<
     TAccountConfig,
@@ -590,8 +602,8 @@ export function getCreateOfferInstruction<
     InstructionAccountInputAddress<TAccountUsdcMint>
   >,
   ResolvedInstructionAccountMeta<
-    TAccountWriterUsdc,
-    InstructionAccountInputAddress<TAccountWriterUsdc>
+    TAccountCreatorUsdc,
+    InstructionAccountInputAddress<TAccountCreatorUsdc>
   >,
   ResolvedInstructionAccountMeta<
     TAccountAgreement,
@@ -626,7 +638,7 @@ export function getCreateOfferInstruction<
 
   // Original accounts.
   const originalAccounts = {
-    writer: { value: input.writer ?? null, isSigner: true, isWritable: true },
+    creator: { value: input.creator ?? null, isSigner: true, isWritable: true },
     config: { value: input.config ?? null, isSigner: false, isWritable: false },
     policy: { value: input.policy ?? null, isSigner: false, isWritable: false },
     underlyingMint: {
@@ -639,8 +651,8 @@ export function getCreateOfferInstruction<
       isSigner: false,
       isWritable: false,
     },
-    writerUsdc: {
-      value: input.writerUsdc ?? null,
+    creatorUsdc: {
+      value: input.creatorUsdc ?? null,
       isSigner: false,
       isWritable: true,
     },
@@ -699,12 +711,12 @@ export function getCreateOfferInstruction<
 
   return Object.freeze({
     accounts: [
-      getAccountMeta("writer", accounts.writer),
+      getAccountMeta("creator", accounts.creator),
       getAccountMeta("config", accounts.config),
       getAccountMeta("policy", accounts.policy),
       getAccountMeta("underlyingMint", accounts.underlyingMint),
       getAccountMeta("usdcMint", accounts.usdcMint),
-      getAccountMeta("writerUsdc", accounts.writerUsdc),
+      getAccountMeta("creatorUsdc", accounts.creatorUsdc),
       getAccountMeta("agreement", accounts.agreement),
       getAccountMeta("reserve", accounts.reserve),
       getAccountMeta("settlement", accounts.settlement),
@@ -719,8 +731,8 @@ export function getCreateOfferInstruction<
   } as CreateOfferInstruction<
     TProgramAddress,
     ResolvedInstructionAccountMeta<
-      TAccountWriter,
-      InstructionAccountInputAddress<TAccountWriter>
+      TAccountCreator,
+      InstructionAccountInputAddress<TAccountCreator>
     >,
     ResolvedInstructionAccountMeta<
       TAccountConfig,
@@ -739,8 +751,8 @@ export function getCreateOfferInstruction<
       InstructionAccountInputAddress<TAccountUsdcMint>
     >,
     ResolvedInstructionAccountMeta<
-      TAccountWriterUsdc,
-      InstructionAccountInputAddress<TAccountWriterUsdc>
+      TAccountCreatorUsdc,
+      InstructionAccountInputAddress<TAccountCreatorUsdc>
     >,
     ResolvedInstructionAccountMeta<
       TAccountAgreement,
@@ -775,12 +787,12 @@ export type ParsedCreateOfferInstruction<
 > = {
   programAddress: Address<TProgram>;
   accounts: {
-    writer: TAccountMetas[0];
+    creator: TAccountMetas[0];
     config: TAccountMetas[1];
     policy: TAccountMetas[2];
     underlyingMint: TAccountMetas[3];
     usdcMint: TAccountMetas[4];
-    writerUsdc: TAccountMetas[5];
+    creatorUsdc: TAccountMetas[5];
     agreement: TAccountMetas[6];
     reserve: TAccountMetas[7];
     settlement: TAccountMetas[8];
@@ -817,12 +829,12 @@ export function parseCreateOfferInstruction<
   return {
     programAddress: instruction.programAddress,
     accounts: {
-      writer: getNextAccount(),
+      creator: getNextAccount(),
       config: getNextAccount(),
       policy: getNextAccount(),
       underlyingMint: getNextAccount(),
       usdcMint: getNextAccount(),
-      writerUsdc: getNextAccount(),
+      creatorUsdc: getNextAccount(),
       agreement: getNextAccount(),
       reserve: getNextAccount(),
       settlement: getNextAccount(),

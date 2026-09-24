@@ -2,13 +2,14 @@ import { expect, test, type Page } from '@playwright/test';
 import { address, createSolanaRpc } from '@solana/kit';
 import { fetchToken } from '@solana-program/token';
 import { fetchToken as fetchAsset } from '@solana-program/token-2022';
-import { AgreementStatus, fetchAgreement, protocolAddresses } from '@volaryn/protocol';
+import { AgreementStatus, OfferSide, fetchAgreement, protocolAddresses } from '@volaryn/protocol';
 import type { Deployment, Wallet } from '../../frontend/src/lib/api/client';
 import { signAction, switchWallet, selectAsset } from './support/actions';
 
 async function fillOffer(page: Page, expiry?: bigint) {
   await page.goto('/offers/new');
   await switchWallet(page, 'writer');
+  await page.getByRole('button', { name: 'Provide protection', exact: true }).click();
   await selectAsset(page, 'SPACEX');
   await page.getByLabel('Gross quantity (unscaled tokens)', { exact: true }).fill('0.2');
   await page.getByLabel('Payout (USDC)', { exact: true }).fill('5');
@@ -89,7 +90,7 @@ test('writer funds and cancels offers, holder matches and exercises, writer rece
 
   await fillOffer(page);
   await page.getByText('Restrict to a wallet', { exact: true }).click();
-  await page.getByLabel('Designated holder (optional)').fill(config.localnet!.holder);
+  await page.getByLabel('Designated counterparty (optional)').fill(config.localnet!.holder);
   await signAction(page, 'Review funded offer');
   const agreementAddress = address(page.url().split('/').at(-1)!);
   await switchWallet(page, 'holder');
@@ -99,9 +100,7 @@ test('writer funds and cancels offers, holder matches and exercises, writer rece
   await page.getByText('More filters', { exact: true }).click();
   await page.getByLabel('Exact quantity (unscaled tokens)').fill('0.3');
   await page.getByRole('button', { name: 'Find matching offers' }).click();
-  await expect(
-    page.getByText('No funded offers match these terms.', { exact: false }),
-  ).toBeVisible();
+  await expect(page.getByText('No offers match these terms.', { exact: false })).toBeVisible();
   await page.getByLabel('Exact quantity (unscaled tokens)').fill('0.2');
   await page.getByLabel('Minimum payout (USDC)').fill('5');
   await page.getByLabel('Maximum premium (USDC)').fill('0.1');
@@ -157,7 +156,7 @@ test('writer funds and cancels offers, holder matches and exercises, writer rece
     )
     .toEqual(['activate', 'exercise']);
   expect(settled.netReceived).toBe(198500000n);
-  const accounts = await protocolAddresses(settled.underlyingMint, settled.writer, settled.nonce);
+  const accounts = await protocolAddresses(settled.underlyingMint, settled.creator, settled.nonce);
   const receipt = (await fetchAsset(rpc, accounts.settlement)).data;
   expect(receipt.owner).toBe(config.localnet!.writer);
   expect(receipt.amount).toBe(settled.netReceived);
@@ -259,4 +258,105 @@ test('wallet switch during fee preparation discards the previous request', async
   await expect(page.getByRole('alert')).toContainText('Wallet changed while preparing');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   expect(submissions).toBe(0);
+});
+
+test('holder requests escrow only premium, refund cancellation, and settle after a provider funds', async ({
+  page,
+  request,
+  baseURL,
+}, info) => {
+  test.setTimeout(300_000);
+  const config = (await (await request.get('/api/config')).json()) as Deployment;
+  const local = config.localnet!;
+  const asset = config.assets.find((item) => item.symbol === 'SPACEX')!;
+  const rpc = createSolanaRpc(`${baseURL}/rpc`);
+  const wallet = (await (await request.get(`/api/wallet?owner=${local.holder}`)).json()) as Wallet;
+  const delivery = address(wallet.accounts.find((account) => account.mint === asset.mint)!.address);
+  const cash = async (owner: 'holder' | 'writer') =>
+    (await fetchToken(rpc, address(local[`${owner}Usdc`]), { commitment: 'finalized' })).data
+      .amount;
+  const tokens = async () =>
+    (await fetchAsset(rpc, delivery, { commitment: 'finalized' })).data.amount;
+  const initial = {
+    holder: await cash('holder'),
+    writer: await cash('writer'),
+    tokens: await tokens(),
+  };
+  const createRequest = async () => {
+    await page.goto('/offers/new');
+    await switchWallet(page, 'holder');
+    await expect(
+      page.getByRole('button', { name: 'Request protection', exact: true }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    await selectAsset(page, 'SPACEX');
+    await page.getByLabel('Gross quantity (unscaled tokens)', { exact: true }).fill('0.2');
+    await page.getByLabel('Payout (USDC)', { exact: true }).fill('5');
+    await page.getByLabel('Premium (USDC)', { exact: true }).fill('0.1');
+    await expect(page.getByRole('group', { name: 'Funding USDC account balance' })).toContainText(
+      'Premium to escrow',
+    );
+    await signAction(page, 'Review protection request');
+    return address(page.url().split('/').at(-1)!);
+  };
+
+  const cancelledAddress = await createRequest();
+  const open = (await fetchAgreement(rpc, cancelledAddress)).data;
+  expect(open.side).toBe(OfferSide.Holder);
+  expect(open.creator).toBe(local.holder);
+  expect(open.writer).toEqual({ __option: 'None' });
+  expect(open.status).toBe(AgreementStatus.Open);
+  const cancelledAccounts = await protocolAddresses(open.underlyingMint, open.creator, open.nonce);
+  expect((await fetchToken(rpc, cancelledAccounts.reserve)).data.amount).toBe(100_000n);
+  expect(await cash('holder')).toBe(initial.holder - 100_000n);
+  expect(await cash('writer')).toBe(initial.writer);
+  expect(await tokens()).toBe(initial.tokens);
+  await expect(page.getByLabel('Your agreement role')).toHaveText(
+    'Your role: requester · no active protection',
+  );
+  await expect(page.getByRole('button', { name: 'Fund protection', exact: true })).toHaveCount(0);
+  await signAction(page, 'Cancel request');
+  expect((await fetchAgreement(rpc, cancelledAddress)).data.status).toBe(AgreementStatus.Cancelled);
+  expect(await cash('holder')).toBe(initial.holder);
+  await signAction(page, 'Recover residual funds');
+  expect((await fetchAsset(rpc, cancelledAccounts.settlement)).data.owner).toBe(local.holder);
+
+  const agreementAddress = await createRequest();
+  const agreementUrl = page.url();
+  await switchWallet(page, 'writer');
+  await expect(page.getByRole('button', { name: 'Cancel request', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('group', { name: 'USDC account balance' })).toContainText(
+    'Full payout to reserve',
+  );
+  await signAction(page, 'Fund protection');
+  const active = (await fetchAgreement(rpc, agreementAddress)).data;
+  const accounts = await protocolAddresses(active.underlyingMint, active.creator, active.nonce);
+  expect(active.status).toBe(AgreementStatus.Active);
+  expect(active.writer).toEqual({ __option: 'Some', value: local.writer });
+  expect(active.holder).toEqual({ __option: 'Some', value: local.holder });
+  expect((await fetchToken(rpc, accounts.reserve)).data.amount).toBe(5_000_000n);
+  expect(await cash('writer')).toBe(initial.writer - 5_000_000n + 100_000n);
+  expect(await cash('holder')).toBe(initial.holder - 100_000n);
+  expect(await tokens()).toBe(initial.tokens);
+  await expect(page.getByRole('button', { name: 'Reserve locked until expiry' })).toBeDisabled();
+  await switchWallet(page, 'holder');
+  await page.reload();
+  await expect(page).toHaveURL(agreementUrl);
+  await signAction(page, 'Exercise protection');
+  const exercised = (await fetchAgreement(rpc, agreementAddress)).data;
+  expect(exercised.status).toBe(AgreementStatus.Exercised);
+  expect(exercised.netReceived).toBe(198_500_000n);
+  expect(await tokens()).toBe(initial.tokens - 200_000_000n);
+  expect(await cash('holder')).toBe(initial.holder - 100_000n + 5_000_000n);
+  expect((await fetchToken(rpc, accounts.reserve)).data.amount).toBe(0n);
+  expect((await fetchAsset(rpc, accounts.settlement)).data.owner).toBe(local.writer);
+  await expect
+    .poll(async () => {
+      const history = await (await request.get(`/api/activity?owner=${local.writer}`)).json();
+      return history.items.find(
+        (item: { agreement: string; operation: string }) =>
+          item.agreement === agreementAddress && item.operation === 'activate',
+      );
+    })
+    .toMatchObject({ side: 'holder', actorRole: 'writer', status: 'finalized' });
+  await page.screenshot({ path: info.outputPath('holder-request-exercised.png'), fullPage: true });
 });

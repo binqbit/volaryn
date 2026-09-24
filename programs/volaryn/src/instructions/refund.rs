@@ -1,7 +1,7 @@
 use super::validation::check_state;
 use crate::{
     error::VolarynError,
-    state::{Agreement, AgreementStatus},
+    state::{Agreement, AgreementStatus, OfferSide},
     token,
 };
 use anchor_lang::prelude::*;
@@ -12,12 +12,11 @@ use anchor_spl::{
 
 #[derive(Accounts)]
 pub struct Refund<'info> {
-    pub writer: Signer<'info>,
+    pub actor: Signer<'info>,
     #[account(
         mut,
-        seeds = [b"agreement", writer.key().as_ref(), &agreement.nonce.to_le_bytes()],
-        bump = agreement.bump,
-        has_one = writer
+        seeds = [b"agreement", agreement.creator.as_ref(), &agreement.nonce.to_le_bytes()],
+        bump = agreement.bump
     )]
     pub agreement: Box<Account<'info, Agreement>>,
     #[account(address = agreement.usdc_mint, owner = usdc_program.key())]
@@ -34,10 +33,10 @@ pub struct Refund<'info> {
     #[account(
         mut,
         token::mint = usdc_mint,
-        token::authority = writer,
+        token::authority = actor,
         token::token_program = usdc_program
     )]
-    pub writer_usdc: InterfaceAccount<'info, TokenAccount>,
+    pub actor_usdc: InterfaceAccount<'info, TokenAccount>,
     #[account(address = agreement.usdc_program)]
     pub usdc_program: Program<'info, Token>,
 }
@@ -50,26 +49,41 @@ pub fn handle_refund(ctx: Context<Refund>, expired: bool) -> Result<()> {
         if expired {
             AgreementStatus::Active
         } else {
-            AgreementStatus::Funded
+            AgreementStatus::Open
         },
     )?;
+    let recipient = if expired {
+        agreement.writer.ok_or(VolarynError::InvalidState)?
+    } else {
+        agreement.creator
+    };
+    require_keys_eq!(
+        ctx.accounts.actor.key(),
+        recipient,
+        VolarynError::UnauthorizedActor
+    );
+    let amount = if !expired && agreement.side == OfferSide::Holder {
+        agreement.premium
+    } else {
+        agreement.payout
+    };
     if expired {
         require!(now >= agreement.expires_at, VolarynError::NotExpired);
     }
     require!(
-        ctx.accounts.reserve.amount >= agreement.payout,
+        ctx.accounts.reserve.amount >= amount,
         VolarynError::InsufficientReserve
     );
     let nonce = agreement.nonce.to_le_bytes();
     let bump = [agreement.bump];
-    let seeds: &[&[u8]] = &[b"agreement", agreement.writer.as_ref(), &nonce, &bump];
+    let seeds: &[&[u8]] = &[b"agreement", agreement.creator.as_ref(), &nonce, &bump];
     token::transfer(
         &ctx.accounts.usdc_program.to_account_info(),
         &ctx.accounts.reserve.to_account_info(),
         &ctx.accounts.usdc_mint.to_account_info(),
-        &ctx.accounts.writer_usdc.to_account_info(),
+        &ctx.accounts.actor_usdc.to_account_info(),
         &agreement.to_account_info(),
-        agreement.payout,
+        amount,
         ctx.accounts.usdc_mint.decimals,
         &[seeds],
     )?;

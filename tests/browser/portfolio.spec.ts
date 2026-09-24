@@ -8,7 +8,7 @@ test('All combines wallet roles and keeps status selection through navigation, p
   const { state } = await balanceFixture(page);
   const d = state.deployment;
   const owner = d.localnet!.holder;
-  const written = { ...state.agreement, writer: owner };
+  const written = { ...state.agreement, creator: owner, writer: owner };
   const purchased = { ...state.agreement, address: d.authority, holder: owner, status: 'active' };
   const second = { ...purchased, address: d.usdcMint };
   const queries: URL[] = [];
@@ -53,7 +53,9 @@ test('All combines wallet roles and keeps status selection through navigation, p
   await expect(cards.filter({ hasText: 'Protection purchased by your wallet' })).toHaveCount(1);
   // The holder's payout must not be counted as capital this wallet wrote.
   await expect(
-    page.getByText('Reserved in your funded and active offers on this page:', { exact: false }),
+    page.getByText('Payout reserved in your open and active capital commitments on this page:', {
+      exact: false,
+    }),
   ).toContainText('20 USDC');
   expect(queries.at(-1)!.searchParams.get('owner')).toBe(owner);
   for (const width of [1440, 375]) {

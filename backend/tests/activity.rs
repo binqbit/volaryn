@@ -36,6 +36,7 @@ struct Network {
     simulation_started: tokio::sync::Notify,
     resume_simulation: tokio::sync::Notify,
     statuses: Mutex<BTreeMap<String, Value>>,
+    accounts: Mutex<BTreeMap<String, Value>>,
 }
 async fn upstream(State(state): State<Arc<Network>>, Json(request): Json<Value>) -> Json<Value> {
     let result = match request["method"].as_str().unwrap() {
@@ -45,7 +46,13 @@ async fn upstream(State(state): State<Arc<Network>>, Json(request): Json<Value>)
         {
             support::identity::response(&request, &support::deployment()).unwrap()
         }
-        "getAccountInfo" => json!({"context":{"slot":1000},"value":null}),
+        "getAccountInfo" => {
+            json!({"context":{"slot":1000},"value":state.accounts.lock().unwrap().get(request["params"][0].as_str().unwrap()).cloned().unwrap_or(Value::Null)})
+        }
+        "getMultipleAccounts" => {
+            let accounts = state.accounts.lock().unwrap();
+            json!({"context":{"slot":1000},"value":request["params"][0].as_array().unwrap().iter().map(|key| accounts.get(key.as_str().unwrap()).cloned().unwrap_or(Value::Null)).collect::<Vec<_>>()})
+        }
         "isBlockhashValid" => json!({"context":{"slot":10},"value":true}),
         "getLatestBlockhash" => json!({"value":{"lastValidBlockHeight":200}}),
         "getEpochInfo" => {
@@ -124,6 +131,7 @@ async fn authenticated_receipts_survive_relay_duplicates_and_reconcile_without_a
         simulation_started: tokio::sync::Notify::new(),
         resume_simulation: tokio::sync::Notify::new(),
         statuses: Mutex::default(),
+        accounts: Mutex::default(),
     });
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let url = format!("http://{}", listener.local_addr().unwrap());
@@ -338,6 +346,150 @@ async fn authenticated_receipts_survive_relay_duplicates_and_reconcile_without_a
 use std::future::IntoFuture;
 
 #[tokio::test]
+async fn both_origins_persist_verified_side_and_actor_role_for_every_operation() {
+    use volaryn::state::{AgreementStatus, OfferSide as ChainSide};
+    use volaryn_backend::{activity::Operation, observations::OfferSide};
+    let database = database::Database::new().await;
+    let deployment = support::deployment();
+    let pool = store::open(database.options.clone(), &deployment)
+        .await
+        .unwrap();
+    let network = Arc::new(Network {
+        pool: pool.clone(),
+        height: AtomicU64::new(10),
+        sent: AtomicU64::new(0),
+        reject_submissions: AtomicBool::new(false),
+        simulated: AtomicU64::new(0),
+        simulation: Mutex::new(Some(json!({"context":{"slot":10},"value":{"err":null}}))),
+        pause_simulation: AtomicBool::new(false),
+        simulation_started: tokio::sync::Notify::new(),
+        resume_simulation: tokio::sync::Notify::new(),
+        statuses: Mutex::default(),
+        accounts: Mutex::default(),
+    });
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let endpoint = format!("http://{}", listener.local_addr().unwrap());
+    let server = tokio::spawn(
+        axum::serve(
+            listener,
+            Router::new()
+                .route("/", post(upstream))
+                .with_state(network.clone()),
+        )
+        .into_future(),
+    );
+    let app = Application::new(
+        deployment,
+        Chain::new(endpoint.clone()).unwrap(),
+        pool.clone(),
+        volaryn_backend::catalog::Catalog::new(endpoint).unwrap(),
+    );
+    for (side_index, side) in [ChainSide::Writer, ChainSide::Holder]
+        .into_iter()
+        .enumerate()
+    {
+        for (index, (operation, status)) in [
+            (Operation::Cancel, AgreementStatus::Open),
+            (Operation::Activate, AgreementStatus::Open),
+            (Operation::Exercise, AgreementStatus::Active),
+            (Operation::Reclaim, AgreementStatus::Active),
+            (Operation::Cleanup, AgreementStatus::Cancelled),
+            (Operation::Cleanup, AgreementStatus::Exercised),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let origin = SignedAction::create_side(2000 + (side_index * 10 + index) as u64, side);
+            app.record_submission(&origin.params()).await.unwrap();
+            let created = receipts::find(&pool, &origin.signature())
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(created.side, OfferSide::from(side));
+            assert_eq!(created.actor_role, OfferSide::from(side));
+            assert_eq!(
+                created.created_terms.as_ref().unwrap().side,
+                OfferSide::from(side)
+            );
+            let mut state = origin.state();
+            let counterpart = origin.operation(volaryn::instruction::Activate {}.data(), 8);
+            if matches!(status, AgreementStatus::Active | AgreementStatus::Exercised) {
+                match side {
+                    ChainSide::Writer => state.holder = Some(counterpart.owner.parse().unwrap()),
+                    ChainSide::Holder => state.writer = Some(counterpart.owner.parse().unwrap()),
+                }
+                state.activated_at = Some(2);
+            }
+            state.status = status;
+            network
+                .accounts
+                .lock()
+                .unwrap()
+                .extend(fixtures::accounts(&state, 20));
+            let role = match operation {
+                Operation::Activate => OfferSide::from(side).counterparty(),
+                Operation::Cancel => OfferSide::from(side),
+                Operation::Exercise => OfferSide::Holder,
+                Operation::Reclaim => OfferSide::Writer,
+                Operation::Cleanup if status == AgreementStatus::Cancelled => OfferSide::from(side),
+                Operation::Cleanup => OfferSide::Writer,
+                Operation::Create => unreachable!(),
+            };
+            let data = match operation {
+                Operation::Activate if side == ChainSide::Holder => {
+                    volaryn::instruction::AcceptRequest {}.data()
+                }
+                Operation::Activate => volaryn::instruction::Activate {}.data(),
+                Operation::Cancel => volaryn::instruction::CancelOffer {}.data(),
+                Operation::Exercise => volaryn::instruction::Exercise {}.data(),
+                Operation::Reclaim => volaryn::instruction::ReclaimExpired {}.data(),
+                Operation::Cleanup => volaryn::instruction::CleanupTerminal {}.data(),
+                Operation::Create => unreachable!(),
+            };
+            let actor_seed = if role == OfferSide::from(side) { 9 } else { 8 };
+            let action = origin.operation(data.clone(), actor_seed);
+            if operation != Operation::Activate {
+                let wrong_actor = origin.operation(data, 7);
+                assert!(app.record_submission(&wrong_actor.params()).await.is_err());
+                assert!(receipts::find(&pool, &wrong_actor.signature())
+                    .await
+                    .unwrap()
+                    .is_none());
+            } else {
+                let wrong_instruction = origin.operation(
+                    if side == ChainSide::Holder {
+                        volaryn::instruction::Activate {}.data()
+                    } else {
+                        volaryn::instruction::AcceptRequest {}.data()
+                    },
+                    8,
+                );
+                assert!(app
+                    .record_submission(&wrong_instruction.params())
+                    .await
+                    .is_err());
+                let self_acceptance = origin.operation(data, 9);
+                assert!(app
+                    .record_submission(&self_acceptance.params())
+                    .await
+                    .is_err());
+            }
+            app.record_submission(&action.params()).await.unwrap();
+            let receipt = receipts::find(&pool, &action.signature())
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(receipt.operation, operation);
+            assert_eq!(receipt.side, OfferSide::from(side));
+            assert_eq!(receipt.actor_role, role);
+        }
+    }
+    app.pool.close().await;
+    database.close().await;
+    server.abort();
+}
+
+#[tokio::test]
 async fn server_preflight_blocks_invalid_receipts_and_preserves_relay_ambiguity() {
     let database = database::Database::new().await;
     let deployment = support::deployment();
@@ -355,6 +507,7 @@ async fn server_preflight_blocks_invalid_receipts_and_preserves_relay_ambiguity(
         simulation_started: tokio::sync::Notify::new(),
         resume_simulation: tokio::sync::Notify::new(),
         statuses: Mutex::default(),
+        accounts: Mutex::default(),
     });
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let endpoint = format!("http://{}", listener.local_addr().unwrap());
@@ -377,6 +530,11 @@ async fn server_preflight_blocks_invalid_receipts_and_preserves_relay_ambiguity(
     action.transaction.message.instructions[0].data = volaryn::instruction::CancelOffer {}.data();
     action.transaction.message.instructions[0].accounts = vec![0, 1, 2, 2, 2, 2];
     action.resign();
+    network
+        .accounts
+        .lock()
+        .unwrap()
+        .extend(fixtures::accounts(&action.state(), 20));
     let router = http::router(app.clone(), "missing-test-frontend".into());
     let request = || {
         Request::post("/rpc")
@@ -425,6 +583,7 @@ async fn server_preflight_blocks_invalid_receipts_and_preserves_relay_ambiguity(
             .status,
         Status::Pending,
     );
+    network.accounts.lock().unwrap().clear();
     network.height.store(201, Ordering::Relaxed);
     for _ in 0..2 {
         app.reconcile_activity().await.unwrap();
@@ -483,6 +642,8 @@ async fn history_pagination_keeps_old_pending_receipts_recoverable() {
         owner: first.owner.clone(),
         agreement: first.agreement.to_string(),
         operation: volaryn_backend::activity::Operation::Create,
+        side: volaryn_backend::observations::OfferSide::Writer,
+        actor_role: volaryn_backend::observations::OfferSide::Writer,
         created_terms: None,
         last_valid_block_height: u64::MAX.to_string(),
         status: Status::Pending,

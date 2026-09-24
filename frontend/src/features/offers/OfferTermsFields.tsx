@@ -6,6 +6,7 @@ import type { OfferTerms } from './useOfferTerms';
 import layout from '../../App.module.css';
 import info from '../InfoContent.module.css';
 import styles from './OfferTerms.module.css';
+import type { OfferSide } from '../../lib/chain/actionTypes';
 
 function policyDate(seconds: bigint) {
   // The local policy has an unlimited i64 timestamp, which is not a JavaScript date.
@@ -15,7 +16,15 @@ function policyDate(seconds: bigint) {
     : `${formatUtcDate(seconds).replace('T', ' ')} UTC`;
 }
 
-export function OfferTermsFields({ terms, asset }: { terms: OfferTerms; asset?: Asset }) {
+export function OfferTermsFields({
+  terms,
+  asset,
+  side,
+}: {
+  terms: OfferTerms;
+  asset?: Asset;
+  side: OfferSide;
+}) {
   const local = import.meta.env.MODE === 'localnet';
   const { pricing, dates, context, suggested } = terms;
   return (
@@ -82,9 +91,11 @@ export function OfferTermsFields({ terms, asset }: { terms: OfferTerms; asset?: 
               to the nearest 0.000001 USDC.
             </p>
             <p>
-              The holder pays the premium once on activation. If they exercise, they receive the
-              full payout and deliver the gross quantity. An issuer transfer fee can reduce the
-              tokens you receive.
+              {side === 'holder'
+                ? 'The premium is escrowed now and paid to the provider only when they fund the payout.'
+                : 'The holder pays you the premium once on activation.'}{' '}
+              If the holder exercises, they receive the full payout and deliver the gross quantity.
+              An issuer transfer fee can reduce the provider’s token receipt.
             </p>
           </section>
           <section className={info.section}>
@@ -117,7 +128,7 @@ export function OfferTermsFields({ terms, asset }: { terms: OfferTerms; asset?: 
       {pricing.net !== undefined && (
         <dl className={styles.summary} aria-label="Offer economics">
           <div>
-            <dt>You earn on activation</dt>
+            <dt>{side === 'holder' ? 'Premium you escrow' : 'You earn on activation'}</dt>
             <dd>{pricing.premium} USDC</dd>
           </div>
           <div>

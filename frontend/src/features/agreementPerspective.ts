@@ -7,34 +7,48 @@ export function agreementPerspective(
 ) {
   const writer = !!owner && agreement.writer === owner;
   const holder = !!owner && agreement.holder === owner;
-  const designated = !!owner && agreement.designatedHolder === owner;
+  const creator = !!owner && agreement.creator === owner;
+  const request = agreement.side === 'holder';
+  const designated = !!owner && agreement.designatedCounterparty === owner;
   const role = !owner
     ? 'Public agreement'
-    : writer
-      ? 'Your role: writer · capital provider'
-      : holder
-        ? 'Your role: protection holder · payout recipient'
-        : agreement.status === 'funded' && designated
-          ? 'Reserved for you · not activated'
-          : agreement.status === 'funded' && !agreement.designatedHolder
-            ? 'Prospective holder · not activated'
-            : 'Your role: viewer';
-  if (agreement.status === 'funded') {
+    : request && holder && ['open', 'cancelled'].includes(agreement.status)
+      ? 'Your role: requester · no active protection'
+      : writer
+        ? 'Your role: writer · capital provider'
+        : holder
+          ? 'Your role: protection holder · payout recipient'
+          : agreement.status === 'open' && designated
+            ? 'Reserved for you · not activated'
+            : agreement.status === 'open' && !agreement.designatedCounterparty
+              ? request
+                ? 'Prospective provider · not funded'
+                : 'Prospective holder · not activated'
+              : 'Your role: viewer';
+  if (agreement.status === 'open') {
     const ended = now !== undefined && now >= BigInt(agreement.acceptBefore);
     return {
       role,
       title: ended
         ? 'Acceptance ended'
-        : writer
-          ? 'Your offer is awaiting a holder'
+        : creator
+          ? request
+            ? 'Your request is awaiting a provider'
+            : 'Your offer is awaiting a holder'
           : 'Protection not activated',
       description: ended
-        ? writer
-          ? 'You can cancel this offer to recover your reserved USDC.'
-          : 'This offer can no longer be accepted. Only its writer can recover the reserved USDC.'
-        : writer
-          ? 'Your USDC funds the payout. You receive the premium when a holder activates and receive PreStocks only if they exercise.'
-          : 'The holder pays the premium to the writer. After activation, only that holder can deliver the PreStocks and receive the USDC payout.',
+        ? creator
+          ? request
+            ? 'You can cancel this request to recover your escrowed premium.'
+            : 'You can cancel this offer to recover your reserved USDC.'
+          : 'This offer can no longer be accepted. Only its creator can recover the deposit.'
+        : request
+          ? creator
+            ? 'Your premium is escrowed. A provider must fund the full payout before protection starts. Your tokens stay in your wallet.'
+            : 'Fund the full payout to accept this request and receive its escrowed premium. You then buy the agreed tokens if the holder exercises.'
+          : writer
+            ? 'Your USDC funds the payout. You receive the premium when a holder activates and receive PreStocks only if they exercise.'
+            : 'The holder pays the premium to the writer. After activation, only that holder can deliver the PreStocks and receive the USDC payout.',
     };
   }
   if (agreement.status === 'active') {
@@ -87,8 +101,10 @@ export function agreementPerspective(
     role,
     title:
       agreement.status === 'cancelled'
-        ? writer
-          ? 'Your offer was cancelled'
+        ? creator
+          ? request
+            ? 'Your request was cancelled'
+            : 'Your offer was cancelled'
           : 'Offer cancelled'
         : writer
           ? 'Your reserve was reclaimed'
@@ -97,9 +113,13 @@ export function agreementPerspective(
             : 'Protection expired · reserve reclaimed',
     description:
       agreement.status === 'cancelled'
-        ? writer
-          ? 'The reserved USDC was returned to you. No protection was activated.'
-          : 'The reserved USDC was returned to the writer. No protection was activated.'
+        ? creator
+          ? request
+            ? 'The escrowed premium was returned to you. No protection was activated.'
+            : 'The reserved USDC was returned to you. No protection was activated.'
+          : request
+            ? 'The escrowed premium was returned to the requester. No protection was activated.'
+            : 'The reserved USDC was returned to the writer. No protection was activated.'
         : writer
           ? 'The unused USDC reserve was returned to you after expiry. No PreStocks were delivered.'
           : 'The unused reserve was returned to the writer after expiry. The holder received no payout; the premium is not refunded.',

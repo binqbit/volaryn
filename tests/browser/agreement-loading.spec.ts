@@ -16,9 +16,12 @@ test('a newly signed offer waits for finalized data without a false outage and a
     signature: '1'.repeat(64),
     lastValidBlockHeight: '1000',
     owner: d.localnet!.writer,
+    side: 'writer',
+    actorRole: 'writer',
     operation: 'create',
     agreement: state.agreement.address,
     createdTerms: {
+      side: 'writer',
       underlyingMint: state.agreement.underlyingMint,
       nonce: '91',
       quantityRaw: state.agreement.quantityRaw,
@@ -26,7 +29,7 @@ test('a newly signed offer waits for finalized data without a false outage and a
       premium: state.agreement.premium,
       acceptBefore: state.agreement.acceptBefore,
       expiresAt: state.agreement.expiresAt,
-      designatedHolder: null,
+      designatedCounterparty: null,
     },
   };
   const key = journalKey(d.genesisHash, d.programId, d.localnet!.writer);

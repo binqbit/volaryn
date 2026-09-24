@@ -6,6 +6,7 @@
  * @see https://github.com/codama-idl/codama
  */
 
+export * from "./acceptRequest";
 export * from "./activate";
 export * from "./cancelOffer";
 export * from "./cleanupTerminal";

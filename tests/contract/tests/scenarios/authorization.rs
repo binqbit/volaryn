@@ -39,7 +39,7 @@ fn writer_cannot_activate_own_offer_with_any_owned_usdc_account() {
         assert_eq!(fixture.amount(fixture.writer_usdc), writer_before);
         assert_eq!(fixture.amount(payment), payment_before);
         assert_eq!(fixture.amount(fixture.reserve), PAYOUT);
-        assert_eq!(fixture.agreement().status, AgreementStatus::Funded);
+        assert_eq!(fixture.agreement().status, AgreementStatus::Open);
         assert_eq!(fixture.agreement().holder, None);
         fixture.activate();
         assert_eq!(
@@ -54,7 +54,7 @@ fn writer_cannot_designate_itself_as_holder() {
     let mut fixture = Fixture::new(AssetFixture::Plain);
     let before = fixture.amount(fixture.writer_usdc);
     let mut terms = fixture.terms();
-    terms.designated_holder = Some(signer_pubkey(&fixture.writer));
+    terms.designated_counterparty = Some(signer_pubkey(&fixture.writer));
     assert_error(
         fixture.writer_send(fixture.create_instruction(terms)),
         VolarynError::WriterCannotBeHolder,
@@ -64,7 +64,7 @@ fn writer_cannot_designate_itself_as_holder() {
         assert!(fixture.svm.get_account(&address(account)).is_none());
     }
     let mut terms = fixture.terms();
-    terms.designated_holder = Some(signer_pubkey(&fixture.holder));
+    terms.designated_counterparty = Some(signer_pubkey(&fixture.holder));
     fixture
         .writer_send(fixture.create_instruction(terms))
         .unwrap();
@@ -76,16 +76,16 @@ fn writer_cannot_designate_itself_as_holder() {
 }
 
 #[test]
-fn designated_holder_and_full_delivery_are_enforced() {
+fn designated_counterparty_and_full_delivery_are_enforced() {
     let mut fixture = Fixture::new(AssetFixture::Plain);
     let mut terms = fixture.terms();
-    terms.designated_holder = Some(signer_pubkey(&key(4)));
+    terms.designated_counterparty = Some(signer_pubkey(&key(4)));
     fixture
         .writer_send(fixture.create_instruction(terms))
         .unwrap();
     assert_error(
         fixture.holder_send(fixture.activate_instruction()),
-        VolarynError::WrongHolder,
+        VolarynError::WrongCounterparty,
     );
 
     let mut fixture = Fixture::new(AssetFixture::Plain);

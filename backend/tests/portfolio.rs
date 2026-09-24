@@ -31,11 +31,12 @@ async fn owner_union_and_lifecycle_filters_apply_before_pagination() {
         .map(|index| {
             let mut row = agreement::agreement(10, 100);
             row.address = Pubkey::new_unique().to_string();
-            row.writer = if index % 2 == 0 {
+            row.creator = if index % 2 == 0 {
                 owner.clone()
             } else {
                 other.clone()
             };
+            row.writer = Some(row.creator.clone());
             row.holder = if index % 2 == 1 {
                 Some(owner.clone())
             } else {
@@ -44,7 +45,7 @@ async fn owner_union_and_lifecycle_filters_apply_before_pagination() {
             row.accept_before = "100".into();
             row.expires_at = "200".into();
             row.status = match index {
-                0 | 1 => "funded",
+                0 | 1 => "open",
                 2 | 3 | 7 | 8 => "active",
                 4 => "exercised",
                 5 => "cancelled",
@@ -57,11 +58,11 @@ async fn owner_union_and_lifecycle_filters_apply_before_pagination() {
     rows[0].accept_before = "101".into();
     rows[2].expires_at = "100".into();
     // A match on both sides must still produce exactly one row.
-    rows[3].writer = owner.clone();
+    rows[3].writer = Some(owner.clone());
     // Neither designation nor an unrelated agreement is ownership.
     rows[7].holder = None;
-    rows[7].designated_holder = Some(owner.clone());
-    rows[8].writer = other;
+    rows[7].designated_counterparty = Some(owner.clone());
+    rows[8].writer = Some(other);
     store::upsert(&pool, &rows, 10, 100).await.unwrap();
     let mut query = AgreementQuery {
         owner: Some(owner.clone()),
@@ -150,7 +151,7 @@ async fn owner_union_and_lifecycle_filters_apply_before_pagination() {
     assert_eq!(
         raw.items.len(),
         2,
-        "Raw contract status remains backward compatible"
+        "Raw contract status is distinct from the deadline-based lifecycle"
     );
     assert!(
         store::agreements(
@@ -172,9 +173,11 @@ async fn owner_union_and_lifecycle_filters_apply_before_pagination() {
         let receipt = volaryn_backend::activity::Activity {
             id: String::new(),
             signature: format!("receipt-{index}"),
-            owner: rows[0].writer.clone(),
+            owner: rows[0].writer.clone().unwrap(),
             agreement: (*address).clone(),
             operation: volaryn_backend::activity::Operation::Create,
+            side: volaryn_backend::observations::OfferSide::Writer,
+            actor_role: volaryn_backend::observations::OfferSide::Writer,
             created_terms: None,
             last_valid_block_height: "200".into(),
             status: volaryn_backend::activity::Status::Pending,
@@ -192,17 +195,20 @@ async fn owner_union_and_lifecycle_filters_apply_before_pagination() {
         .await
         .unwrap();
     }
-    let activity = volaryn_backend::adapters::activity::page(&pool, &rows[0].writer, None)
-        .await
-        .unwrap();
+    let activity =
+        volaryn_backend::adapters::activity::page(&pool, rows[0].writer.as_ref().unwrap(), None)
+            .await
+            .unwrap();
     assert_eq!(activity.items.len(), 2);
     assert_eq!(activity.indexed_agreements, vec![rows[0].address.clone()]);
     let activation = volaryn_backend::activity::Activity {
         id: String::new(),
         signature: "activation".into(),
-        owner: rows[0].writer.clone(),
+        owner: rows[0].writer.clone().unwrap(),
         agreement: rows[8].address.clone(),
         operation: volaryn_backend::activity::Operation::Activate,
+        side: volaryn_backend::observations::OfferSide::Writer,
+        actor_role: volaryn_backend::observations::OfferSide::Holder,
         created_terms: None,
         last_valid_block_height: "200".into(),
         status: volaryn_backend::activity::Status::Pending,
@@ -219,20 +225,22 @@ async fn owner_union_and_lifecycle_filters_apply_before_pagination() {
     )
     .await
     .unwrap();
-    let before = volaryn_backend::adapters::activity::page(&pool, &rows[0].writer, None)
-        .await
-        .unwrap();
+    let before =
+        volaryn_backend::adapters::activity::page(&pool, rows[0].writer.as_ref().unwrap(), None)
+            .await
+            .unwrap();
     assert!(
         !before.indexed_agreements.contains(&activation.agreement),
         "An existing record without this holder does not complete activation discovery"
     );
     let mut activated = rows[8].clone();
-    activated.holder = Some(rows[0].writer.clone());
+    activated.holder = rows[0].writer.clone();
     activated.finalized_slot = "11".into();
     store::upsert(&pool, &[activated], 11, 101).await.unwrap();
-    let after = volaryn_backend::adapters::activity::page(&pool, &rows[0].writer, None)
-        .await
-        .unwrap();
+    let after =
+        volaryn_backend::adapters::activity::page(&pool, rows[0].writer.as_ref().unwrap(), None)
+            .await
+            .unwrap();
     assert!(after.indexed_agreements.contains(&activation.agreement));
     pool.close().await;
     database.close().await;
@@ -256,7 +264,7 @@ async fn portfolio_http_validates_filters_and_observes_chain_deadlines() {
     let rows = store::agreements(&app.pool, &Default::default(), false, None)
         .await
         .unwrap();
-    let owner = &rows.items[0].writer;
+    let owner = rows.items[0].writer.as_ref().unwrap();
     let service = router(
         app.clone(),
         std::path::PathBuf::from("missing-test-frontend"),

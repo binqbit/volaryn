@@ -9,6 +9,8 @@ import {
 } from './model';
 
 const item: ActivityItem = {
+  side: 'writer' as const,
+  actorRole: 'holder' as const,
   id: 'attempt',
   owner: '11111111111111111111111111111111',
   agreement: '11111111111111111111111111111111',
@@ -41,6 +43,7 @@ describe('operation lifecycle', () => {
       ...signed,
       id: 'creation',
       operation: 'create' as const,
+      actorRole: 'writer' as const,
       agreement: 'created',
       status: 'finalized' as const,
       source: 'server' as const,
@@ -59,10 +62,40 @@ describe('operation lifecycle', () => {
     expect(portfolioOperations(items, [], 'writer')).toEqual([creation]);
     expect(portfolioOperations(items, [], 'holder')).toEqual([activation, signed]);
   });
+  it('uses recorded participant roles for requests, funding and cancelled-request cleanup', () => {
+    const request: ActivityItem = {
+      ...signed,
+      id: 'request',
+      side: 'holder',
+      actorRole: 'holder',
+      operation: 'create',
+    };
+    const funding: ActivityItem = {
+      ...signed,
+      id: 'funding',
+      side: 'holder',
+      actorRole: 'writer',
+      operation: 'activate',
+    };
+    const cleanup: ActivityItem = {
+      ...signed,
+      id: 'cleanup',
+      side: 'holder',
+      actorRole: 'holder',
+      operation: 'cleanup',
+    };
+    expect(portfolioOperations([request, funding, cleanup], [], 'holder')).toEqual([
+      request,
+      cleanup,
+    ]);
+    expect(portfolioOperations([request, funding, cleanup], [], 'writer')).toEqual([funding]);
+    expect(asPending(funding)).toMatchObject({ side: 'holder', actorRole: 'writer' });
+  });
   it('keeps unindexed server receipts without mistaking older local history for undiscovered agreements', () => {
     const latest = {
       ...signed,
       operation: 'create' as const,
+      actorRole: 'writer' as const,
       status: 'finalized' as const,
       source: 'server' as const,
     };
@@ -70,7 +103,7 @@ describe('operation lifecycle', () => {
     expect(portfolioOperations([latest, older], [], 'writer')).toEqual([latest, older]);
     expect(portfolioOperations([{ ...latest, source: 'browser' }], [], 'writer')).toEqual([]);
     expect(portfolioOperations([latest], [latest.agreement], 'writer')).toEqual([]);
-    const cancel = { ...signed, operation: 'cancel' as const };
+    const cancel = { ...signed, operation: 'cancel' as const, actorRole: 'writer' as const };
     expect(portfolioOperations([cancel], [cancel.agreement], 'writer')).toEqual([cancel]);
   });
   it('distinguishes unsigned interruption from recoverable signed operations', () => {

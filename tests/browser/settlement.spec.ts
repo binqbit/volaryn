@@ -48,7 +48,7 @@ test('holder cancels review, isolates tabs, restores after closing a tab, and ex
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.getByRole('alert')).toHaveCount(0);
   expect(submissions).toBe(0);
-  expect((await fetchAgreement(rpc, accounts.agreement)).data.status).toBe(AgreementStatus.Funded);
+  expect((await fetchAgreement(rpc, accounts.agreement)).data.status).toBe(AgreementStatus.Open);
 
   // A real browser lock prevents another tab from opening a signing flow.
   const otherTab = await context.newPage();

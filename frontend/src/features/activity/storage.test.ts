@@ -6,6 +6,8 @@ import type { ActivityItem } from './model';
 const owner = '11111111111111111111111111111111';
 const key = journalKey('ledger', 'program', owner);
 const item: ActivityItem = {
+  side: 'writer' as const,
+  actorRole: 'holder' as const,
   id: 'attempt',
   owner,
   agreement: owner,

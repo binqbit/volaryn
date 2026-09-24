@@ -17,6 +17,8 @@ function parseActivity(item: unknown, owner: string): ActivityItem {
   const entry = item as ActivityItem;
   if (
     typeof entry.id !== 'string' ||
+    !['writer', 'holder'].includes(entry.side) ||
+    !['writer', 'holder'].includes(entry.actorRole) ||
     entry.owner !== owner ||
     typeof entry.agreement !== 'string' ||
     !operations.includes(entry.operation) ||
@@ -43,6 +45,8 @@ function parseActivity(item: unknown, owner: string): ActivityItem {
   )
     throw new Error('Saved signed activity is incomplete');
   return {
+    side: entry.side,
+    actorRole: entry.actorRole,
     id: entry.id,
     owner: entry.owner,
     agreement: entry.agreement,

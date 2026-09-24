@@ -7,30 +7,36 @@ use solana_clock::Clock;
 
 #[test]
 fn every_admitted_extension_combination_settles() {
-    for mask in 0..16 {
-        let mut fixture = Fixture::new(AssetFixture::Subset(mask));
-        fixture.create();
-        fixture.activate();
-        let meta = fixture.holder_send(fixture.exercise_instruction()).unwrap();
-        assert!(meta.compute_units_consumed < 200_000);
-        let net = if mask & 1 != 0 {
-            QUANTITY - QUANTITY / 100
-        } else {
-            QUANTITY
-        };
-        assert_eq!(
-            fixture.agreement().net_received,
-            net,
-            "extension mask {mask}"
-        );
-        assert_eq!(
-            fixture.amount(fixture.holder_usdc),
-            HOLDER_USDC - PREMIUM + PAYOUT
-        );
-        assert_eq!(
-            fixture.token(fixture.settlement).owner,
-            signer_pubkey(&fixture.writer)
-        );
+    for request in [false, true] {
+        for mask in 0..16 {
+            let mut fixture = if request {
+                Fixture::request(AssetFixture::Subset(mask))
+            } else {
+                Fixture::new(AssetFixture::Subset(mask))
+            };
+            fixture.create();
+            fixture.activate();
+            let meta = fixture.holder_send(fixture.exercise_instruction()).unwrap();
+            assert!(meta.compute_units_consumed < 200_000);
+            let net = if mask & 1 != 0 {
+                QUANTITY - QUANTITY / 100
+            } else {
+                QUANTITY
+            };
+            assert_eq!(
+                fixture.agreement().net_received,
+                net,
+                "extension mask {mask}"
+            );
+            assert_eq!(
+                fixture.amount(fixture.holder_usdc),
+                HOLDER_USDC - PREMIUM + PAYOUT
+            );
+            assert_eq!(
+                fixture.token(fixture.settlement).owner,
+                signer_pubkey(&fixture.writer)
+            );
+        }
     }
 }
 

@@ -45,6 +45,7 @@ import {
   type ProtocolConfigArgs,
 } from "../accounts";
 import {
+  getAcceptRequestInstructionAsync,
   getActivateInstructionAsync,
   getCancelOfferInstructionAsync,
   getCleanupTerminalInstructionAsync,
@@ -54,6 +55,7 @@ import {
   getInitializeInstructionAsync,
   getReclaimExpiredInstructionAsync,
   getUpdateAssetPolicyInstructionAsync,
+  parseAcceptRequestInstruction,
   parseActivateInstruction,
   parseCancelOfferInstruction,
   parseCleanupTerminalInstruction,
@@ -63,6 +65,7 @@ import {
   parseInitializeInstruction,
   parseReclaimExpiredInstruction,
   parseUpdateAssetPolicyInstruction,
+  type AcceptRequestAsyncInput,
   type ActivateAsyncInput,
   type CancelOfferAsyncInput,
   type CleanupTerminalAsyncInput,
@@ -70,6 +73,7 @@ import {
   type CreateOfferAsyncInput,
   type ExerciseAsyncInput,
   type InitializeAsyncInput,
+  type ParsedAcceptRequestInstruction,
   type ParsedActivateInstruction,
   type ParsedCancelOfferInstruction,
   type ParsedCleanupTerminalInstruction,
@@ -151,24 +155,26 @@ export function identifyVolarynAccount(
 }
 
 export const VolarynInstruction = {
-  0: "Activate",
-  1: "CancelOffer",
-  2: "CleanupTerminal",
-  3: "CreateAssetPolicy",
-  4: "CreateOffer",
-  5: "Exercise",
-  6: "Initialize",
-  7: "ReclaimExpired",
-  8: "UpdateAssetPolicy",
-  Activate: 0,
-  CancelOffer: 1,
-  CleanupTerminal: 2,
-  CreateAssetPolicy: 3,
-  CreateOffer: 4,
-  Exercise: 5,
-  Initialize: 6,
-  ReclaimExpired: 7,
-  UpdateAssetPolicy: 8,
+  0: "AcceptRequest",
+  1: "Activate",
+  2: "CancelOffer",
+  3: "CleanupTerminal",
+  4: "CreateAssetPolicy",
+  5: "CreateOffer",
+  6: "Exercise",
+  7: "Initialize",
+  8: "ReclaimExpired",
+  9: "UpdateAssetPolicy",
+  AcceptRequest: 0,
+  Activate: 1,
+  CancelOffer: 2,
+  CleanupTerminal: 3,
+  CreateAssetPolicy: 4,
+  CreateOffer: 5,
+  Exercise: 6,
+  Initialize: 7,
+  ReclaimExpired: 8,
+  UpdateAssetPolicy: 9,
 } as const;
 
 export type VolarynInstruction = (typeof VolarynInstruction)[Exclude<
@@ -180,6 +186,17 @@ export function identifyVolarynInstruction(
   instruction: { data: ReadonlyUint8Array } | ReadonlyUint8Array,
 ): VolarynInstruction {
   const data = "data" in instruction ? instruction.data : instruction;
+  if (
+    containsBytes(
+      data,
+      fixEncoderSize(getBytesEncoder(), 8).encode(
+        new Uint8Array([4, 60, 28, 227, 25, 199, 246, 124]),
+      ),
+      0,
+    )
+  ) {
+    return VolarynInstruction.AcceptRequest;
+  }
   if (
     containsBytes(
       data,
@@ -289,6 +306,9 @@ export type ParsedVolarynInstruction<
   TProgram extends string = "Fg6PaFpoGXkYsidMpWxTWqkZcEYKpEjzMTB7zLZJwQYQ",
 > =
   | ({
+      instructionType: typeof VolarynInstruction.AcceptRequest;
+    } & ParsedAcceptRequestInstruction<TProgram>)
+  | ({
       instructionType: typeof VolarynInstruction.Activate;
     } & ParsedActivateInstruction<TProgram>)
   | ({
@@ -321,6 +341,13 @@ export function parseVolarynInstruction<TProgram extends string>(
 ): ParsedVolarynInstruction<TProgram> {
   const instructionType = identifyVolarynInstruction(instruction);
   switch (instructionType) {
+    case VolarynInstruction.AcceptRequest: {
+      assertIsInstructionWithAccounts(instruction);
+      return {
+        instructionType: VolarynInstruction.AcceptRequest,
+        ...parseAcceptRequestInstruction(instruction),
+      };
+    }
     case VolarynInstruction.Activate: {
       assertIsInstructionWithAccounts(instruction);
       return {
@@ -411,6 +438,10 @@ export type VolarynPluginAccounts = {
 };
 
 export type VolarynPluginInstructions = {
+  acceptRequest: (
+    input: AcceptRequestAsyncInput,
+  ) => ReturnType<typeof getAcceptRequestInstructionAsync> &
+    SelfPlanAndSendFunctions;
   activate: (
     input: ActivateAsyncInput,
   ) => ReturnType<typeof getActivateInstructionAsync> &
@@ -478,6 +509,11 @@ export function volarynProgram() {
           ),
         },
         instructions: {
+          acceptRequest: (input) =>
+            addSelfPlanAndSendFunctions(
+              client,
+              getAcceptRequestInstructionAsync(input),
+            ),
           activate: (input) =>
             addSelfPlanAndSendFunctions(
               client,

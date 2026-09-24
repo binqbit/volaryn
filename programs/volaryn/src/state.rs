@@ -1,6 +1,6 @@
 use anchor_lang::prelude::*;
 
-pub const AGREEMENT_VERSION: u8 = 1;
+pub const AGREEMENT_VERSION: u8 = 2;
 
 #[account]
 #[derive(InitSpace)]
@@ -24,11 +24,18 @@ pub struct AssetPolicy {
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq, Eq, InitSpace)]
 pub enum AgreementStatus {
-    Funded,
+    Open,
     Active,
     Exercised,
     Cancelled,
     Expired,
+}
+
+/// The role of the creator; the opposite role accepts the open agreement.
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, Debug, PartialEq, Eq, InitSpace)]
+pub enum OfferSide {
+    Writer,
+    Holder,
 }
 
 #[account]
@@ -36,9 +43,11 @@ pub enum AgreementStatus {
 pub struct Agreement {
     pub version: u8,
     pub bump: u8,
-    pub writer: Pubkey,
+    pub creator: Pubkey,
+    pub side: OfferSide,
     pub nonce: u64,
-    pub designated_holder: Option<Pubkey>,
+    pub designated_counterparty: Option<Pubkey>,
+    pub writer: Option<Pubkey>,
     pub holder: Option<Pubkey>,
     pub underlying_mint: Pubkey,
     pub underlying_program: Pubkey,
@@ -62,7 +71,8 @@ pub struct Agreement {
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct OfferTerms {
     pub nonce: u64,
-    pub designated_holder: Option<Pubkey>,
+    pub side: OfferSide,
+    pub designated_counterparty: Option<Pubkey>,
     pub quantity_raw: u64,
     pub payout: u64,
     pub premium: u64,

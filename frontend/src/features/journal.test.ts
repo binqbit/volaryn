@@ -3,6 +3,8 @@ import { clearJournal, journalKey, readJournal, saveJournal } from './journal';
 
 const owner = '11111111111111111111111111111111';
 const saved = {
+  side: 'writer' as const,
+  actorRole: 'holder' as const,
   signature: '1'.repeat(64),
   lastValidBlockHeight: '100',
   owner,

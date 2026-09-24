@@ -2,7 +2,8 @@ use super::validation::admit;
 use crate::{
     error::VolarynError,
     state::{
-        Agreement, AgreementStatus, AssetPolicy, OfferTerms, ProtocolConfig, AGREEMENT_VERSION,
+        Agreement, AgreementStatus, AssetPolicy, OfferSide, OfferTerms, ProtocolConfig,
+        AGREEMENT_VERSION,
     },
     token,
 };
@@ -17,7 +18,7 @@ use anchor_spl::{
 #[instruction(terms: OfferTerms)]
 pub struct CreateOffer<'info> {
     #[account(mut)]
-    pub writer: Signer<'info>,
+    pub creator: Signer<'info>,
     #[account(seeds = [b"config"], bump)]
     pub config: Account<'info, ProtocolConfig>,
     #[account(seeds = [b"policy", underlying_mint.key().as_ref()], bump)]
@@ -29,15 +30,15 @@ pub struct CreateOffer<'info> {
     #[account(
         mut,
         token::mint = usdc_mint,
-        token::authority = writer,
+        token::authority = creator,
         token::token_program = usdc_program
     )]
-    pub writer_usdc: Box<InterfaceAccount<'info, TokenAccount>>,
+    pub creator_usdc: Box<InterfaceAccount<'info, TokenAccount>>,
     #[account(
         init,
-        payer = writer,
+        payer = creator,
         space = 8 + Agreement::INIT_SPACE,
-        seeds = [b"agreement", writer.key().as_ref(), &terms.nonce.to_le_bytes()],
+        seeds = [b"agreement", creator.key().as_ref(), &terms.nonce.to_le_bytes()],
         bump
     )]
     pub agreement: Box<Account<'info, Agreement>>,
@@ -55,7 +56,7 @@ pub struct CreateOffer<'info> {
 
 pub fn handle_create_offer(ctx: Context<CreateOffer>, terms: OfferTerms) -> Result<()> {
     require!(
-        terms.designated_holder != Some(ctx.accounts.writer.key()),
+        terms.designated_counterparty != Some(ctx.accounts.creator.key()),
         VolarynError::WriterCannotBeHolder
     );
     let now = Clock::get()?.unix_timestamp;
@@ -71,7 +72,7 @@ pub fn handle_create_offer(ctx: Context<CreateOffer>, terms: OfferTerms) -> Resu
     token::validate_mint(&ctx.accounts.underlying_mint.to_account_info(), true)?;
     let agreement_key = ctx.accounts.agreement.key();
     token::create_account(
-        &ctx.accounts.writer.to_account_info(),
+        &ctx.accounts.creator.to_account_info(),
         &ctx.accounts.reserve.to_account_info(),
         &ctx.accounts.usdc_mint.to_account_info(),
         &agreement_key,
@@ -80,7 +81,7 @@ pub fn handle_create_offer(ctx: Context<CreateOffer>, terms: OfferTerms) -> Resu
         &[b"reserve", agreement_key.as_ref(), &[ctx.bumps.reserve]],
     )?;
     token::create_account(
-        &ctx.accounts.writer.to_account_info(),
+        &ctx.accounts.creator.to_account_info(),
         &ctx.accounts.settlement.to_account_info(),
         &ctx.accounts.underlying_mint.to_account_info(),
         &agreement_key,
@@ -99,21 +100,26 @@ pub fn handle_create_offer(ctx: Context<CreateOffer>, terms: OfferTerms) -> Resu
     )?;
     token::transfer(
         &ctx.accounts.usdc_program.to_account_info(),
-        &ctx.accounts.writer_usdc.to_account_info(),
+        &ctx.accounts.creator_usdc.to_account_info(),
         &ctx.accounts.usdc_mint.to_account_info(),
         &ctx.accounts.reserve.to_account_info(),
-        &ctx.accounts.writer.to_account_info(),
-        terms.payout,
+        &ctx.accounts.creator.to_account_info(),
+        match terms.side {
+            OfferSide::Writer => terms.payout,
+            OfferSide::Holder => terms.premium,
+        },
         ctx.accounts.usdc_mint.decimals,
         &[],
     )?;
     ctx.accounts.agreement.set_inner(Agreement {
         version: AGREEMENT_VERSION,
         bump: ctx.bumps.agreement,
-        writer: ctx.accounts.writer.key(),
+        creator: ctx.accounts.creator.key(),
+        side: terms.side,
         nonce: terms.nonce,
-        designated_holder: terms.designated_holder,
-        holder: None,
+        designated_counterparty: terms.designated_counterparty,
+        writer: (terms.side == OfferSide::Writer).then_some(ctx.accounts.creator.key()),
+        holder: (terms.side == OfferSide::Holder).then_some(ctx.accounts.creator.key()),
         underlying_mint: ctx.accounts.underlying_mint.key(),
         underlying_program: ctx.accounts.underlying_program.key(),
         underlying_decimals: ctx.accounts.underlying_mint.decimals,
@@ -129,7 +135,7 @@ pub fn handle_create_offer(ctx: Context<CreateOffer>, terms: OfferTerms) -> Resu
         activated_at: None,
         settled_at: None,
         net_received: 0,
-        status: AgreementStatus::Funded,
+        status: AgreementStatus::Open,
     });
     Ok(())
 }

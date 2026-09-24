@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { parsePending } from './pending';
 
 const saved = {
+  side: 'writer' as const,
+  actorRole: 'holder' as const,
   signature: '1'.repeat(64),
   lastValidBlockHeight: '9007199254740993',
   owner: '11111111111111111111111111111111',
@@ -19,6 +21,9 @@ describe('pending transaction recovery', () => {
     { signature: 'bad' },
     { agreement: null },
     { operation: 'withdraw' },
+    { side: undefined },
+    { side: 'either' },
+    { actorRole: 'writer' },
     { lastValidBlockHeight: 12 },
     { lastValidBlockHeight: '-1' },
   ])('rejects malformed tracking state %j', (change) => {
@@ -26,8 +31,17 @@ describe('pending transaction recovery', () => {
   });
 });
 
+it('preserves the accepting writer role for a holder-origin request', () => {
+  const accepted = { ...saved, side: 'holder', actorRole: 'writer' };
+  expect(parsePending(JSON.stringify(accepted))).toEqual(accepted);
+  expect(() => parsePending(JSON.stringify({ ...accepted, operation: 'exercise' }))).toThrow(
+    'role',
+  );
+});
+
 it('requires complete public creation terms and discards unrelated saved values', () => {
   const createdTerms = {
+    side: 'writer',
     nonce: '1',
     underlyingMint: saved.owner,
     quantityRaw: '10',
@@ -35,7 +49,7 @@ it('requires complete public creation terms and discards unrelated saved values'
     premium: '1',
     acceptBefore: '1000',
     expiresAt: '2000',
-    designatedHolder: null,
+    designatedCounterparty: null,
   };
   for (const underlyingMint of [undefined, 'bad', 123]) {
     expect(() =>
@@ -48,7 +62,7 @@ it('requires complete public creation terms and discards unrelated saved values'
       ),
     ).toThrow();
   }
-  const record = { ...saved, operation: 'create', createdTerms };
+  const record = { ...saved, actorRole: 'writer', operation: 'create', createdTerms };
   expect(parsePending(JSON.stringify(record))).toEqual(record);
   expect(() => parsePending(JSON.stringify({ ...record, createdTerms: null }))).toThrow();
   expect(() =>

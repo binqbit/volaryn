@@ -112,6 +112,23 @@
             }
           },
           {
+            "name": "creator",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "side",
+            "in": "query",
+            "description": "Origin role of the offer creator; absent selects both origins.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/OfferSide"
+            }
+          },
+          {
             "name": "owner",
             "in": "query",
             "description": "Agreements written or held by this wallet. Applied before pagination.",
@@ -171,9 +188,9 @@
             }
           },
           {
-            "name": "eligible_holder",
+            "name": "eligible_counterparty",
             "in": "query",
-            "description": "Include unrestricted offers and offers reserved for this holder, excluding their own offers.",
+            "description": "Include unrestricted offers and offers reserved for this counterparty, excluding their own offers.",
             "required": false,
             "schema": {
               "type": "string"
@@ -327,6 +344,23 @@
             }
           },
           {
+            "name": "creator",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "side",
+            "in": "query",
+            "description": "Origin role of the offer creator; absent selects both origins.",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/OfferSide"
+            }
+          },
+          {
             "name": "owner",
             "in": "query",
             "description": "Agreements written or held by this wallet. Applied before pagination.",
@@ -386,9 +420,9 @@
             }
           },
           {
-            "name": "eligible_holder",
+            "name": "eligible_counterparty",
             "in": "query",
-            "description": "Include unrestricted offers and offers reserved for this holder, excluding their own offers.",
+            "description": "Include unrestricted offers and offers reserved for this counterparty, excluding their own offers.",
             "required": false,
             "schema": {
               "type": "string"
@@ -475,12 +509,17 @@
           "owner",
           "agreement",
           "operation",
+          "side",
+          "actorRole",
           "lastValidBlockHeight",
           "status",
           "createdAt",
           "updatedAt"
         ],
         "properties": {
+          "actorRole": {
+            "$ref": "#/components/schemas/OfferSide"
+          },
           "agreement": {
             "type": "string"
           },
@@ -509,6 +548,9 @@
           },
           "owner": {
             "type": "string"
+          },
+          "side": {
+            "$ref": "#/components/schemas/OfferSide"
           },
           "signature": {
             "type": "string"
@@ -594,7 +636,8 @@
         "required": [
           "address",
           "version",
-          "writer",
+          "creator",
+          "side",
           "underlyingMint",
           "underlyingProgram",
           "underlyingDecimals",
@@ -620,7 +663,10 @@
           "address": {
             "type": "string"
           },
-          "designatedHolder": {
+          "creator": {
+            "type": "string"
+          },
+          "designatedCounterparty": {
             "type": [
               "string",
               "null"
@@ -668,6 +714,9 @@
           "settlement": {
             "type": "string"
           },
+          "side": {
+            "$ref": "#/components/schemas/OfferSide"
+          },
           "status": {
             "type": "string"
           },
@@ -691,7 +740,10 @@
             "minimum": 0
           },
           "writer": {
-            "type": "string"
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
@@ -1013,6 +1065,13 @@
           }
         }
       },
+      "OfferSide": {
+        "type": "string",
+        "enum": [
+          "writer",
+          "holder"
+        ]
+      },
       "OfficialAsset": {
         "type": "object",
         "required": [
@@ -1252,6 +1311,7 @@
       "Terms": {
         "type": "object",
         "required": [
+          "side",
           "underlyingMint",
           "nonce",
           "quantityRaw",
@@ -1264,7 +1324,7 @@
           "acceptBefore": {
             "type": "string"
           },
-          "designatedHolder": {
+          "designatedCounterparty": {
             "type": [
               "string",
               "null"
@@ -1284,6 +1344,9 @@
           },
           "quantityRaw": {
             "type": "string"
+          },
+          "side": {
+            "$ref": "#/components/schemas/OfferSide"
           },
           "underlyingMint": {
             "type": "string"

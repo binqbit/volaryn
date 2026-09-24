@@ -3,6 +3,38 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+#[derive(Clone, Copy, Debug, Deserialize, Serialize, ToSchema, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum OfferSide {
+    Writer,
+    Holder,
+}
+
+impl OfferSide {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Writer => "writer",
+            Self::Holder => "holder",
+        }
+    }
+
+    pub fn counterparty(self) -> Self {
+        match self {
+            Self::Writer => Self::Holder,
+            Self::Holder => Self::Writer,
+        }
+    }
+}
+
+impl From<volaryn::state::OfferSide> for OfferSide {
+    fn from(side: volaryn::state::OfferSide) -> Self {
+        match side {
+            volaryn::state::OfferSide::Writer => Self::Writer,
+            volaryn::state::OfferSide::Holder => Self::Holder,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct Deployment {
@@ -36,9 +68,11 @@ pub struct LocalFixtures {
 pub struct AgreementView {
     pub address: String,
     pub version: u8,
-    pub writer: String,
+    pub creator: String,
+    pub side: OfferSide,
+    pub writer: Option<String>,
     pub holder: Option<String>,
-    pub designated_holder: Option<String>,
+    pub designated_counterparty: Option<String>,
     pub underlying_mint: String,
     pub underlying_program: String,
     pub underlying_decimals: u8,

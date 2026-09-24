@@ -16,12 +16,21 @@ use volaryn::Agreement;
 impl Fixture {
     pub fn create(&mut self) {
         let ix = self.create_instruction(self.terms());
-        self.writer_send(ix).unwrap();
+        match self.side {
+            volaryn::OfferSide::Writer => self.writer_send(ix).unwrap(),
+            volaryn::OfferSide::Holder => self.holder_send(ix).unwrap(),
+        };
     }
 
     pub fn activate(&mut self) {
-        let ix = self.activate_instruction();
-        self.holder_send(ix).unwrap();
+        match self.side {
+            volaryn::OfferSide::Writer => {
+                self.holder_send(self.activate_instruction()).unwrap();
+            }
+            volaryn::OfferSide::Holder => {
+                self.writer_send(self.accept_request_instruction()).unwrap();
+            }
+        }
     }
 
     pub fn writer_send(

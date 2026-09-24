@@ -16,12 +16,12 @@ import {
 } from "@solana/kit";
 
 export const AgreementStatus = {
-  0: "Funded",
+  0: "Open",
   1: "Active",
   2: "Exercised",
   3: "Cancelled",
   4: "Expired",
-  Funded: 0,
+  Open: 0,
   Active: 1,
   Exercised: 2,
   Cancelled: 3,

@@ -1,6 +1,6 @@
 //! Application query parameters; SQL and HTTP extraction stay at their boundaries.
 
-use crate::domain::AppError;
+use crate::{domain::AppError, observations::OfferSide};
 use anchor_lang::prelude::Pubkey;
 use serde::Deserialize;
 use std::str::FromStr;
@@ -33,6 +33,9 @@ pub struct AgreementQuery {
     pub limit: Option<u16>,
     pub holder: Option<String>,
     pub writer: Option<String>,
+    pub creator: Option<String>,
+    /// Origin role of the offer creator; absent selects both origins.
+    pub side: Option<OfferSide>,
     /// Agreements written or held by this wallet. Applied before pagination.
     pub owner: Option<String>,
     pub mint: Option<String>,
@@ -43,8 +46,8 @@ pub struct AgreementQuery {
     pub quantity_raw: Option<String>,
     pub min_payout: Option<String>,
     pub max_premium: Option<String>,
-    /// Include unrestricted offers and offers reserved for this holder, excluding their own offers.
-    pub eligible_holder: Option<String>,
+    /// Include unrestricted offers and offers reserved for this counterparty, excluding their own offers.
+    pub eligible_counterparty: Option<String>,
 }
 
 impl AgreementQuery {
@@ -57,9 +60,10 @@ impl AgreementQuery {
             &self.after,
             &self.holder,
             &self.writer,
+            &self.creator,
             &self.owner,
             &self.mint,
-            &self.eligible_holder,
+            &self.eligible_counterparty,
         ]
         .into_iter()
         .flatten()
@@ -78,7 +82,7 @@ impl AgreementQuery {
         if self.status.as_deref().is_some_and(|status| {
             !matches!(
                 status,
-                "funded" | "active" | "exercised" | "cancelled" | "expired"
+                "open" | "active" | "exercised" | "cancelled" | "expired"
             )
         }) {
             return Err(AppError::Invalid);
