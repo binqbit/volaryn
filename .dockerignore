@@ -13,3 +13,5 @@ frontend/dist
 frontend/dist-live
 
 deployment
+
+security-audit

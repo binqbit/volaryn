@@ -82,7 +82,7 @@ docker compose --env-file deployment/release.env -f compose.live.yaml \
   up -d --wait --wait-timeout 180
 ```
 
-The application binds host loopback port 8080. Configure the host's HTTPS reverse proxy to forward the chosen domain to `http://127.0.0.1:8080`, preserve the path, limit request bodies to 2 MiB, and disable caching for HTML, `/api/*`, and `/rpc`. Hashed frontend assets may use their supplied immutable cache headers. No WebSocket proxy is required. Wallet signing and cross-tab Web Locks require a secure browser origin.
+The application binds host loopback port 8080. Configure the host's HTTPS reverse proxy to forward the chosen domain to `http://127.0.0.1:8080`, preserve the path, limit request bodies to 2 MiB, and disable caching for HTML, `/api/*`, and `/rpc`. Hashed frontend assets may use their supplied immutable cache headers. Set ingress connection, request-rate, and upload-time limits for the expected workload. The application bounds body size and total upload duration, and limits concurrent handlers per route; these are not per-client abuse quotas. No WebSocket proxy is required. Wallet signing and cross-tab Web Locks require a secure browser origin.
 
 ```sh
 python3 tools/release/smoke.py https://YOUR_DOMAIN \

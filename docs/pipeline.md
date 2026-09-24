@@ -51,7 +51,7 @@ Build with the pinned program toolchain and verify transaction size, compute, me
 **Scope**
 
 - Connect a minimal backend and frontend through stable application interfaces and the architecture's [extension boundaries](architecture.md#business-changes-and-extension-boundaries). Generate the program client from the contract interface and keep HTTP types aligned with the backend contract; introduce replaceable interfaces at external boundaries rather than around every module.
-- Add the local ledger and an idempotent initialization job that deploys the program, initializes policy, and prepares test participants and funded offers through real program instructions.
+- Load the program into the local validator at ledger genesis. Add an idempotent bootstrap job that verifies its identity, initializes policy, and prepares test participants and funded offers through real program instructions.
 - Expose network identity, one supported fixture position, funded offers, agreement terms, and transaction outcomes. Store a minimal rebuildable projection of chain state, applying versioned migrations before readiness, and reconcile it from authoritative accounts on startup and after transactions.
 - Support wallet signing, transaction submission, and confirmation in the browser; the backend never signs financial actions. Clearly distinguish pending, provisional, finalized, and failed outcomes. Persist public pending identifiers across tab closure, serialize signing across tabs, and reconcile expired signatures against finalized agreement state before offering a retry.
 - Serve the frontend and API together. Add PostgreSQL with persistent storage, an application role, embedded migrations, and separate chain and index readiness. Local initialization and disposable signers require the expected local ledger identity and remain isolated from live configuration.
@@ -111,7 +111,7 @@ Test captured provider responses, missing or changed fields, unit mismatches, ti
 
 **Scope**
 
-- Complete bounded reconciliation of agreements, reserves, and token accounts. Treat local storage as a recoverable projection, with explicit observation freshness.
+- Complete bounded reconciliation of agreements, reserves, and token accounts. Treat indexed financial observations as rebuildable projections, with explicit observation freshness; preserve application history and signed pending identifiers separately.
 - Retain signed operation receipts before relay, restore authorized wallet connections, and show unsigned interruptions, pending operations, and terminal results in wallet activity. Keep application history separate from rebuildable agreement projections.
 - Resolve uncertain transaction outcomes before offering a retry. Keep confirmed feedback separate from finalized records and avoid duplicate financial actions.
 - Support compatible schema changes, repeated initialization, and clear failure on incompatible deployment state. Never repair incompatibility by silently resetting balances.

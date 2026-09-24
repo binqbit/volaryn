@@ -6,19 +6,19 @@ The selection favors a small operational footprint, precise financial behavior, 
 
 ## 1. Selected stack
 
-| Concern                 | Selection                                                            | Responsibility                                                                              |
-| ----------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Application server      | Rust, Tokio, Axum, Tower, `tower-http`                               | HTTP API, static frontend, bounded background work.                                         |
-| External access         | `reqwest` with Rustls; asynchronous `solana-rpc-client`              | Market-source HTTP and typed chain reads.                                                   |
-| Persistence             | PostgreSQL, SQLx, embedded SQL migrations                            | Deployment identity, agreement projections, operation receipts, reconciliation checkpoints. |
-| Data and diagnostics    | Serde, `serde_json`, `thiserror`, `tracing`, `tracing-subscriber`    | Validated boundaries, stable errors, structured logs.                                       |
-| Exact market arithmetic | `rust_decimal`                                                       | Off-chain prices and derived estimates; settlement uses integer base units.                 |
-| Settlement program      | Rust, Anchor, `anchor-spl`, Token-2022 interfaces                    | Agreement authorization, reserves, atomic settlement.                                       |
-| Frontend                | React, TypeScript, Vite, React Router, CSS Modules                   | Static wallet application with navigable feature screens.                                   |
-| Wallet and transactions | Solana Kit HTTP RPC, Wallet Standard plugin, React bindings          | Wallet discovery, signing, chain decoding, transaction submission and status polling.       |
-| Generated contracts     | Anchor IDL and Codama; Utoipa, `openapi-typescript`, `openapi-fetch` | Typed program and HTTP clients from authoritative definitions.                              |
-| Verification            | Rust tests, LiteSVM, Vitest, Playwright                              | Domain, program, adapter, frontend logic, and browser-flow evidence.                        |
-| Build and delivery      | Cargo and npm workspaces, Docker BuildKit, Docker Compose            | One repository, pinned builds, isolated tests, simple deployment.                           |
+| Concern                 | Selection                                                                       | Responsibility                                                                                |
+| ----------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Application server      | Rust, Tokio, Axum, Tower, `tower-http`                                          | HTTP API, static frontend, bounded background work.                                           |
+| External access         | `reqwest` with Rustls; asynchronous `solana-rpc-client`                         | Market-source HTTP and typed chain reads.                                                     |
+| Persistence             | PostgreSQL, SQLx, embedded SQL migrations                                       | Deployment identity, agreement projections, operation receipts, reconciliation checkpoints.   |
+| Data and diagnostics    | Serde, `serde_json`, `thiserror`, `tracing`, `tracing-subscriber`               | Validated boundaries, stable errors, structured logs.                                         |
+| Exact values            | Rust integer base units, TypeScript `bigint`, and preserved JSON number strings | Settlement and premium calculations remain exact; source prices are separate display context. |
+| Settlement program      | Rust, Anchor, `anchor-spl`, Token-2022 interfaces                               | Agreement authorization, reserves, atomic settlement.                                         |
+| Frontend                | React, TypeScript, Vite, React Router, CSS Modules                              | Static wallet application with navigable feature screens.                                     |
+| Wallet and transactions | Solana Kit HTTP RPC, Wallet Standard plugin, React bindings                     | Wallet discovery, signing, chain decoding, transaction submission and status polling.         |
+| Generated contracts     | Anchor IDL and Codama; Utoipa, `openapi-typescript`, `openapi-fetch`            | Typed program and HTTP clients from authoritative definitions.                                |
+| Verification            | Rust tests, LiteSVM, Vitest, Playwright                                         | Domain, program, adapter, frontend logic, and browser-flow evidence.                          |
+| Build and delivery      | Cargo and npm workspaces, Docker BuildKit, Docker Compose                       | One repository, pinned builds, isolated tests, simple deployment.                             |
 
 Node and the frontend build tools are build/test dependencies. PostgreSQL is the sole additional application data service; it has its own lifecycle and persistent storage.
 
@@ -32,7 +32,7 @@ Actix Web is a valid alternative and also uses Tokio. Axum is selected because i
 
 Keep HTTP extraction and response mapping in `http`, orchestration in `application`, and business types in `domain`. Background jobs use the same application services with bounded concurrency and explicit cancellation. A message broker, scheduler service, and dependency-injection framework are unnecessary for the defined polling workload.
 
-Map middleware failures into the REST error contract: a generic timeout layer does not automatically produce the application's JSON error. Apply body limits to streamed requests, including `/rpc`, as well as JSON extractors; bound response consumption and the whole upstream operation. Test chunked bodies and slow upstreams. [Axum error handling](https://docs.rs/axum/latest/axum/error_handling/), [extractor-limit boundary](https://docs.rs/axum/latest/axum/extract/struct.DefaultBodyLimit.html).
+Streamed requests, including `/rpc`, have a two-MiB body limit and a ten-second total upload deadline. Oversized bodies receive the structured REST size error; incomplete or trickled bodies past the deadline are rejected with HTTP 400 before RPC dispatch. The deadline does not reset on new chunks. Upstream response consumption and complete RPC operations are bounded separately. Test chunked bodies and slow upstreams. [Axum error handling](https://docs.rs/axum/latest/axum/error_handling/), [extractor-limit boundary](https://docs.rs/axum/latest/axum/extract/struct.DefaultBodyLimit.html).
 
 ### HTTP, chain reads, errors, and logs
 
@@ -60,23 +60,23 @@ Use `query`/`query_as` with `FromRow` and real migrated-database tests. These qu
 
 ### Exact values across boundaries
 
-| Value                                | Representation and rule                                                                                                                       |
-| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| Settlement quantity, payout, premium | Checked integer base units in Rust and the program; wider intermediates for arithmetic.                                                       |
-| Browser token amounts                | Input strings until validated, then `bigint`; never JavaScript floating-point financial arithmetic.                                           |
-| Volaryn REST financial values        | Validated decimal strings with explicit units.                                                                                                |
-| PostgreSQL financial values          | Canonical decimal strings in typed JSONB projections; exact `NUMERIC` columns with explicit bounds when numeric queries are needed.           |
-| Market prices and derived estimates  | Bounded `rust_decimal` values off chain, with checked arithmetic and explicit precision and rounding rules for derived estimates and display. |
+| Value                                | Representation and rule                                                                                                                |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Settlement quantity, payout, premium | Checked integer base units in Rust and the program; wider intermediates for arithmetic.                                                |
+| Browser token amounts                | Input strings until validated, then `bigint`; never JavaScript floating-point financial arithmetic.                                    |
+| Volaryn REST financial values        | Validated decimal strings with explicit units.                                                                                         |
+| PostgreSQL financial values          | Canonical decimal strings in typed JSONB projections; exact `NUMERIC` columns with explicit bounds when numeric queries are needed.    |
+| Market source values                 | Exact JSON number strings retained by Serde and returned as strings; rounded browser display never feeds settlement or offer defaults. |
 
 PostgreSQL `BIGINT` is signed and cannot represent the full token `u64` range. JSONB projections retain amount strings without floating-point conversion; the finalized-slot checkpoint uses `NUMERIC(20,0)` with explicit `u64` bounds. Generated typed columns index status, holder, writer, and mint for bounded filtered queries. Slot and observation time are separate columns; account payloads remain JSONB. List queries use address keyset pagination, and detail reads use the primary key. Do not sort decimal strings lexically or coerce them through floating point. Dedicated market-price columns need declared precision, scale, and validated conversion. [PostgreSQL numeric types](https://www.postgresql.org/docs/17/datatype-numeric.html), [JSONB](https://www.postgresql.org/docs/17/datatype-json.html).
 
-Preserve external JSON number text, using `serde_json::RawValue` where necessary, and parse it directly into `rust_decimal`; converting through `f64` first loses the intended precision. Reject values outside the supported range or scale. This decimal dependency belongs to market context, not the on-chain settlement program. [Raw JSON values](https://docs.rs/serde_json/latest/serde_json/value/struct.RawValue.html), [Decimal representation](https://docs.rs/rust_decimal/latest/rust_decimal/struct.Decimal.html).
+Preserve external JSON numbers with `serde_json`'s `arbitrary_precision` feature and return accepted source values as strings. The provider adapter rejects negative or non-finite numeric observations; its finite-range check does not replace the original number text. These values supply display context only: their price time and token-unit relationship are unverified, so they do not drive payouts, premiums, or risk estimates. Premium calculations use checked integer base units and explicit upward rounding. No additional decimal-arithmetic package is required for these paths. [Raw JSON values](https://docs.rs/serde_json/latest/serde_json/value/struct.RawValue.html).
 
 Solana JSON-RPC retains its own numeric wire format. Use Kit's Solana-aware serializer/parser; do not route RPC through the REST client or ordinary browser JSON parsing. The bounded `/rpc` proxy validates the envelope and method allowlist while preserving payload numbers and JSON-RPC result/error envelopes. Test values above `Number.MAX_SAFE_INTEGER` through the entire proxy path. [Kit HTTP transport](https://github.com/anza-xyz/kit/tree/main/packages/rpc-transport-http).
 
 ### Migration contract
 
-Keep the development schema in one initial SQL migration in `backend/migrations/`, replacing obsolete fields instead of retaining stage-specific compatibility layers. Once application-owned data requires retention, add ordered immutable forward migrations and explicit upgrade tests. Embed them with `sqlx::migrate!()` and run them before readiness and reconciliation. A small `backend/build.rs` tracks the migrations directory so newly added files trigger a rebuild; use consistent LF line endings. Validate the applied history against the embedded migrations and fail clearly on incompatible history or checksum mismatch. Never reset data as a startup repair. [Embedded migrations](https://docs.rs/sqlx/latest/sqlx/macro.migrate.html), [migration validation](https://docs.rs/sqlx/latest/sqlx/migrate/struct.Migrator.html).
+The migrations in `backend/migrations/` define the initial chain projection and a separate additive activity-receipt schema. Retained application history requires immutable forward migrations and explicit upgrade tests; do not rewrite an applied baseline or add compatibility layers solely for discarded development stages. Embed them with `sqlx::migrate!()` and run them before readiness and reconciliation. A small `backend/build.rs` tracks the migrations directory so newly added files trigger a rebuild; use consistent LF line endings. Validate the applied history against the embedded migrations and fail clearly on incompatible history or checksum mismatch. Never reset data as a startup repair. [Embedded migrations](https://docs.rs/sqlx/latest/sqlx/macro.migrate.html), [migration validation](https://docs.rs/sqlx/latest/sqlx/migrate/struct.Migrator.html).
 
 SQLx uses PostgreSQL advisory locking to serialize migrations across concurrent startups. Projection batches use ordered row upserts with per-row finalized-slot guards and an atomic high-water checkpoint. A stale batch cannot overwrite a newer row, even when another agreement advances independently; rows absent from a batch are retained. Identity binding prevents the same database from serving a different ledger or program. These safeguards do not make incompatible application versions safe to overlap: stop the previous writer before an incompatible migration. [PostgreSQL migration implementation](https://github.com/launchbadge/sqlx/blob/v0.9.0/sqlx-postgres/src/migrate.rs), [advisory locks](https://www.postgresql.org/docs/17/explicit-locking.html#ADVISORY-LOCKS).
 
