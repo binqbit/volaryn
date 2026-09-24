@@ -31,14 +31,14 @@ Stages are cumulative. Preparation for later work may proceed independently, but
 **Scope**
 
 - Establish program boundaries, account identities, explicit agreement versioning, and agreement states, with a machine-readable interface suitable for generating application clients. Separate economic terms from authorization checks without implementing unused financial variants.
-- Implement the full financial lifecycle: isolated payout funding, separate USDC premium payment, holder authorization, full exercise, cancellation before activation, expiry recovery, and terminal cleanup.
+- Implement both origins: holder premium escrow and writer payout funding, side-specific acceptance, full backing at activation, holder authorization, full exercise, creator cancellation before activation, expiry recovery, and beneficiary-specific terminal cleanup.
 - Enforce asset admission and lifecycle limits for new commitments while preserving active terms. Start with a deliberately small supported fixture set.
 - Include representative issuer behavior from the beginning: gross token delivery, transfer fees, scaled display amounts, transfer restrictions, and the settlement account's handoff to the writer. Test fee and display-scaling changes after activation against the fixed obligation.
 - Provide shared, versioned fixture recipes and the fast test entry point defined in the [test-environment contract](architecture.md#test-environment-and-entry-points). Isolate each scenario and control chain time and epochs for boundary tests. Automated contract checks begin here and remain required throughout the pipeline.
 
 **Verification**
 
-Run both successful paths and rejected actions: insufficient backing or delivery balance, incorrect signer or asset, early reserve withdrawal, repeated or partial exercise, activation/cancellation races, exact expiry boundaries, and arithmetic limits. Verify that policy changes cannot rewrite active rights, fees cannot reduce the promised USDC payout, and a failed transfer rolls back the entire operation. Include donated surplus and cleanup restrictions so account housekeeping cannot block settlement or refunds.
+Run both origins through successful and rejected actions: self-acceptance, wrong-side instruction, incorrect premium refund, insufficient backing or delivery balance, incorrect signer or asset, early reserve withdrawal, repeated or partial exercise, activation/cancellation races, exact expiry boundaries, and arithmetic limits. Verify that policy changes cannot rewrite active rights, fees cannot reduce the promised USDC payout, and a failed transfer rolls back the entire operation. Include donated surplus and cleanup restrictions so account housekeeping cannot block settlement or refunds.
 
 Build with the pinned program toolchain and verify transaction size, compute, memory, and nested-call limits for the largest supported token configuration. Atomic settlement must fit a transaction format supported by the runtime and intended wallets.
 
@@ -67,20 +67,21 @@ Verify strict dependency and generated-client checks, supported interface versio
 
 ## 3. Complete local product
 
-**Working result:** both participants can complete the entire product workflow through the application using local assets. Fixture provisioning supplies balances and asset policies; the writer can create new offers without fixture scripts.
+**Working result:** both participants can complete the entire product workflow through the application using local assets. Fixture provisioning supplies balances and asset policies; either participant can propose fixed terms without fixture scripts.
 
 **Scope**
 
 - Complete position discovery, searchable token selection by name/ticker/mint, exact-quantity offer selection, offer review, active protection, and writer commitments. Use the selected mint and its precision throughout creation, filters, signing, recovery, and per-asset balances.
 - Separate product introduction from application workflows: Home explains the agreement; Explore offers lists comparable cards; Create offer owns funding; My portfolio separates purchased protection and written commitments. Full terms and financial actions belong on agreement detail pages. Keep navigation, connection prompts, empty states, and mobile layouts explicit.
-- Let writers set terms, fund offers, cancel unaccepted offers, inspect committed capital, reclaim expired reserves, and locate delivered tokens.
-- Match existing funded inventory against the selected asset, quantity, holder restrictions, and acceptable terms. Preserve each offer's fixed terms; distinguish no matching offer from an unavailable lookup.
+- Default creation to holder requests that escrow the premium; allow writers to propose buy offers that reserve the payout. Let the opposite role accept once, with atomic premium payment and full payout backing. Keep the token quantity fixed and underlying in the holder's wallet until exercise.
+- Let creators cancel unaccepted requests/offers to recover the correct initial deposit. Show writer commitments, expiry reclaim, delivered tokens, and creator-specific residual recovery after cancellation.
+- Separate All offers, Sell requests, and Buy offers by immutable origin. Match open inventory against the selected asset, exact quantity, counterparty restrictions, and acceptable terms; require premium escrow for requests and payout backing for buy offers. Preserve each offer's fixed terms; distinguish no matching offer from an unavailable lookup.
 - Show premium, payout, deadlines, gross delivery, estimated net receipt, transaction costs, and issuer restrictions before signing. Exercise remains an explicit holder action.
 - Cover loading, empty, rejected, expired, and completed states, including balances split across token accounts and insufficient deliverable holdings.
 
 **Verification**
 
-Run complete holder and writer journeys with separate wallets and at least two underlying assets. Verify name/ticker/mint search, keyboard selection, exact decimal conversion, per-mint filtering, identity in signature reviews, and rejection of the wrong delivery mint. Exercise after the writer disconnects; separately allow protection to expire and reclaim the reserve. Verify cancellation races, designated-holder restrictions, no-match behavior, full-quantity requirements, and the inability to withdraw an active reserve. Check that a falling displayed price cannot trigger exercise and that the UI explains costs and deadlines correctly. Validate basic keyboard access and usable layouts for the core journeys.
+Run complete holder and writer journeys with separate wallets and at least two underlying assets. Verify name/ticker/mint search, keyboard selection, exact decimal conversion, per-mint filtering, identity in signature reviews, and rejection of the wrong delivery mint. Exercise after the writer disconnects; separately allow protection to expire and reclaim the reserve. Verify both origins' creation, acceptance, cancellation, and terminal cleanup, cancellation races, designated-counterparty restrictions, no-match behavior, full-quantity requirements, and the inability to withdraw an active reserve. Check that a falling displayed price cannot trigger exercise and that the UI explains costs and deadlines correctly. Validate basic keyboard access and usable layouts for the core journeys.
 
 Repeat clicks, switch wallets during preparation, and exercise component remounts. These must not duplicate submission, reuse another account's request results, or present retained stale data as a fresh observation.
 
@@ -112,7 +113,7 @@ Test captured provider responses, missing or changed fields, unit mismatches, ti
 **Scope**
 
 - Complete bounded reconciliation of agreements, reserves, and token accounts. Treat indexed financial observations as rebuildable projections, with explicit observation freshness; preserve application history and signed pending identifiers separately.
-- Retain signed operation receipts before relay, restore authorized wallet connections, and show unsigned interruptions, pending operations, and terminal results in wallet activity. Keep application history separate from rebuildable agreement projections.
+- Retain signed operation receipts with offer side and actor role before relay, restore authorized wallet connections, and show unsigned interruptions, pending operations, and terminal results in wallet activity. Keep application history separate from rebuildable agreement projections.
 - Resolve uncertain transaction outcomes before offering a retry. Keep confirmed feedback separate from finalized records and avoid duplicate financial actions.
 - Support compatible schema changes, repeated initialization, and clear failure on incompatible deployment state. Never repair incompatibility by silently resetting balances.
 - Add actionable health and readiness signals, request correlation, dependency failures, and reconciliation lag without exposing secrets.
@@ -162,8 +163,8 @@ Contract checks run natively in LiteSVM; optional container packaging supplies r
 
 ## Extending the pipeline
 
-An additional capability enters through its owning boundary, brings a demonstrable user outcome, and adds tests for its new failure modes. A new asset repeats the admission and compatibility gate; a contract change repeats financial verification and client compatibility; a storage change repeats update and recovery checks. Preserve active agreement semantics across every increment.
+An additional capability enters through its owning boundary, brings a demonstrable user outcome, and adds tests for its new failure modes. A new asset repeats the admission and compatibility gate; a contract change repeats financial verification and client checks; a storage change repeats initialization and recovery checks. Maintain one current development format and recreate disposable state after incompatible changes.
 
-Classify a business change before extending the system: presentation or provider changes stay within application boundaries; new economic or authorization rules follow [agreement evolution](architecture.md#agreement-evolution); additional runtime capacity follows measured bottlenecks. Require cross-version decoding and behavior tests when supporting more than one agreement version, and define migration or continued service for earlier agreements. A capability such as transferring a right enters as its own bounded product increment, with authorization and settlement tests, rather than as a configuration switch or speculative module.
+Classify a business change before extending the system: presentation or provider changes stay within application boundaries; new economic or authorization rules follow [agreement evolution](architecture.md#agreement-evolution); additional runtime capacity follows measured bottlenecks. Update the contract, generated clients, application and tests together instead of adding historical compatibility branches. A capability such as transferring a right enters as its own bounded product increment, with authorization and settlement tests, rather than as a configuration switch or speculative module.
 
 Optional context, including Pyth, follows the official-data integration boundary only when its access, units, and product value are established. It must work as an isolated addition whose absence does not block core journeys, local startup, or settlement. Changes to the financial model or deployed service boundaries require an explicit product and architecture update before entering this pipeline.

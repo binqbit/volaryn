@@ -53,10 +53,12 @@ Volaryn is appropriate only if the holder values retaining the asset in their wa
 The agreement answers four questions before the holder pays: **which asset, how much must be delivered, how much USDC is received, and until when?** The premium is a separate cost.
 
 1. **Identify the position.** Connect the wallet, recognize a supported official PreStocks mint, and show the spendable position with its market context and lifecycle restrictions.
-2. **Review a funded offer.** A writer specifies the delivery quantity, USDC payout, premium, and expiry, and deposits the entire payout. A suggested price or unfunded expression of interest is not shown as reserved protection.
-3. **Activate the right.** A different wallet from the writer accepts before the offer's deadline and pays the premium. The underlying stays in the holder's wallet; the USDC remains reserved for this agreement.
+2. **Propose the protection you need.** The holder sets a fixed delivery quantity, USDC payout, premium, and expiry, and escrows the premium in a sell request. A writer accepts those exact terms by depositing the entire payout and receiving the premium atomically. Until then, the request is visibly awaiting capital and has no exercise right.
+3. **Or accept an existing buy offer.** A writer can propose the same terms and reserve the payout first; a different signing holder accepts by paying the premium. Both directions produce the same active agreement. The underlying stays in the holder's wallet; the full payout remains reserved for that agreement.
 4. **Choose whether to exercise.** Before protection expires, the holder may deliver the entire agreed amount once; partial exercise is not supported. Asset delivery, payment of the full USDC payout, and consumption of the right occur atomically. The writer cannot decline because the acquisition has become unattractive.
 5. **Resolve unused protection.** If the holder does not exercise before expiry, the right ends. The writer can reclaim the reserve and keeps the premium. The holder retains any underlying they still own.
+
+The creator can cancel before acceptance and recover the original premium or payout. Each request matches once in full, with no partial fills or bidding. The marketplace separates **Sell requests** and **Buy offers**, using visible type labels as well as color. These are proposals about the underlying PreStocks position, not transferable option tokens.
 
 Exercise is the holder's action. It does not happen automatically when a displayed price falls, and the application must make the deadline explicit. No price feed decides whether an otherwise valid exercise is allowed.
 
@@ -86,7 +88,7 @@ That commitment has a real cost. While an offer is funded, its reserve is unavai
 
 The writer's decision therefore includes the exact asset, net quantity they may receive, committed capital, duration, premium, and lifecycle risks. A headline percentage yield would omit much of that decision.
 
-The product only has an executable market when a holder's willingness to pay meets a writer's required compensation and transaction costs. If it does not, Volaryn should show no matching funded offer. The platform does not manufacture a counterparty or assume that collateral arrives after protection is sold.
+The product only has an executable market when a holder's willingness to pay meets a writer's required compensation and transaction costs. If it does not, a holder can publish a request and wait, but it must remain distinct from active protection. The platform does not manufacture a counterparty or assume that collateral arrives after protection is sold.
 
 ## 7. How the product choices change the experience
 
@@ -97,7 +99,7 @@ Volaryn applies a familiar option structure through a workflow that starts with 
 | Start from a verified wallet holding              | The holder reviews protection for the asset they actually own, rather than inferring whether a similarly named market is an adequate hedge.                                                                                  |
 | Present quantity, payout, cost, and date together | The decision can be understood without navigating option chains or interpreting volatility metrics. The underlying financial terms remain visible.                                                                           |
 | Use PreStocks market and lifecycle context        | The holder can relate the cost and payout to the issuer's information, while known conversion deadlines constrain available terms. Unit-dependent valuation calculations remain unavailable until their inputs are verified. |
-| Require an isolated, fully funded reserve         | A holder can inspect the actual backing of the offered payout before activation. The reserve is neither shared across promises nor invested for yield.                                                                       |
+| Require an isolated, fully funded reserve         | A buy offer exposes its backing before acceptance; accepting a sell request funds the entire payout in the same transaction that activates protection. The reserve is neither shared across promises nor invested for yield. |
 | Keep exercise tied to fixed delivery terms        | A changed reference price or unavailable market-data API cannot change the agreed payout. Valid settlement does not require a fresh writer decision.                                                                         |
 | Account for issuer fees and token behavior        | Both sides understand gross delivery and estimated net receipt. Changes to display scaling do not silently change the underlying obligation.                                                                                 |
 

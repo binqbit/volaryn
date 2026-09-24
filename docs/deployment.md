@@ -95,11 +95,13 @@ The smoke check compares the hosted revision, program fingerprint, complete publ
 
 Retain the previous release bundle, public manifest and database backup. Run the full checks and read-only deployment verification for a candidate release before changing the serving image. The bundled operator configuration is stable across releases; keep the existing deployment secrets and volume.
 
+A release supports one contract format and requires its matching program, generated client, API, manifest and database schema. Historical conversions are not included. Development replaces incompatible disposable state through [local development reset](development.md#local-development-reset); this procedure must not be applied to live rights or retained application data. Such data requires a separately designed preservation plan before an incompatible release.
+
 For a compatible application update, copy the new `release.env` to `deployment/release.env`, update the public manifest only when its reviewed identity changes, and run the same `up -d --wait` command. SQLx validates applied checksums and serializes migrations before readiness. A checksum conflict or incompatible network/database identity fails explicitly; startup does not reset state.
 
 Rollback uses the retained previous image and matching manifest only if they support the deployed program and the applied database schema. Rehearse that exact candidate in an isolated restored database before using it. Do not run down-migrations automatically. If a program upgrade or schema change is incompatible, use an explicitly reviewed forward fix. Restarting the same release is tested independently of a cross-version rollback and must not be presented as proof of every older version's compatibility.
 
-The local backend and release tooling tests verify configuration rejection and compatible migration behavior. The full native harness also checks database outage recovery, projection rebuild, application and ledger restarts, restoration into a new database, and settlement through an independent client while the application is stopped.
+The local backend and release tooling tests verify configuration rejection, fresh schema initialization, repeated startup and migration-history conflicts. The full native harness also checks database outage recovery, projection rebuild, application and ledger restarts, restoration into a new database, and settlement through an independent client while the application is stopped.
 
 ## Backup and restore
 
