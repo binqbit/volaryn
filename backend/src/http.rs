@@ -152,8 +152,6 @@ async fn serve_frontend(uri: Uri, directory: PathBuf) -> Response {
             | "/portfolio/protection"
             | "/portfolio/written"
             | "/portfolio/activity"
-            | "/writer"
-            | "/protection"
             | "/issuer-assets"
     ) || path.starts_with("/agreements/")
     {

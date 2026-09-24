@@ -1,16 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useConnectedWallet, useDisconnect } from '@solana/kit-plugin-wallet/react';
 import { useClient } from '@solana/react';
-import {
-  Link,
-  NavLink,
-  Navigate,
-  Outlet,
-  Route,
-  Routes,
-  useNavigate,
-  useLocation,
-} from 'react-router';
+import { Link, NavLink, Outlet, Route, Routes, useNavigate, useLocation } from 'react-router';
 import { shortAddress, type Deployment } from './lib/api/client';
 import type { AppClient } from './lib/chain/client';
 import { useWallet } from './features/useWallet';
@@ -286,8 +277,6 @@ export function App({ deployment }: { deployment: Deployment }) {
             />
           </Route>
           <Route path="/issuer-assets" element={<OfficialAssets />} />
-          <Route path="/protection" element={<Navigate replace to="/offers" />} />
-          <Route path="/writer" element={<Navigate replace to="/offers/new" />} />
           <Route
             path="*"
             element={
