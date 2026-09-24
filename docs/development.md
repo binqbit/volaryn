@@ -103,6 +103,10 @@ Terminal agreements remain allocated to prevent address reuse. Cleanup sweeps re
 
 ## Run the local application
 
+The [demo walkthrough](demo.md) provides the two-wallet sequence and expected settlement outcomes. PreStocks balances, filters, offer inputs and reviews use **unscaled token units**: raw base units divided only by the mint's decimal precision. They do not automatically convert issuer-scaled amounts copied from another wallet. Each review also shows the exact integer base-unit delivery obligation. USDC remains denominated in ordinary six-decimal USDC units.
+
+Each holding's **Find protection** link selects its exact settlement mint in **Explore offers**. Offer filters live in the URL, so a copied link, reload, Back and pagination preserve the same criteria. The plain **Explore offers** navigation link starts a new unfiltered search. **Token identity → Verified issuer context** opens the official catalogue filtered by the asset's mainnet reference mint. From a signing review it opens a separate tab, leaving the reviewed terms unchanged. Mainnet reference links never switch the settlement network or request a signature.
+
 ```sh
 docker compose up --build
 ```

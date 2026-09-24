@@ -120,7 +120,7 @@ Test captured provider responses, missing or changed fields, unit mismatches, ti
 
 **Verification**
 
-Interrupt submission and confirmation, repeat requests, restart the application during activity, and make the RPC or market source temporarily unavailable. Rebuild projections after deleting the local cache and recover the same authoritative financial state; cached market history is a separate concern. Exercise through an independent compatible client while the backend is unavailable. Test both a clean installation and an update with existing data and agreements.
+Interrupt submission and confirmation, repeat requests, restart the application during activity, and make the RPC or market source temporarily unavailable. Rebuild agreement projections and recover the same authoritative financial state while preserving persisted operation receipts. Refresh the independent in-memory issuer and market cache after restart; it has no persisted history. Exercise through an independent compatible client while the backend is unavailable. Test both a clean installation and an update with existing data and agreements.
 
 Reload or navigate away with a transaction pending, recreate the application container while the browser remains open, and recover through public transaction identifiers. Test oversized/chunked responses and rate-limit delays against whole-operation bounds. Run migration and interrupted-write scenarios on isolated PostgreSQL databases with production settings. Verify migration locking, concurrent startup, monotonic checkpoints, and recovery after database unavailability.
 
