@@ -164,7 +164,19 @@ docker compose down       # stop services; retain ledger and application data
 docker compose up         # resume the same agreements and balances
 ```
 
-Use the same Compose project for repeated development. After an incompatible program, manifest or schema change, follow [local development reset](#local-development-reset). Rebuilding an image alone does not replace the program stored in the ledger.
+Use the same Compose project for repeated development. If you choose `-p NAME`, include it in every `build`, `up`, `run`, `logs` and `down` command: images, containers and volumes are project-scoped. Two local projects cannot both publish port 8080. After an incompatible program, manifest or schema change, follow [local development reset](#local-development-reset). Rebuilding an image alone does not replace the program stored in the ledger.
+
+If `app` fails to start, inspect `docker compose ps -a app` and `docker compose logs --no-color --tail=100 app`. `Restarting (1)` means the process exited; `unhealthy` alone only reports a failed readiness check. Startup errors identify the failing stage, and structured RPC diagnostics distinguish connection failures, HTTP status, invalid JSON, response limits and RPC error codes. Diagnostics go to stderr; `--check-deployment` keeps its JSON result on stdout. Connection URLs, credentials and upstream error bodies are omitted.
+
+For `port is already allocated`, identify the existing publisher with `docker ps --filter publish=8080 --format '{{.Names}} {{.Ports}}'`. Stop the intended old local project with `docker compose -p OLD_PROJECT down`, then start the selected project again. Omitting `--volumes` retains the old project's data. A successful HTTP check on port 8080 may belong to that old project; compare `/api/config`'s genesis with the selected bootstrap's ledger identity.
+
+If a failed container-network setup leaves `app` disconnected, clear the port conflict first, then recreate only the application:
+
+```sh
+docker compose up -d --no-deps --no-build --force-recreate --wait --wait-timeout 600 app
+```
+
+This uses the existing image and retains the database, ledger and manifest. Use it after the selected project's dependencies and bootstrap have succeeded; normal startup remains `docker compose up --build`.
 
 Backend CLI arguments select the manifest, upstream RPC, static files, and listening address. PostgreSQL uses `DATABASE_URL` (or `--database-url`); prefer the environment to keep credentials out of command arguments. Compose and the native launcher supply the local connection automatically. The application accepts fixture manifests only when built with the `localnet` feature, verifies genesis and program bytes, and applies embedded migrations before listening. The index discovers account addresses every thirty seconds and refreshes open/active agreements every two seconds, with up to four concurrent batches of fifty agreement/reserve pairs. Each pair uses one finalized RPC context; stale slots cannot replace newer rows.
 
