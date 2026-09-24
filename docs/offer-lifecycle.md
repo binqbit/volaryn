@@ -16,11 +16,15 @@ An agreement represents an on-chain right and its reserved funds. An operation i
 
 The deadline is exclusive: acceptance and exercise stop at the corresponding on-chain timestamp. The interface checks chain time; an unavailable clock does not authorize an action. Residual recovery does not reopen an agreement or erase its outcome. Version 1 has immutable terms, a fixed holder after activation, and no partial acceptance, partial exercise, transfer, or early writer withdrawal from an active agreement.
 
-**Explore offers** lists finalized, funded, still-acceptable offers. After activation, an agreement leaves that market but remains in the holder's **My protection** and the writer's **My offers**, including after settlement. These are wallet filters over public chain records, not confidentiality controls; direct agreement URLs remain readable by anyone.
+**Explore offers** lists finalized, funded, still-acceptable offers. When a wallet is connected, the list excludes that wallet's own offers; they remain available for management in **My offers**. After activation, an agreement leaves that market but remains in the holder's **My protection** and the writer's **My offers**, including after settlement. These are wallet filters over public chain records, not confidentiality controls; direct agreement URLs remain readable by anyone.
+
+Agreement details identify the connected wallet's role. The writer provides the reserved USDC, receives the activation premium and, on exercise, controls the delivered PreStocks. The holder owns the exercise right and receives the USDC payout only upon settlement. A designated holder has no protection until activation; viewers receive neutral descriptions and cannot exercise or reclaim another wallet's funds. Status messages distinguish these outcomes for each role, including expiry without payout and reserve recovery. The writer and holder must be different wallet addresses. The program rejects self-activation and self-designation when creating an offer. The interface hides activation from the writer and explains invalid self-designation before requesting a signature. This is an address constraint, not a claim that different addresses represent different people.
 
 ## Operation lifecycle
 
-Each confirmed review starts a separate attempt. Merely editing a form or closing its terms review does not submit an operation.
+Each confirmed review starts a separate attempt. Merely editing a form or closing its terms review does not submit an operation. Preparation and signing errors receive focus and are brought into view, including when the triggering button is below the page heading. An expired admission policy blocks new offers before signing and reports the reason; it does not erase existing agreements.
+
+**Confirm and sign** is the application's only approval step. The disposable local wallets sign immediately after the reviewed conditions are rechecked, and submission follows without another dialog. **Back** or Escape closes the review without signing. External wallets retain control of their own signing approval; the application cannot confirm on their behalf. Connection and silent reconnection never authorize a transaction.
 
 | Status                              | Evidence and recovery                                                                                                                                                |
 | ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -37,6 +41,8 @@ Each confirmed review starts a separate attempt. Merely editing a form or closin
 | Outcome unknown · checking          | Submission feedback, signature history, or sufficient state proof is unavailable. Observation continues; no automatic replacement transaction is created.            |
 
 The same tracking applies to creation, activation, exercise, cancellation, expiry reclaim, and residual recovery. A failed attempt does not change an agreement's lifecycle. Another wallet can win activation, an acceptance deadline can pass while signing, and balances or issuer restrictions can change after review; the program remains authoritative when a transaction executes.
+
+Agreement action buttons show the operation in progress rather than leaving an unchanged disabled label. Activation reads **Activating protection…** while pending, distinguishes provisional confirmation, and reads **Protection activated** only after finalized success or verified agreement state. If the agreement read is still catching up, the completed action stays disabled; the next action appears from the updated agreement. Active protection retains an explicit activation outcome beside **Exercise protection**. Closed acceptance, expired protection, and reserves locked until expiry have explanatory labels. Failed or expired transaction attempts do not display a successful outcome or prevent a fresh review when the agreement still permits it.
 
 ## Persistence and recovery
 

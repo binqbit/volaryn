@@ -197,3 +197,7 @@ Record the resolved combination in manifests and lockfiles, with exact toolchain
 Add a dependency for a concrete responsibility, not a possible future feature. Use build/dev dependencies for generators and test tooling, limit Cargo features, and exclude local signers and fault controls from live artifacts. Neither optional market context nor a framework's convenience plugin may silently introduce credentials, a new service, or a settlement prerequisite.
 
 A separate indexer, a query-cache library, or targeted UI primitives can be introduced when the architecture's change boundaries and measured needs justify them. The baseline does not include Redis, message brokers, a general plugin engine, an ORM, a full-stack frontend server, a secondary option token, or a settlement-price oracle. Adopting a different financial model requires a product decision as well as technology changes.
+
+## Release packaging
+
+The existing Rust server and PostgreSQL are also the hosted runtime; a separate `app-live` target contains the production frontend and a backend without the localnet feature. Docker Compose secrets supply connection files. Python standard-library tools prepare operator configuration and perform read-only hosted checks; they are not runtime services. Release bundles pair the image content ID with source and program fingerprints, and the host supplies HTTPS. The [deployment guide](deployment.md) defines the exact build, verification, backup and rollback commands.

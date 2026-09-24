@@ -54,7 +54,7 @@ The agreement answers four questions before the holder pays: **which asset, how 
 
 1. **Identify the position.** Connect the wallet, recognize a supported official PreStocks mint, and show the spendable position with its market context and lifecycle restrictions.
 2. **Review a funded offer.** A writer specifies the delivery quantity, USDC payout, premium, and expiry, and deposits the entire payout. A suggested price or unfunded expression of interest is not shown as reserved protection.
-3. **Activate the right.** The holder accepts before the offer's deadline and pays the premium. The underlying stays in the holder's wallet; the USDC remains reserved for this agreement.
+3. **Activate the right.** A different wallet from the writer accepts before the offer's deadline and pays the premium. The underlying stays in the holder's wallet; the USDC remains reserved for this agreement.
 4. **Choose whether to exercise.** Before protection expires, the holder may deliver the entire agreed amount once; partial exercise is not supported. Asset delivery, payment of the full USDC payout, and consumption of the right occur atomically. The writer cannot decline because the acquisition has become unattractive.
 5. **Resolve unused protection.** If the holder does not exercise before expiry, the right ends. The writer can reclaim the reserve and keeps the premium. The holder retains any underlying they still own.
 

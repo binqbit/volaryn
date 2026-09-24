@@ -133,6 +133,7 @@ Reload or navigate away with a transaction pending, recreate the application con
 **Scope**
 
 - Build reproducible artifacts with pinned dependencies and matched program, client, API, and network configuration. Promote tested artifacts rather than rebuilding untracked variants for deployment.
+- Provide a content-addressed application image and release bundle with program, IDL, API and registry fingerprints; keep operator keys outside the runtime.
 - Add the live deployment configuration: the application connects to the declared program and assets; local ledger services, fixture routes, and disposable signers are excluded.
 - Separate application startup from explicit program deployment and upgrades. Verify network and program identity before enabling transactions; keep deployment authority outside the application runtime.
 - Configure hosting, persistent application data, health checks, and minimal operator settings. Document deployment, compatible application rollback, cache recovery, and diagnosis of failed initialization.

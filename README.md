@@ -36,7 +36,7 @@ Protection requires delivery of the specified asset before expiry. It does not i
 docker compose up --build
 ```
 
-Open `http://localhost:8080`. Connect **Test Wallet 1** for the holder journey or **Test Wallet 2** to fund and manage offers. Disconnect before switching roles. Every financial action opens a terms review before wallet signing. After **Confirm and sign**, approve with **Sign transaction** in the local test-wallet dialog, or cancel without sending. The local environment provides eight clearly labelled PreStocks replicas, including OpenAI, SpaceX and Anthropic, with issuer-fee simulations and real local-chain settlement. OpenAI and SpaceX each start with a funded offer; both test wallets receive 10,000 test USDC and 100 units of every supported replica before offer funding. Existing demos can be refilled with the explicit [top-up command](docs/development.md#run-the-local-application). No environment file or external account is required. Restarting preserves the ledger, database, and balances. Native development can use `npm run dev:localnet`; its pinned prerequisites and build commands are in the development guide.
+Open `http://localhost:8080`. Connect **Test Wallet 1** for the holder journey or **Test Wallet 2** to fund and manage offers. Disconnect before switching roles. Every financial action opens a terms review before wallet signing. For Test Wallet 1 and Test Wallet 2, **Confirm and sign** signs and submits after rechecking the reviewed conditions, with no additional confirmation dialog. **Back** or Escape closes the review without signing. External wallets retain their own signing approval. The local environment provides eight clearly labelled PreStocks replicas, including OpenAI, SpaceX and Anthropic, with issuer-fee simulations and real local-chain settlement. OpenAI and SpaceX each start with a funded offer; both test wallets receive 10,000 test USDC and 100 units of every supported replica before offer funding. Existing demos can be refilled with the explicit [top-up command](docs/development.md#run-the-local-application). No environment file or external account is required. Restarting preserves the ledger, database, and balances. Native development can use `npm run dev:localnet`; its pinned prerequisites and build commands are in the development guide.
 
 - **Home** (`/`) explains the PreStocks exit floor, premium, expiry, and both participant roles through a clearly labelled numerical example. It does not load an offer list. **View wallet** in the header opens the connected wallet panel.
 - **Explore offers** (`/offers`) searches PreStocks by name, ticker or mint and compares funded offers by selected token, exact quantity, minimum payout, maximum premium, and holder eligibility. Open a card to review the full agreement and activate protection.
@@ -47,6 +47,10 @@ Open `http://localhost:8080`. Connect **Test Wallet 1** for the holder journey o
 - **Official assets** reads PreStocks context and verified mainnet mint behavior separately from the local demo. It shows lifecycle limits and unavailable or stale sources without enabling mainnet transactions. See [asset integration](docs/asset-integration.md) for source boundaries and read-only verification.
 
 Run `./tools/test app` for native backend/frontend checks, or `./tools/test full` for the isolated Compose browser and recovery suite. See the [development guide](docs/development.md#run-the-local-application) for setup, reset, native localnet testing, and generated interfaces.
+
+## Deploy a release
+
+Use the [deployment guide](docs/deployment.md) for the separate mainnet configuration, verified release bundle, HTTPS hosting, backups and compatible rollback. `compose.live.yaml` runs only the application and PostgreSQL. It requires an explicitly deployed and reviewed program; local startup remains unchanged.
 
 ## Contract development
 

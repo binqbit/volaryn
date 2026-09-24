@@ -4,7 +4,7 @@ The **Official assets** page (`/issuer-assets`) reads PreStocks context and veri
 
 ## Local PreStocks experience
 
-The local demo uses disposable replicas of the reviewed ANDURIL, ANTHROPIC, FIGUREAI, KALSHI, NEURALINK, OPENAI, POLYMARKET, and SPACEX identities. `tools/localnet/assets.ts` maps stable local fixture seeds to `config/assets.json`; bootstrap derives the public metadata from that registry. Deployment schema 2 carries the local mint, reference mainnet mint, name, ticker, precision, and issuer page. The backend rejects unknown references, duplicate identities, altered metadata, and mainnet mints passed as local replicas.
+The local demo uses disposable replicas of the reviewed ANDURIL, ANTHROPIC, FIGUREAI, KALSHI, NEURALINK, OPENAI, POLYMARKET, and SPACEX identities. `tools/localnet/assets.ts` maps stable local fixture seeds to `config/assets.json`; bootstrap derives the public metadata from that registry. Deployment schema 3 carries the local mint, reference mainnet mint, name, ticker, precision, and issuer page. The backend rejects unknown references, duplicate identities, altered metadata, and mainnet mints passed as local replicas.
 
 `GET /api/assets` and `/api/config` expose the supported local assets without calling an external provider. Explore offers and Create offer share a searchable selector for name, ticker, local mint, or reference mint. Selection resolves to the **local mint** for filtering and signing. Exact-quantity filters require a selected asset and clear when it changes. Cards, agreement details, signature reviews, and per-asset wallet balances retain that identity. The official catalog also supports name, ticker, and mainnet-mint search.
 
