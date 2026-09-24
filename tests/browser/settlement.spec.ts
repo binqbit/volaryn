@@ -1,5 +1,5 @@
 import { demoBalances, fixtureAssets } from '../../tools/localnet/assets';
-import { approveTestSignature, confirmReview, selectAsset } from './support/actions';
+import { confirmReview, selectAsset } from './support/actions';
 import { expect, test } from '@playwright/test';
 import { address, createSolanaRpc } from '@solana/kit';
 import { fetchToken } from '@solana-program/token';
@@ -8,7 +8,7 @@ import { fetchAgreement, AgreementStatus, protocolAddresses } from '@volaryn/pro
 import recipe from '../fixtures/recipe.json' with { type: 'json' };
 import type { components } from '../../frontend/src/lib/api/schema';
 
-test('holder rejects, isolates tabs, restores after closing a tab, and exercises without the writer', async ({
+test('holder cancels review, isolates tabs, restores after closing a tab, and exercises without the writer', async ({
   page,
   context,
   request,
@@ -39,16 +39,11 @@ test('holder rejects, isolates tabs, restores after closing a tab, and exercises
   const activate = page.getByRole('button', { name: 'Activate protection' });
   await expect(activate).toBeEnabled();
 
-  // The wallet can reject; the contract stays funded and no transaction is sent.
+  // The holder can close the review; the contract stays funded and nothing is signed.
   await activate.click();
-  await confirmReview(page);
-  await page
-    .getByRole('dialog', { name: 'Approve test transaction', exact: true })
-    .getByRole('button', { name: 'Cancel signing' })
-    .click();
-  await expect(page.getByRole('alert')).toContainText(
-    'Signing cancelled. No transaction was sent.',
-  );
+  await page.getByRole('dialog').getByRole('button', { name: 'Back', exact: true }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('alert')).toHaveCount(0);
   expect(submissions).toBe(0);
   expect((await fetchAgreement(rpc, accounts.agreement)).data.status).toBe(AgreementStatus.Funded);
 
@@ -110,7 +105,6 @@ test('holder rejects, isolates tabs, restores after closing a tab, and exercises
   );
   await activate.click();
   await confirmReview(page);
-  await approveTestSignature(page);
   await submitted;
   const agreementUrl = page.url();
   await page
@@ -151,7 +145,6 @@ test('holder rejects, isolates tabs, restores after closing a tab, and exercises
 
   await exercise.click();
   await confirmReview(page);
-  await approveTestSignature(page);
   await expect(page.getByText('SETTLEMENT COMPLETE', { exact: true })).toBeVisible();
   await expect(page.getByRole('status', { name: 'Transaction status' })).toContainText(
     'Transaction finalized',

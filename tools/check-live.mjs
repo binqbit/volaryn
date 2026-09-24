@@ -12,8 +12,6 @@ for (const name of files) {
     'Test Wallet 1',
     'Test Wallet 2',
     'Disposable localnet wallet',
-    'Approve test transaction',
-    'Only disposable test assets are involved.',
     'createKeyPairSignerFromPrivateKeyBytes',
     'LOCALNET DEMO',
     'PRESTOCKS · LOCAL DEMO',

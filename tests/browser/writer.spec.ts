@@ -4,7 +4,7 @@ import { fetchToken } from '@solana-program/token';
 import { fetchToken as fetchAsset } from '@solana-program/token-2022';
 import { AgreementStatus, fetchAgreement, protocolAddresses } from '@volaryn/protocol';
 import type { Deployment, Wallet } from '../../frontend/src/lib/api/client';
-import { confirmReview, signAction, switchWallet, selectAsset } from './support/actions';
+import { signAction, switchWallet, selectAsset } from './support/actions';
 
 async function fillOffer(page: Page, expiry?: bigint) {
   await page.goto('/offers/new');
@@ -26,7 +26,7 @@ test('writer funds and cancels offers, holder matches and exercises, writer rece
   baseURL,
 }, info) => {
   test.setTimeout(240_000);
-  // Browser suppression of native confirmation popups must not reject an explicit approval.
+  // Confirming the terms is sufficient; no additional browser popup is required.
   await page.addInitScript(() => {
     window.confirm = () => false;
   });
@@ -55,15 +55,7 @@ test('writer funds and cancels offers, holder matches and exercises, writer rece
       (button as HTMLButtonElement).click();
       (button as HTMLButtonElement).click();
     });
-  const approval = page.getByRole('dialog', { name: 'Approve test transaction', exact: true });
-  await expect(approval).toHaveCount(1);
-  await approval
-    .getByRole('button', { name: 'Sign transaction', exact: true })
-    .evaluate((button) => {
-      (button as HTMLButtonElement).click();
-      (button as HTMLButtonElement).click();
-    });
-  await expect(approval).toHaveCount(0);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.getByRole('status', { name: 'Transaction status' })).toContainText(
     'Transaction finalized',
   );
@@ -208,13 +200,13 @@ test('expired protection disables delivery and returns the reserve only to its w
   );
 });
 
-test('cancelling test signing by button or Escape submits nothing and permits another review', async ({
+test('closing the terms review by Back or Escape submits nothing and permits another review', async ({
   page,
 }) => {
   await fillOffer(page);
   await page.getByRole('button', { name: 'Review funded offer' }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
-  // Reject in the wallet after the review. No offer should be created.
+  // Reviewing the terms alone never signs or submits a transaction.
   let submissions = 0;
   page.on('request', (request) => {
     if (request.url().endsWith('/rpc') && request.postDataJSON()?.method === 'sendTransaction')
@@ -225,25 +217,17 @@ test('cancelling test signing by button or Escape submits nothing and permits an
     browserDialogs.push(dialog.message());
     await dialog.dismiss();
   });
-  await confirmReview(page);
-  const approval = page.getByRole('dialog', { name: 'Approve test transaction', exact: true });
-  await expect(approval).toContainText('Test Wallet 2');
-  await approval.getByRole('button', { name: 'Cancel signing' }).click();
-  await expect(page.getByRole('alert')).toContainText(
-    'Signing cancelled. No transaction was sent.',
-  );
+  await page.getByRole('dialog').getByRole('button', { name: 'Back', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(page.getByRole('alert')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Review funded offer' })).toBeFocused();
   expect(submissions).toBe(0);
 
   // Escape is also an explicit cancellation, never an approval.
   await page.getByRole('button', { name: 'Review funded offer' }).click();
-  await confirmReview(page);
-  await expect(approval).toBeVisible();
+  await expect(page.getByRole('dialog')).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(page.getByRole('alert')).toContainText(
-    'Signing cancelled. No transaction was sent.',
-  );
+  await expect(page.getByRole('alert')).toHaveCount(0);
   await expect(page.getByRole('dialog')).toHaveCount(0);
   expect(browserDialogs).toEqual([]);
   await switchWallet(page, 'holder');

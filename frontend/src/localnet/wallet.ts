@@ -14,7 +14,6 @@ import {
 import type { SolanaSignTransactionFeature } from '@solana/wallet-standard-features';
 import type { Deployment } from '../lib/api/client';
 import recipe from '../../../tests/fixtures/recipe.json' with { type: 'json' };
-import { requestDemoSignature } from './approval';
 
 export async function registerDemoWallet(deployment: Pick<Deployment, 'mode' | 'localnet'>) {
   if (deployment.mode !== 'localnet' || deployment.localnet?.fixtureVersion !== recipe.version)
@@ -46,7 +45,8 @@ async function registerParticipant(expected: string, seed: number, name: string)
     supportedTransactionVersions: ['legacy'],
     signTransaction: async (...inputs) => {
       if (!accounts.length) throw new Error('Wallet disconnected');
-      if (signingRequest) throw new Error('A signature request is already open for this wallet');
+      if (signingRequest)
+        throw new Error('A signature request is already in progress for this wallet');
       const controller = new AbortController();
       signingRequest = controller;
       try {
@@ -55,7 +55,7 @@ async function registerParticipant(expected: string, seed: number, name: string)
           if (input.account.address !== signer.address || input.chain !== 'solana:localnet')
             throw new Error('Wallet/network mismatch');
           const transaction = getTransactionDecoder().decode(new Uint8Array(input.transaction));
-          await requestDemoSignature(name, signer.address, controller.signal);
+          // The application's terms review is the approval for this disposable local signer.
           controller.signal.throwIfAborted();
           const signed = await signTransaction([signer.keyPair], transaction);
           controller.signal.throwIfAborted();

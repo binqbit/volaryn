@@ -10,22 +10,15 @@ export async function confirmReview(page: Page) {
 export async function signAction(page: Page, name: string) {
   await page.getByRole('button', { name }).click();
   await confirmReview(page);
-  await approveTestSignature(page);
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await expect(page.getByRole('status', { name: 'Transaction status' })).toContainText(
     'Transaction finalized',
   );
 }
 
-export async function approveTestSignature(page: Page) {
-  const approval = page.getByRole('dialog', { name: 'Approve test transaction', exact: true });
-  await expect(approval).toHaveCount(1);
-  await expect(approval.getByRole('button', { name: 'Cancel signing' })).toBeFocused();
-  await approval.getByRole('button', { name: 'Sign transaction', exact: true }).click();
-  await expect(approval).toHaveCount(0);
-}
-
 export async function switchWallet(page: Page, role: 'holder' | 'writer') {
+  // Navigation finishes before the app has loaded its manifest and restored the wallet.
+  await expect(page.getByRole('region', { name: 'Your wallet' })).toBeVisible();
   const disconnect = page.getByRole('button', { name: 'Disconnect', exact: true });
   if (await disconnect.isVisible()) await disconnect.click();
   await page

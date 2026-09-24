@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   registerWallet,
   type StandardConnectFeature,
@@ -17,13 +17,12 @@ import {
   setTransactionMessageLifetimeUsingBlockhash,
 } from '@solana/kit';
 import recipe from '../../../tests/fixtures/recipe.json' with { type: 'json' };
-import { requestDemoSignature } from './approval';
 import { registerDemoWallet } from './wallet';
 
 vi.mock('@wallet-standard/core', () => ({ registerWallet: vi.fn() }));
-vi.mock('./approval', () => ({ requestDemoSignature: vi.fn() }));
 
 beforeEach(() => vi.resetAllMocks());
+afterEach(() => vi.restoreAllMocks());
 
 async function setup() {
   const holder = await createKeyPairSignerFromPrivateKeyBytes(
@@ -80,39 +79,35 @@ async function setup() {
   };
 }
 
-function holdApproval() {
-  let approve!: () => void;
-  vi.mocked(requestDemoSignature).mockImplementation(
-    (_name, _address, signal) =>
-      new Promise<void>((resolve, reject) => {
-        approve = resolve;
-        signal.addEventListener('abort', () => reject(signal.reason), { once: true });
-      }),
-  );
-  return () => approve();
+function holdSigning() {
+  const original = crypto.subtle.sign.bind(crypto.subtle);
+  let notifyStarted!: () => void;
+  const started = new Promise<void>((resolve) => {
+    notifyStarted = resolve;
+  });
+  let finish!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    finish = resolve;
+  });
+  vi.spyOn(crypto.subtle, 'sign').mockImplementation(async (...args) => {
+    notifyStarted();
+    await pending;
+    return original(...args);
+  });
+  return { started, finish };
 }
 
 describe('local test wallet signing', () => {
-  it('waits for explicit approval and signs exactly the transaction presented', async () => {
+  it('signs exactly the requested transaction without a second approval', async () => {
+    const signing = vi.spyOn(crypto.subtle, 'sign');
     const { holder, sign, input } = await setup();
-    const approve = holdApproval();
     const original = getTransactionDecoder().decode(new Uint8Array(input.transaction));
-    let finished = false;
-    const pending = sign(input).then((value) => {
-      finished = true;
-      return value;
-    });
-    expect(requestDemoSignature).toHaveBeenCalledExactlyOnceWith(
-      'Test Wallet 1',
-      holder.address,
-      expect.any(AbortSignal),
-    );
-    await Promise.resolve();
-    expect(finished).toBe(false);
-    // A caller cannot replace the pending bytes while approval is open.
+    expect(signing).not.toHaveBeenCalled();
+    const pending = sign(input);
+    // A caller cannot replace the bytes while the cryptographic operation is in progress.
     input.transaction.fill(0);
-    approve();
     const [result] = await pending;
+    expect(signing).toHaveBeenCalledTimes(1);
     const signed = getTransactionDecoder().decode(result!.signedTransaction);
     expect(signed.messageBytes).toEqual(original.messageBytes);
     expect(
@@ -125,53 +120,60 @@ describe('local test wallet signing', () => {
     ).toBe(true);
   });
 
-  it('propagates cancellation without a signed result and permits another request', async () => {
+  it('propagates a signing failure and permits another request', async () => {
     const { sign, input } = await setup();
-    vi.mocked(requestDemoSignature).mockRejectedValueOnce(
-      new Error('Signing cancelled. No transaction was sent.'),
-    );
-    await expect(sign(input)).rejects.toThrow('Signing cancelled');
-    vi.mocked(requestDemoSignature).mockResolvedValueOnce(undefined);
+    vi.spyOn(crypto.subtle, 'sign').mockRejectedValueOnce(new Error('Signing unavailable'));
+    await expect(sign(input)).rejects.toThrow();
     await expect(sign(input)).resolves.toHaveLength(1);
   });
 
-  it('rejects simultaneous requests instead of opening a second approval', async () => {
+  it('rejects simultaneous signature requests', async () => {
     const { sign, input } = await setup();
-    const approve = holdApproval();
+    const signing = holdSigning();
     const first = sign(input);
-    await expect(sign(input)).rejects.toThrow('A signature request is already open');
-    expect(requestDemoSignature).toHaveBeenCalledTimes(1);
-    approve();
-    await expect(first).resolves.toHaveLength(1);
+    try {
+      await expect(sign(input)).rejects.toThrow('A signature request is already in progress');
+      // Public-key export is asynchronous; rejection need not wait for signing to start.
+      await signing.started;
+      expect(crypto.subtle.sign).toHaveBeenCalledTimes(1);
+    } finally {
+      signing.finish();
+      await expect(first).resolves.toHaveLength(1);
+    }
   });
 
-  it('aborts approval on disconnect without returning a signature', async () => {
+  it('aborts pending signing on disconnect without returning a signature', async () => {
     const { sign, input, disconnect } = await setup();
-    holdApproval();
+    const signing = holdSigning();
     const pending = expect(sign(input)).rejects.toThrow(
       'Wallet disconnected before signing completed',
     );
-    const signal = vi.mocked(requestDemoSignature).mock.calls[0]![2];
-    await disconnect();
-    await pending;
-    expect(signal.aborted).toBe(true);
+    try {
+      await signing.started;
+      await disconnect();
+    } finally {
+      signing.finish();
+      await pending;
+    }
     await expect(sign(input)).rejects.toThrow('Wallet disconnected');
-    expect(requestDemoSignature).toHaveBeenCalledTimes(1);
+    expect(crypto.subtle.sign).toHaveBeenCalledTimes(1);
   });
 
-  it('does not sign when approval and disconnect race', async () => {
+  it('does not return a signature when signing completion and disconnect race', async () => {
     const { sign, input, disconnect } = await setup();
-    const approve = holdApproval();
+    const signing = holdSigning();
     const pending = expect(sign(input)).rejects.toThrow(
       'Wallet disconnected before signing completed',
     );
-    approve();
+    await signing.started;
+    signing.finish();
     await disconnect();
     await pending;
   });
 
-  it('rejects mismatched networks and accounts before approval', async () => {
+  it('rejects mismatched networks and accounts before signing', async () => {
     const { sign, input } = await setup();
+    const signing = vi.spyOn(crypto.subtle, 'sign');
     await expect(sign({ ...input, chain: 'solana:mainnet' })).rejects.toThrow(
       'Wallet/network mismatch',
     );
@@ -181,6 +183,6 @@ describe('local test wallet signing', () => {
         account: { ...input.account, address: '11111111111111111111111111111111' },
       }),
     ).rejects.toThrow('Wallet/network mismatch');
-    expect(requestDemoSignature).not.toHaveBeenCalled();
+    expect(signing).not.toHaveBeenCalled();
   });
 });

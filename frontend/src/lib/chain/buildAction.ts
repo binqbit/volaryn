@@ -151,12 +151,18 @@ export async function buildAction(
       policy.programAddress !== VOLARYN_PROGRAM_ADDRESS ||
       policy.data.mint !== mintAddress ||
       policy.data.tokenProgram !== TOKEN_2022_PROGRAM_ADDRESS ||
-      policy.data.decimals !== mint.decimals ||
-      !policy.data.enabled ||
-      now >= policy.data.reviewedUntil ||
-      expiresAt > policy.data.maxExpiry
+      policy.data.decimals !== mint.decimals
     )
-      throw new Error('The asset policy does not admit these deadlines');
+      throw new Error('The asset policy does not match the selected token');
+    if (!policy.data.enabled) throw new Error('New offers are disabled for this asset');
+    if (now >= policy.data.reviewedUntil)
+      throw new Error(
+        'This asset’s approval has expired. New offers are unavailable until it is renewed.',
+      );
+    if (expiresAt > policy.data.maxExpiry)
+      throw new Error(
+        `Protection must expire by ${new Date(Number(policy.data.maxExpiry) * 1000).toISOString()}. Choose an earlier expiry.`,
+      );
     instruction = getCreateOfferInstruction({
       ...addresses,
       writer: signer,

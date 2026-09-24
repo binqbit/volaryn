@@ -60,11 +60,19 @@ export function App({ deployment }: { deployment: Deployment }) {
   const [preparing, setPreparing] = useState(false);
   const previewLock = useRef(false);
   const reviewTrigger = useRef<HTMLElement | null>(null);
+  const actionError = useRef<HTMLDivElement>(null);
   const visibleReview = review?.value.owner === owner ? review : undefined;
   const workspace =
     location.pathname.startsWith('/offers') ||
     location.pathname.startsWith('/portfolio') ||
     location.pathname.startsWith('/agreements');
+
+  useEffect(() => {
+    if (!visibleReview && (reviewError || transaction.error)) {
+      actionError.current?.focus();
+      actionError.current?.scrollIntoView({ block: 'center' });
+    }
+  }, [reviewError, transaction.error, visibleReview]);
 
   useEffect(() => {
     const main = document.getElementById('main');
@@ -100,7 +108,6 @@ export function App({ deployment }: { deployment: Deployment }) {
       const agreement = await transaction.execute(visibleReview.request, visibleReview.value);
       setReview(undefined);
       if (agreement) await navigate(`/agreements/${agreement}`);
-      else requestAnimationFrame(() => reviewTrigger.current?.focus());
       setRevision((value) => value + 1);
       wallet.refresh();
     } finally {
@@ -195,7 +202,7 @@ export function App({ deployment }: { deployment: Deployment }) {
           transaction.error ||
           reviewError ||
           (workspace && owner && wallet.status === 'error')) && (
-          <div className={styles.error} role="alert">
+          <div ref={actionError} className={styles.error} role="alert" tabIndex={-1}>
             {reviewError ||
               transaction.error ||
               (workspace && owner && wallet.status === 'error'
