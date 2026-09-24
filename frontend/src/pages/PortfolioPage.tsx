@@ -1,6 +1,7 @@
 import { Link, NavLink, useSearchParams } from 'react-router';
 import type { Deployment } from '../lib/api/client';
 import { PortfolioAgreements, type PortfolioRole } from '../features/PortfolioAgreements';
+import { ConnectWalletButton } from '../features/wallets/WalletConnection';
 import { ActivityList } from '../features/activity/ActivityList';
 import type { useActivity } from '../features/activity/useActivity';
 import styles from '../App.module.css';
@@ -50,9 +51,7 @@ export function PortfolioPage({
             Connect to see agreements belonging to your address. Public offers are available to
             browse without connecting.
           </p>
-          <a className={styles.outlineButton} href="#wallet">
-            Connect wallet
-          </a>
+          <ConnectWalletButton className={styles.outlineButton} />
         </div>
       ) : (
         <>

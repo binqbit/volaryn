@@ -1,5 +1,5 @@
 import { demoBalances, fixtureAssets } from '../../tools/localnet/assets';
-import { confirmReview, selectAsset } from './support/actions';
+import { connectWallet, confirmReview, selectAsset } from './support/actions';
 import { expect, test } from '@playwright/test';
 import { address, createSolanaRpc } from '@solana/kit';
 import { fetchToken } from '@solana-program/token';
@@ -33,7 +33,7 @@ test('holder cancels review, isolates tabs, restores after closing a tab, and ex
       submissions++;
   });
   await page.goto('/offers');
-  await page.getByRole('button', { name: 'Connect Test Wallet 1' }).click();
+  await connectWallet(page, 'Test Wallet 1');
   await selectAsset(page, 'OPENAI');
   await page
     .getByRole('article', { name: `Agreement ${accounts.agreement}`, exact: true })

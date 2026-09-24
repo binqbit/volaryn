@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { balanceFixture } from './support/balanceFixture';
-import { selectAsset, switchWallet } from './support/actions';
+import { connectWallet, selectAsset, switchWallet } from './support/actions';
 
 test('a failed offer review brings its error into view without requesting a signature', async ({
   page,
@@ -24,7 +24,7 @@ test('a failed offer review brings its error into view without requesting a sign
   });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/offers/new');
-  await page.getByRole('button', { name: 'Connect Test Wallet 2', exact: true }).click();
+  await connectWallet(page, 'Test Wallet 2');
   await selectAsset(page, 'OPENAI');
   await page.getByRole('button', { name: 'Review funded offer' }).click();
   const error = page.getByRole('alert');

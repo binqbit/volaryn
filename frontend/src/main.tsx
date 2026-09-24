@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router';
 import { ClientProvider } from '@solana/react';
 import { App } from './App';
+import { WalletConnectionProvider } from './features/wallets/WalletConnection';
 import { api, validateDeployment } from './lib/api/client';
 import { createAppClient } from './lib/chain/client';
 import './styles.css';
@@ -32,7 +33,9 @@ async function start() {
       <StrictMode>
         <ClientProvider client={client}>
           <BrowserRouter>
-            <App deployment={deployment} />
+            <WalletConnectionProvider>
+              <App deployment={deployment} />
+            </WalletConnectionProvider>
           </BrowserRouter>
         </ClientProvider>
       </StrictMode>,

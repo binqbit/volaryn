@@ -1,10 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import {
-  useConnectedWallet,
-  useConnect,
-  useDisconnect,
-  useWallets,
-} from '@solana/kit-plugin-wallet/react';
+import { useConnectedWallet, useDisconnect } from '@solana/kit-plugin-wallet/react';
 import { useClient } from '@solana/react';
 import {
   Link,
@@ -24,6 +19,7 @@ import { TransactionStatus } from './features/TransactionStatus';
 import type { ActionRequest, ActionReview as Review } from './lib/chain/actionTypes';
 import { useTransaction } from './features/useTransaction';
 import { PositionPanel } from './features/PositionPanel';
+import { ConnectWalletButton } from './features/wallets/WalletConnection';
 import { InfoPopover } from './features/InfoPopover';
 import info from './features/InfoContent.module.css';
 import { OfficialAssets } from './features/OfficialAssets';
@@ -37,8 +33,6 @@ import styles from './App.module.css';
 export function App({ deployment }: { deployment: Deployment }) {
   const client = useClient<AppClient>();
   const connected = useConnectedWallet(client);
-  const wallets = useWallets(client);
-  const connect = useConnect(client);
   const disconnect = useDisconnect(client);
   const navigate = useNavigate();
   const location = useLocation();
@@ -123,17 +117,7 @@ export function App({ deployment }: { deployment: Deployment }) {
       wallet={wallet.data}
       status={wallet.status}
     >
-      {wallets.map((wallet) => (
-        <button
-          key={wallet.name}
-          className={styles.walletButton}
-          disabled={connect.isRunning}
-          onClick={() => connect.dispatch(wallet)}
-        >
-          Connect {wallet.name}
-        </button>
-      ))}
-      {wallets.length === 0 && <p className={styles.note}>No compatible wallet found.</p>}
+      <ConnectWalletButton className={styles.walletButton} />
     </PositionPanel>
   );
 
@@ -176,12 +160,7 @@ export function App({ deployment }: { deployment: Deployment }) {
               </button>
             </>
           ) : (
-            <Link
-              className={styles.outlineButton}
-              to={workspace ? `${location.pathname}${location.search}#wallet` : '/portfolio#wallet'}
-            >
-              Connect wallet
-            </Link>
+            <ConnectWalletButton className={styles.outlineButton} />
           )}
         </div>
       </header>
@@ -207,8 +186,7 @@ export function App({ deployment }: { deployment: Deployment }) {
             </InfoPopover>
           </div>
         )}
-        {(connect.error ||
-          transaction.error ||
+        {(transaction.error ||
           reviewError ||
           (workspace && owner && wallet.status === 'error')) && (
           <div ref={actionError} className={styles.error} role="alert" tabIndex={-1}>
@@ -216,7 +194,7 @@ export function App({ deployment }: { deployment: Deployment }) {
               transaction.error ||
               (workspace && owner && wallet.status === 'error'
                 ? 'Chain data is unavailable. Displayed observations may be stale; actions are paused.'
-                : 'Wallet connection failed.')}
+                : '')}
             <button onClick={() => wallet.refresh()}>Refresh observations</button>
           </div>
         )}

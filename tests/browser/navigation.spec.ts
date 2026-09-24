@@ -1,4 +1,4 @@
-import { selectAsset } from './support/actions';
+import { connectWallet, selectAsset } from './support/actions';
 import { expect, test } from '@playwright/test';
 import type { Agreement, Deployment } from '../../frontend/src/lib/api/client';
 
@@ -31,8 +31,12 @@ test('home explains the product and gives clear entry points without loading off
     page.getByRole('heading', { name: 'Connect a wallet to create an offer' }),
   ).toBeVisible();
   await expect(page.getByRole('form', { name: 'Create an offer' })).toHaveCount(0);
-  await page.getByRole('link', { name: 'Choose a wallet', exact: true }).click();
-  await expect(page.getByRole('region', { name: 'Your wallet' })).toBeInViewport();
+  await page.getByRole('button', { name: 'Choose a wallet', exact: true }).click();
+  const chooser = page.getByRole('dialog', { name: 'Connect wallet', exact: true });
+  await expect(chooser).toBeVisible();
+  await expect(page).toHaveURL(/\/offers\/new$/);
+  await page.keyboard.press('Escape');
+  await expect(chooser).toHaveCount(0);
   await navigation.getByRole('link', { name: 'My portfolio', exact: true }).click();
   await expect(
     page.getByRole('heading', { name: 'Your portfolio starts with your wallet' }),
@@ -105,7 +109,7 @@ test('offer cards lead to full terms and portfolio lists remain wallet scoped', 
   await expect(page.getByRole('button', { name: 'Activate protection' })).toBeDisabled();
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Agreement details' })).toBeVisible();
-  await page.getByRole('button', { name: 'Connect Test Wallet 1', exact: true }).click();
+  await connectWallet(page, 'Test Wallet 1');
   const navigation = page.getByRole('navigation', { name: 'Main navigation' });
   await navigation.getByRole('link', { name: 'My portfolio', exact: true }).click();
   await expect(page.getByRole('article', { name: /^Agreement / })).toHaveCount(1);
@@ -124,7 +128,7 @@ test('offer cards lead to full terms and portfolio lists remain wallet scoped', 
     page.getByRole('heading', { name: 'Your portfolio starts with your wallet' }),
   ).toBeVisible();
   await navigation.getByRole('link', { name: 'Create offer', exact: true }).click();
-  await page.getByRole('button', { name: 'Connect Test Wallet 2', exact: true }).click();
+  await connectWallet(page, 'Test Wallet 2');
   await expect(page.getByRole('form', { name: 'Create an offer' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Review funded offer' })).toBeDisabled();
   await selectAsset(page, 'OPENAI');

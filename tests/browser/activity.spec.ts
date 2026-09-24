@@ -1,3 +1,4 @@
+import { connectWallet } from './support/actions';
 import { expect, test } from '@playwright/test';
 import { balanceFixture } from './support/balanceFixture';
 import { journalKey } from '../../frontend/src/features/journal';
@@ -68,7 +69,7 @@ test('pending offers restore from the server, survive reload, and become complet
     await route.fallback();
   });
   await page.goto('/portfolio');
-  await page.getByRole('button', { name: 'Connect Test Wallet 2', exact: true }).click();
+  await connectWallet(page, 'Test Wallet 2');
   const progress = page.getByRole('region', { name: 'Operations in progress' });
   await expect(progress).toContainText('Create funded offer');
   await expect(progress).toContainText('Awaiting confirmation');
@@ -105,7 +106,7 @@ test('pending offers restore from the server, survive reload, and become complet
   await page.screenshot({ path: info.outputPath('activity-finalized.png'), fullPage: true });
   await page.getByRole('button', { name: 'Disconnect', exact: true }).click();
   await expect(history).toHaveCount(0);
-  await page.getByRole('button', { name: 'Connect Test Wallet 1', exact: true }).click();
+  await connectWallet(page, 'Test Wallet 1');
   await expect(page.getByRole('heading', { name: 'No operations yet' })).toBeVisible();
   expect(state.unexpected).toEqual([]);
 });
@@ -137,14 +138,14 @@ test('interrupted signing remains visible without inventing a transaction or rec
     { key, owner: d.localnet!.holder, agreement: state.agreement.address },
   );
   await page.goto('/portfolio/activity');
-  await page.getByRole('button', { name: 'Connect Test Wallet 1', exact: true }).click();
+  await connectWallet(page, 'Test Wallet 1');
   const history = page.getByRole('region', { name: 'Operation history' });
   await expect(history).toContainText('Signing interrupted · not submitted');
   await expect(history).toContainText('Unsigned attempt · saved in this browser');
   await page.getByRole('button', { name: 'Disconnect', exact: true }).click();
   await page.reload();
   await expect(
-    page.getByRole('button', { name: 'Connect Test Wallet 1', exact: true }),
+    page.getByRole('banner').getByRole('button', { name: 'Connect wallet', exact: true }),
   ).toBeVisible();
   await expect(history).toHaveCount(0);
   expect(state.unexpected).toEqual([]);
@@ -160,7 +161,7 @@ test('wallet preference from another ledger is never restored', async ({ page })
   }, state.deployment);
   await page.goto('/portfolio');
   await expect(
-    page.getByRole('button', { name: 'Connect Test Wallet 1', exact: true }),
+    page.getByRole('banner').getByRole('button', { name: 'Connect wallet', exact: true }),
   ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Disconnect', exact: true })).toHaveCount(0);
   expect(state.unexpected).toEqual([]);
@@ -205,7 +206,7 @@ test('an activity outage preserves ongoing confirmation and the saved signature'
     await route.fallback();
   });
   await page.goto(`/agreements/${state.agreement.address}`);
-  await page.getByRole('button', { name: 'Connect Test Wallet 1', exact: true }).click();
+  await connectWallet(page, 'Test Wallet 1');
   const status = page.getByRole('status', { name: 'Transaction status' });
   await expect(status).toContainText('confirmation pending');
   unavailable = true;

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { address, createSolanaRpc } from '@solana/kit';
 import type { Deployment, Wallet } from '../../frontend/src/lib/api/client';
-import { selectAsset } from './support/actions';
+import { connectWallet, selectAsset } from './support/actions';
 
 test('issuer scaling is distinguished from unscaled input and the exact reviewed obligation', async ({
   page,
@@ -34,7 +34,7 @@ test('issuer scaling is distinguished from unscaled input and the exact reviewed
       submissions++;
   });
   await page.goto('/offers/new');
-  await page.getByRole('button', { name: 'Connect Test Wallet 2', exact: true }).click();
+  await connectWallet(page, 'Test Wallet 2');
   await selectAsset(page, asset.symbol);
   const holding = page.getByRole('article', { name: 'ANTHROPIC wallet balance' });
   await expect(holding.locator('strong').first()).toHaveText('100');

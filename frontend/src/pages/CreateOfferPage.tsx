@@ -2,6 +2,7 @@ import { Link } from 'react-router';
 import type { Deployment, Wallet } from '../lib/api/client';
 import type { ActionRequest } from '../lib/chain/actionTypes';
 import { OfferForm } from '../features/OfferForm';
+import { ConnectWalletButton } from '../features/wallets/WalletConnection';
 import styles from '../App.module.css';
 
 export function CreateOfferPage({
@@ -39,9 +40,9 @@ export function CreateOfferPage({
             {import.meta.env.MODE === 'localnet' &&
               ' For the local demonstration, choose Test Wallet 2.'}
           </p>
-          <a href="#wallet" className={styles.outlineButton}>
+          <ConnectWalletButton className={styles.outlineButton}>
             Choose a wallet
-          </a>
+          </ConnectWalletButton>
         </div>
       ) : wallet ? (
         <div className={styles.surface}>

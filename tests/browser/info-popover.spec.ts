@@ -2,7 +2,7 @@ import { expect, test, type Locator } from '@playwright/test';
 import { balanceFixture } from './support/balanceFixture';
 import { officialCatalog } from './support/officialCatalog';
 import { documentBox, paint } from './support/layout';
-import { selectAsset } from './support/actions';
+import { connectWallet, selectAsset } from './support/actions';
 
 async function expectAnchored(trigger: Locator, tooltip: Locator) {
   await expect(tooltip).toBeInViewport({ ratio: 1 });
@@ -136,7 +136,7 @@ test('token identity opens without moving form fields and navigates without leav
   const { state } = await balanceFixture(page);
   await page.route('**/api/assets/official', (route) => route.fulfill({ json: officialCatalog() }));
   await page.goto('/offers/new');
-  await page.getByRole('button', { name: 'Connect Test Wallet 2', exact: true }).click();
+  await connectWallet(page, 'Test Wallet 2');
   await selectAsset(page, 'OPENAI');
   const form = page.getByRole('form', { name: 'Create an offer' });
   const premium = form.getByLabel('Premium (USDC)', { exact: true });

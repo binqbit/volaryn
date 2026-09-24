@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { balanceFixture } from './support/balanceFixture';
-import { selectAsset } from './support/actions';
+import { connectWallet, selectAsset } from './support/actions';
 import { paint } from './support/layout';
 
 function gate() {
@@ -19,7 +19,7 @@ test('background wallet refresh preserves layout, focus, inputs and usable contr
   const fundingAccount = account(d.usdcMint, d.localnet!.writerUsdc, '100000000');
   state.wallets[d.localnet!.writer]!.accounts = [fundingAccount];
   await page.goto('/offers/new');
-  await page.getByRole('button', { name: 'Connect Test Wallet 2', exact: true }).click();
+  await connectWallet(page, 'Test Wallet 2');
   await selectAsset(page, 'OPENAI');
   const funding = page.getByRole('group', { name: 'Funding USDC account balance' });
   const holdings = page.getByRole('group', { name: 'OPENAI holdings' });
@@ -84,7 +84,7 @@ test('a pending retry keeps the last failure visible and financial actions pause
     account(d.usdcMint, d.localnet!.holderUsdc, '1500000'),
   ];
   await page.goto(`/agreements/${state.agreement.address}`);
-  await page.getByRole('button', { name: 'Connect Test Wallet 1', exact: true }).click();
+  await connectWallet(page, 'Test Wallet 1');
   const activate = page.getByRole('button', { name: 'Activate protection' });
   await expect(activate).toBeEnabled();
   state.walletUnavailable = true;

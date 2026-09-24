@@ -1,4 +1,4 @@
-import { selectAsset } from './support/actions';
+import { connectWallet, selectAsset } from './support/actions';
 import { expect, test } from '@playwright/test';
 import type { Agreement, Deployment } from '../../frontend/src/lib/api/client';
 
@@ -19,7 +19,7 @@ test('wallet restores after reload; explicit disconnect clears the saved connect
   });
   await page.goto(`/agreements/${original.address}`);
   const wallet = page.getByRole('region', { name: 'Your wallet' });
-  const connect = wallet.getByRole('button', { name: 'Connect Test Wallet 1' });
+  const connect = wallet.getByRole('button', { name: 'Connect wallet', exact: true });
   await expect(connect).toBeVisible();
   await expect(wallet).toContainText('Connect to see your balances and manage your protection.');
   await expect(wallet.getByText('Available test USDC', { exact: true })).toHaveCount(0);
@@ -29,6 +29,9 @@ test('wallet restores after reload; explicit disconnect clears the saved connect
   await page.screenshot({ path: info.outputPath('disconnected.png'), fullPage: true });
 
   await connect.click();
+  const chooser = page.getByRole('dialog', { name: 'Connect wallet', exact: true });
+  await chooser.getByRole('button', { name: 'Connect Test Wallet 1', exact: true }).click();
+  await expect(chooser).toHaveCount(0);
   await expect(wallet).toContainText(config.localnet!.holder);
   await expect(wallet).toContainText('Balances reflect its activity on this local ledger.');
   await expect(wallet.getByText('Available test USDC', { exact: true })).toBeVisible();
@@ -49,7 +52,7 @@ test('wallet restores after reload; explicit disconnect clears the saved connect
   await expect(page.getByRole('button', { name: /^On-chain details/ })).toBeVisible();
   expect(owners).toHaveLength(countAfterDisconnect);
 
-  await connect.click();
+  await connectWallet(page);
   await expect(wallet.getByText('Available test USDC', { exact: true })).toBeVisible();
   const countBeforeReload = owners.length;
   await page.reload();
@@ -85,7 +88,7 @@ test('public agreement ownership and reserved offers never imply personal protec
   await expect(page.getByText('YOUR PROTECTION', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Exercise protection' })).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Connect Test Wallet 1' }).click();
+  await connectWallet(page, 'Test Wallet 1');
   await expect(
     page.getByText('Only the holder can exercise this agreement and receive its USDC payout.', {
       exact: false,
@@ -134,7 +137,7 @@ test('wallet loading, empty and unavailable states do not invent holdings', asyn
   });
   await page.goto(`/agreements/${original.address}`);
   const wallet = page.getByRole('region', { name: 'Your wallet' });
-  await wallet.getByRole('button', { name: 'Connect Test Wallet 1' }).click();
+  await connectWallet(page, 'Test Wallet 1');
   await expect(wallet).toContainText("Loading this wallet's balances…");
   await expect(wallet.getByText('Available test USDC', { exact: true })).toHaveCount(0);
   release();
@@ -209,7 +212,7 @@ test('split and frozen accounts never authorize delivery from a combined balance
     }),
   );
   await page.goto(`/agreements/${original.address}`);
-  await page.getByRole('button', { name: 'Connect Test Wallet 1' }).click();
+  await connectWallet(page, 'Test Wallet 1');
   await expect(page.getByRole('region', { name: 'Your wallet' })).toContainText('3.2');
   await expect(page.getByRole('button', { name: 'Exercise protection' })).toBeDisabled();
   await expect(

@@ -12,6 +12,7 @@ import { date } from './ActionReview';
 import { AssetIdentity } from './AssetIdentity';
 import { TokenBalance } from './TokenBalance';
 import { InfoPopover } from './InfoPopover';
+import { ConnectWalletButton } from './wallets/WalletConnection';
 import { agreementLifecycle } from './agreementLifecycle';
 import { agreementAction } from './agreementAction';
 import { agreementPerspective } from './agreementPerspective';
@@ -288,8 +289,8 @@ export function AgreementPanel({
       )}
       {!owner && (funded || active) && (
         <p className={styles.connectHint}>
-          <a href="#wallet">Connect a wallet</a> to check eligibility. Nothing is activated
-          automatically.
+          <ConnectWalletButton className={styles.textButton}>Connect a wallet</ConnectWalletButton>{' '}
+          to check eligibility. Nothing is activated automatically.
         </p>
       )}
       {now === undefined && !terminal && (

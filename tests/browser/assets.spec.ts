@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import type { Agreement, Deployment, Wallet } from '../../frontend/src/lib/api/client';
-import { selectAsset } from './support/actions';
+import { connectWallet, selectAsset } from './support/actions';
 import { demoBalances } from '../../tools/localnet/assets';
 
 test('PreStocks search selects actual mints, clears incompatible quantities and supports keyboard navigation', async ({
@@ -85,7 +85,7 @@ test('creation and signing review identify the selected PreStocks replica and wa
       submissions++;
   });
   await page.goto('/offers/new');
-  await page.getByRole('button', { name: 'Connect Test Wallet 2', exact: true }).click();
+  await connectWallet(page, 'Test Wallet 2');
   await selectAsset(page, 'ANTHROPIC');
   await page.getByLabel('Gross quantity (unscaled tokens)', { exact: true }).fill('0.000000001');
   await page.getByRole('button', { name: 'Review funded offer' }).click();

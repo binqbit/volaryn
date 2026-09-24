@@ -200,7 +200,7 @@ test('official context is read only, lazy, and separate from local holdings and 
     .click();
   await expect(page.getByRole('heading', { name: 'Explore offers' })).toBeVisible();
   await expect(
-    page.getByRole('button', { name: 'Connect Test Wallet 1', exact: true }),
+    page.getByRole('banner').getByRole('button', { name: 'Connect wallet', exact: true }),
   ).toBeVisible();
   expect(signatures).toBe(0);
   expect(state.unexpected).toEqual([]);

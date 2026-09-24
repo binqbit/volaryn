@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import registry from '../../config/assets.json' with { type: 'json' };
 import type { components } from '../../frontend/src/lib/api/schema';
 import { balanceFixture } from './support/balanceFixture';
-import { selectAsset } from './support/actions';
+import { connectWallet, selectAsset } from './support/actions';
 
 test('a wallet holding opens local-mint offers and URL filters survive pagination, Back, and reload', async ({
   page,
@@ -25,7 +25,7 @@ test('a wallet holding opens local-mint offers and URL filters survive paginatio
     });
   });
   await page.goto('/portfolio');
-  await page.getByRole('button', { name: 'Connect Test Wallet 1', exact: true }).click();
+  await connectWallet(page, 'Test Wallet 1');
   const holding = page.getByRole('article', { name: 'OPENAI wallet balance', exact: true });
   await expect(holding.getByRole('link', { name: 'Find protection' })).toHaveAttribute(
     'href',

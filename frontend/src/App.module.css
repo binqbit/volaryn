@@ -756,6 +756,16 @@
   color: var(--color-text-muted);
   text-align: center;
 }
+.textButton {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-accent);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
 .agreementPages {
   display: flex;
   flex-wrap: wrap;

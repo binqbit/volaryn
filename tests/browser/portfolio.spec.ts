@@ -1,3 +1,4 @@
+import { connectWallet } from './support/actions';
 import { expect, test } from '@playwright/test';
 import { balanceFixture } from './support/balanceFixture';
 
@@ -40,7 +41,7 @@ test('All combines wallet roles and keeps status selection through navigation, p
     page.getByRole('heading', { name: 'Your portfolio starts with your wallet' }),
   ).toBeVisible();
   expect(queries).toEqual([]);
-  await page.getByRole('button', { name: 'Connect Test Wallet 1', exact: true }).click();
+  await connectWallet(page, 'Test Wallet 1');
   const tabs = page.getByRole('navigation', { name: 'Portfolio views' });
   const cards = page.getByRole('article', { name: /^Agreement / });
   await expect(tabs.getByRole('link', { name: 'All', exact: true })).toHaveAttribute(
@@ -119,7 +120,7 @@ test('wallet switching clears the previous portfolio and unknown statuses cannot
     });
   });
   await page.goto('/portfolio?status=unknown');
-  await page.getByRole('button', { name: 'Connect Test Wallet 1', exact: true }).click();
+  await connectWallet(page, 'Test Wallet 1');
   await expect(page.getByRole('alert')).toContainText('Unknown agreement status');
   expect(queries).toEqual([]);
   await page.getByRole('link', { name: 'Clear status filter' }).click();
@@ -127,7 +128,7 @@ test('wallet switching clears the previous portfolio and unknown statuses cannot
   await expect(cards).toHaveCount(1);
   await page.getByRole('button', { name: 'Disconnect', exact: true }).click();
   await expect(cards).toHaveCount(0);
-  await page.getByRole('button', { name: 'Connect Test Wallet 2', exact: true }).click();
+  await connectWallet(page, 'Test Wallet 2');
   await expect(page.getByRole('status').filter({ hasText: 'Loading agreements' })).toBeVisible();
   await expect(cards).toHaveCount(0);
   release();

@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { shortAddress } from '../../frontend/src/lib/api/client';
 import { balanceFixture } from './support/balanceFixture';
-import { selectAsset } from './support/actions';
+import { connectWallet, selectAsset } from './support/actions';
 import { documentBox } from './support/layout';
 
 test('offer filters are optional, keyboard accessible, and retain applied criteria when collapsed', async ({
@@ -82,7 +82,7 @@ test('creation shows wallet information directly while holder restrictions remai
     ...d.assets.map((asset) => account(asset.mint, asset.mint, '2000000000')),
   ];
   await page.goto('/offers/new');
-  await page.getByRole('button', { name: 'Connect Test Wallet 2', exact: true }).click();
+  await connectWallet(page, 'Test Wallet 2');
   await selectAsset(page, 'OPENAI');
   const form = page.getByRole('form', { name: 'Create an offer' });
   const wallet = page.getByRole('region', { name: 'Your wallet' });
@@ -140,7 +140,7 @@ test('agreement costs, deadlines and blocking warnings stay visible with technic
     account(d.usdcMint, d.localnet!.holderUsdc, '300000'),
   ];
   await page.goto(`/agreements/${state.agreement.address}`);
-  await page.getByRole('button', { name: 'Connect Test Wallet 1', exact: true }).click();
+  await connectWallet(page, 'Test Wallet 1');
   const agreement = page.getByRole('article', {
     name: `Agreement ${state.agreement.address}`,
     exact: true,

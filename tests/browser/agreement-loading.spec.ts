@@ -1,3 +1,4 @@
+import { connectWallet } from './support/actions';
 import { expect, test } from '@playwright/test';
 import { balanceFixture } from './support/balanceFixture';
 import { journalKey } from '../../frontend/src/features/journal';
@@ -65,7 +66,7 @@ test('a newly signed offer waits for finalized data without a false outage and a
     ),
   );
   await page.goto(`/agreements/${state.agreement.address}`);
-  await page.getByRole('button', { name: 'Connect Test Wallet 2', exact: true }).click();
+  await connectWallet(page, 'Test Wallet 2');
   await expect(page.getByRole('heading', { name: 'No finalized agreement yet' })).toBeVisible();
   await expect(page.getByRole('alert')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Cancel offer', exact: true })).toHaveCount(0);
@@ -105,7 +106,7 @@ test('an unavailable API remains an error, keeps known terms, and disables actio
     ),
   );
   await page.goto(`/agreements/${state.agreement.address}`);
-  await page.getByRole('button', { name: 'Connect Test Wallet 1', exact: true }).click();
+  await connectWallet(page, 'Test Wallet 1');
   const activate = page.getByRole('button', { name: 'Activate protection' });
   await expect(activate).toBeEnabled();
   unavailable = true;

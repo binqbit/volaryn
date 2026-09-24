@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { balanceFixture } from './support/balanceFixture';
-import { selectAsset } from './support/actions';
+import { connectWallet, selectAsset } from './support/actions';
 
 test('creation shows token holdings and funds the payout from the selected USDC account only', async ({
   page,
@@ -16,7 +16,7 @@ test('creation shows token holdings and funds the payout from the selected USDC 
     account(mint, d.localnet!.holder, '2000000000', true),
   ];
   await page.goto('/offers/new');
-  await page.getByRole('button', { name: 'Connect Test Wallet 2', exact: true }).click();
+  await connectWallet(page, 'Test Wallet 2');
   await selectAsset(page, 'OPENAI');
   const holdings = page.getByRole('group', { name: 'OPENAI holdings' });
   await expect(holdings).toContainText('3.23456789 OPENAI');
@@ -99,7 +99,7 @@ test('activation exposes premium affordability and exercise exposes the full sin
     account(d.usdcMint, d.authority, '1000000', true),
   ]);
   await page.goto(`/agreements/${state.agreement.address}`);
-  await page.getByRole('button', { name: 'Connect Test Wallet 1', exact: true }).click();
+  await connectWallet(page, 'Test Wallet 1');
   const usdc = page.getByRole('group', { name: 'USDC account balance' });
   await expect(usdc).toContainText('Premium to activate');
   await expect(usdc).toContainText('0.5 USDC');
@@ -145,7 +145,7 @@ test('loading and failed observations are not zero balances or permission to spe
     release = resolve;
   });
   await page.goto(`/agreements/${state.agreement.address}`);
-  await page.getByRole('button', { name: 'Connect Test Wallet 1', exact: true }).click();
+  await connectWallet(page, 'Test Wallet 1');
   const usdc = page.getByRole('group', { name: 'USDC account balance' });
   await expect(usdc).toContainText('Loading…');
   const wallet = page.getByRole('region', { name: 'Your wallet' });

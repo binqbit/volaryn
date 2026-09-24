@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 import { balanceFixture } from './support/balanceFixture';
-import { selectAsset } from './support/actions';
+import { connectWallet, selectAsset } from './support/actions';
 
 for (const width of [1440, 375, 320]) {
   test(`wallet panel is the single balance view across routes at ${width}px`, async ({
@@ -35,7 +35,7 @@ for (const width of [1440, 375, 320]) {
 
     const navigation = page.getByRole('navigation', { name: 'Main navigation' });
     await navigation.getByRole('link', { name: 'Create offer', exact: true }).click();
-    await page.getByRole('button', { name: 'Connect Test Wallet 2', exact: true }).click();
+    await connectWallet(page, 'Test Wallet 2');
     await selectAsset(page, 'OPENAI');
     const balance = page.getByRole('group', { name: 'USDC balance', exact: true });
     await expect(balance).toHaveCount(1);
@@ -118,7 +118,7 @@ test('desktop wallet fits on entry and stays pinned while the form and holdings 
     ...d.assets.map((asset) => account(asset.mint, asset.mint, '100000000000')),
   ];
   await page.goto('/offers/new');
-  await page.getByRole('button', { name: 'Connect Test Wallet 2', exact: true }).click();
+  await connectWallet(page, 'Test Wallet 2');
   const wallet = page.getByRole('region', { name: 'Your wallet', exact: true });
   const holdings = wallet.getByRole('region', { name: 'PreStocks demo balances', exact: true });
   await expect(wallet).toHaveAttribute('data-bounded', 'true');
@@ -156,7 +156,7 @@ test('wallet adapts to short screens and lets a short list keep its natural heig
     account(d.assets[0]!.mint, d.assets[0]!.mint, '100000000000'),
   ];
   await page.goto('/portfolio');
-  await page.getByRole('button', { name: 'Connect Test Wallet 2', exact: true }).click();
+  await connectWallet(page, 'Test Wallet 2');
   const wallet = page.getByRole('region', { name: 'Your wallet', exact: true });
   const holdings = wallet.getByRole('region', { name: 'PreStocks demo balances', exact: true });
   await expect(wallet).toHaveAttribute('data-bounded', 'true');
