@@ -1,0 +1,45 @@
+@startuml
+title Volaryn | Stored agreement states and explicit transitions
+skinparam backgroundColor #101117
+skinparam defaultFontName SansSerif
+skinparam defaultFontSize 15
+skinparam defaultFontColor #F3F0FF
+skinparam ArrowColor #2CE7B3
+skinparam shadowing false
+skinparam state {
+  BackgroundColor #232333
+  BorderColor #AA86F7
+  FontColor #F3F0FF
+  StartColor #2CE7B3
+}
+skinparam note {
+  BackgroundColor #292437
+  BorderColor #AA86F7
+  FontColor #E7E0F5
+}
+
+state Open
+state Active
+state Exercised
+state Cancelled
+state Expired
+[*] --> Open : create_offer(side)
+Open --> Active : activate() or accept_request()\n[opposite actor; now < accept_before\nand now < expires_at; admission passes]
+Open --> Cancelled : cancel_offer()\n[creator signs; also allowed after acceptance closes]
+Active --> Exercised : exercise()\n[holder signs; now < expires_at; full delivery]
+Active --> Expired : reclaim_expired()\n[writer signs; now >= expires_at]
+note left of Open
+  Deadline passage does not write a new state.
+  Open + closed acceptance = unavailable for matching.
+  Creator can still refund the original escrow.
+end note
+note right of Active
+  Active + elapsed expiry = awaiting writer reclaim.
+  Exercise is disabled, but stored status is still Active.
+end note
+note bottom of Exercised
+  Terminal records remain on chain.
+  cleanup_terminal() recovers residual USDC / settlement authority;
+  it does not delete Agreement or reopen the right.
+end note
+@enduml

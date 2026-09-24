@@ -1,0 +1,56 @@
+@startuml
+title Volaryn | Two proposal origins, one funded option
+skinparam backgroundColor #101117
+skinparam defaultFontName SansSerif
+skinparam defaultFontSize 15
+skinparam defaultFontColor #F3F0FF
+skinparam ArrowColor #2CE7B3
+skinparam shadowing false
+skinparam sequence {
+  ParticipantBackgroundColor #232333
+  ParticipantBorderColor #AA86F7
+  ParticipantFontColor #F3F0FF
+  LifeLineBorderColor #6D6488
+  GroupBackgroundColor #171820
+  GroupBorderColor #AA86F7
+  GroupHeaderFontColor #C9B4FF
+}
+skinparam note {
+  BackgroundColor #292437
+  BorderColor #AA86F7
+  FontColor #E7E0F5
+}
+
+participant Holder as h
+participant "Volaryn program" as p
+participant "Agreement's USDC reserve" as r
+participant "Capital provider (writer)" as w
+
+alt Holder-origin Sell request
+  h -> p : create_offer(side = Holder), signed by holder
+  p -> r : transfer premium from holder
+  p -> p : Open; holder set, writer unset
+  note over h,w : Waiting for capital: no active exercise right yet
+  w -> p : accept_request(), signed by writer
+  group One atomic acceptance transaction
+    p -> p : validate distinct actor, exact terms, policy, time
+    p -> r : transfer full payout from writer
+    p -> w : transfer premium out of reserve
+    p -> p : set writer; status = Active
+  end
+else Writer-origin Buy offer
+  w -> p : create_offer(side = Writer), signed by writer
+  p -> r : transfer full payout from writer
+  p -> p : Open; writer set, holder unset
+  h -> p : activate(), signed by holder
+  group One atomic activation transaction
+    p -> p : validate distinct actor, exact terms, policy, time
+    p -> w : transfer premium directly from holder
+    p -> p : set holder; status = Active
+  end
+end
+note over h,w
+  Both paths leave the full payout reserved and underlying in the holder's wallet.
+  Instructions invoke token programs; arrows summarize their balance effects.
+end note
+@enduml

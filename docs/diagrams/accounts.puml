@@ -1,0 +1,63 @@
+@startuml
+title Volaryn | On-chain accounts and token authority
+skinparam backgroundColor #101117
+skinparam defaultFontName SansSerif
+skinparam defaultFontSize 15
+skinparam defaultFontColor #F3F0FF
+skinparam ArrowColor #2CE7B3
+skinparam shadowing false
+skinparam classAttributeIconSize 0
+skinparam class {
+  BackgroundColor #232333
+  BorderColor #AA86F7
+  HeaderBackgroundColor #302640
+}
+skinparam note {
+  BackgroundColor #292437
+  BorderColor #AA86F7
+  FontColor #E7E0F5
+}
+
+class "ProtocolConfig" as config <<Volaryn account>> {
+  authority
+  USDC mint + token program
+}
+class "AssetPolicy" as policy <<Volaryn account>> {
+  underlying mint + token program
+  decimals / version / enabled
+  reviewed_until / max_expiry
+}
+class "Agreement" as agreement <<Volaryn account>> {
+  creator + nonce / origin side
+  holder? / writer? / designated counterparty?
+  exact mints + raw quantity
+  payout / premium / deadlines
+  policy version / status / net_received
+}
+class "USDC reserve" as reserve <<SPL Token account>> {
+  token authority: Agreement PDA
+  Open holder request: premium
+  Open writer offer: payout
+  Active, either origin: payout
+}
+class "Underlying settlement" as settlement <<Token-2022 account>> {
+  token authority: Agreement PDA at creation
+  initialized empty; receives exercise delivery
+  net tokens after issuer fee
+  token authority: writer after exercise
+}
+config --> agreement : settlement currency
+policy --> agreement : admission at create / accept
+agreement "1" --> "1" reserve : authorizes USDC transfers
+agreement "1" --> "1" settlement : initializes + hands off
+note bottom of agreement
+  PDA seeds: ["agreement", creator, nonce]
+  Reserve: ["reserve", agreement]
+  Settlement: ["settlement", agreement]
+  Selected fields shown; this is not a full schema listing.
+end note
+note bottom of settlement
+  Changing token authority does not change the Solana program owner.
+  Settlement remains owned by Token-2022.
+end note
+@enduml

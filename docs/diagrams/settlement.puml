@@ -1,0 +1,44 @@
+@startuml
+title Volaryn | Atomic exercise and ownership handoff
+skinparam backgroundColor #101117
+skinparam defaultFontName SansSerif
+skinparam defaultFontSize 15
+skinparam defaultFontColor #F3F0FF
+skinparam ArrowColor #2CE7B3
+skinparam shadowing false
+skinparam sequence {
+  ParticipantBackgroundColor #232333
+  ParticipantBorderColor #AA86F7
+  ParticipantFontColor #F3F0FF
+  LifeLineBorderColor #6D6488
+  GroupBackgroundColor #171820
+  GroupBorderColor #AA86F7
+  GroupHeaderFontColor #C9B4FF
+}
+skinparam note {
+  BackgroundColor #292437
+  BorderColor #AA86F7
+  FontColor #E7E0F5
+}
+
+participant Holder as h
+participant "Volaryn program" as p
+participant "Token-2022" as t
+participant "SPL Token (USDC)" as u
+
+h -> p : exercise(), signed by holder
+group One Solana transaction
+  p -> p : check Active + holder identity + now < expires_at\nverify mints, vaults and sufficient reserve
+  p -> t : transfer exact gross quantity\nholder account -> settlement account
+  t --> p : settlement balance reflects issuer transfer fee
+  p -> u : transfer fixed payout\nreserve -> holder USDC account
+  p -> t : set settlement AccountOwner authority to writer
+  p -> p : store net_received; status = Exercised
+end
+p --> h : instruction succeeds; await chain finality
+note over h,u
+  Any failed step rolls back the entire transaction.
+  No writer signature, onward transfer to a writer ATA or price oracle is needed.
+  The writer controls the delivered settlement account after success.
+end note
+@enduml

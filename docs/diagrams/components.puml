@@ -1,0 +1,69 @@
+@startuml
+title Volaryn | Components and trust boundaries
+top to bottom direction
+skinparam backgroundColor #101117
+skinparam defaultFontName SansSerif
+skinparam defaultFontSize 15
+skinparam defaultFontColor #F3F0FF
+skinparam ArrowColor #2CE7B3
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam component {
+  BackgroundColor #232333
+  BorderColor #AA86F7
+}
+skinparam package {
+  BackgroundColor #171820
+  BorderColor #6D6488
+  FontColor #C9B4FF
+}
+skinparam database {
+  BackgroundColor #19332E
+  BorderColor #2CE7B3
+}
+skinparam note {
+  BackgroundColor #292437
+  BorderColor #AA86F7
+  FontColor #E7E0F5
+}
+
+package "Browser" {
+  component "React application\nGenerated API + program clients" as ui
+  component "Wallet\nSigns financial actions" as wallet
+  ui -right-> wallet : reviewed message
+}
+package "Application process | Rust / Axum" {
+  component "HTTP API + static frontend\nRestricted /rpc proxy" as http
+  component "Application services\nAgreement queries + admission" as app
+  component "Index + activity workers" as workers
+  component "Official asset catalogue\nRead-only, lazy refresh" as catalogue
+  http --> app
+  http --> catalogue
+  workers --> app
+}
+database "PostgreSQL\nProjections + operation receipts" as db
+package "Selected Solana deployment" {
+  component "RPC" as rpc
+  component "Volaryn program\nAgreement rules + PDA signing" as program
+  component "SPL Token + Token-2022\nUSDC reserve + token delivery" as tokens
+  rpc --> program : signed instructions
+  program --> tokens : cross-program calls
+}
+package "Official asset evidence" {
+  component "PreStocks public API" as issuer
+  component "Mainnet RPC\nMint verification only" as mainnet
+}
+ui --> http : same-origin HTTP\nreads + wallet-signed messages
+app --> db : read models / receipts
+app --> rpc : verified reads / relay
+catalogue --> issuer : identity + source values
+catalogue --> mainnet : finalized mint behavior
+note bottom of catalogue
+  Read-only issuer context.
+  No signing or settlement dependency.
+end note
+note bottom of program
+  Balances and rights live on Solana.
+  The backend never signs as a participant.
+end note
+@enduml

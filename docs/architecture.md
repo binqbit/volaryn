@@ -2,6 +2,8 @@
 
 This document defines the system's responsibilities, financial rules, integrations, and deployment contract. The [README](../README.md) introduces the product; the [product brief](product.md) explains its user problem, agreement, related products, and boundaries. The [technology stack](tech-stack.md) defines dependency choices, rationale, and compatibility requirements. Paths, APIs, and commands below define the implementation contract.
 
+The [technical overview](technical-overview.md) provides linked UML diagrams and code entry points for presenting these mechanisms in a technical demo.
+
 ## 1. Design constraints
 
 Volaryn connects a PreStocks holder seeking temporary downside protection with a writer willing to acquire that position under agreed terms. The holder keeps the underlying until exercise; the writer commits the entire USDC payout before activation.

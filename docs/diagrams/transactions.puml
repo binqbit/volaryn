@@ -1,0 +1,64 @@
+@startuml
+title Volaryn | Signing, durable receipts and finality
+skinparam backgroundColor #101117
+skinparam defaultFontName SansSerif
+skinparam defaultFontSize 15
+skinparam defaultFontColor #F3F0FF
+skinparam ArrowColor #2CE7B3
+skinparam shadowing false
+skinparam sequence {
+  ParticipantBackgroundColor #232333
+  ParticipantBorderColor #AA86F7
+  ParticipantFontColor #F3F0FF
+  LifeLineBorderColor #6D6488
+  GroupBackgroundColor #171820
+  GroupBorderColor #AA86F7
+  GroupHeaderFontColor #C9B4FF
+}
+skinparam note {
+  BackgroundColor #292437
+  BorderColor #AA86F7
+  FontColor #E7E0F5
+}
+
+participant "React + local journal" as ui
+participant Wallet as wallet
+participant "Rust /rpc + activity service" as api
+database PostgreSQL as db
+participant "Solana RPC / runtime" as chain
+
+ui -> ui : review terms; Confirm and sign\nrecheck wallet, deployment, time and accounts
+ui -> api : getLatestBlockhash
+api -> chain : restricted RPC read
+chain --> ui : lifetime (through proxy)
+ui -> wallet : sign exact prepared message
+wallet --> ui : signed transaction
+ui -> ui : persist signature + lifetime before sending
+ui -> api : sendTransaction(signed bytes)
+api -> api : decode supported intent; verify signer / actor\ncheck admission for new mainnet commitments
+api -> chain : validate blockhash; simulate with signatures
+chain --> api : valid simulation
+api -> db : save idempotent pending receipt
+db --> api : committed
+api -> chain : relay signed transaction
+chain --> ui : signature (through proxy)
+par Browser confirmation
+  loop Poll saved signature
+    ui -> api : signature status / finalized account reads
+    api -> chain : restricted RPC reads
+    chain --> api : chain observations
+    api --> ui : pending / provisional / final outcome
+  end
+else Server reconciliation, independently scheduled
+  loop Background tasks
+    api -> chain : receipt evidence / finalized agreement reads
+    chain --> api : signature and account observations
+    api -> db : update receipts / projections
+  end
+end
+note over ui,chain
+  Rejection is not success; an RPC timeout is not proof of failure.
+  Recover the saved signature and check chain state before repeating an action.
+  A receipt or an indexed row never grants an on-chain right.
+end note
+@enduml

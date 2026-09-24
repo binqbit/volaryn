@@ -24,6 +24,8 @@ The architecture combines a Rust backend, a React and TypeScript frontend, and a
 
 Read [the product brief](docs/product.md) for the holder's problem, concrete outcomes, related products, and product boundaries. Read [the architecture](docs/architecture.md) for component boundaries, settlement rules, integrations, dependencies, and the deployment model.
 
+Use the [technical overview with UML diagrams](docs/technical-overview.md) to trace components, escrow, both offer origins, atomic settlement, transaction recovery and deployment during a technical demo.
+
 The [technology stack](docs/tech-stack.md) explains the selected frameworks, alternatives, migrations, and toolchain boundaries. The [implementation pipeline](docs/pipeline.md) defines the development stages, working outcomes, dependencies, and acceptance checks.
 
 ## Product boundaries

@@ -1,0 +1,59 @@
+@startuml
+title Volaryn | Local and live deployment boundaries
+top to bottom direction
+skinparam backgroundColor #101117
+skinparam defaultFontName SansSerif
+skinparam defaultFontSize 15
+skinparam defaultFontColor #F3F0FF
+skinparam ArrowColor #2CE7B3
+skinparam shadowing false
+skinparam componentStyle rectangle
+skinparam node {
+  BackgroundColor #171820
+  BorderColor #AA86F7
+  FontColor #C9B4FF
+}
+skinparam component {
+  BackgroundColor #232333
+  BorderColor #AA86F7
+}
+skinparam artifact {
+  BackgroundColor #232333
+  BorderColor #AA86F7
+}
+skinparam database {
+  BackgroundColor #19332E
+  BorderColor #2CE7B3
+}
+skinparam note {
+  BackgroundColor #292437
+  BorderColor #AA86F7
+  FontColor #E7E0F5
+}
+
+node "Local | compose.yaml" {
+  component "app\nAPI + compiled React" as localApp
+  database "database\nPostgreSQL volume" as localDb
+  component "validator\nPersistent Solana ledger" as validator
+  component "bootstrap\nOne-shot initialization" as bootstrap
+  artifact "Public deployment manifest" as localManifest
+  localApp --> localDb
+  localApp --> validator : RPC
+  bootstrap --> validator : verify program\ninitialize assets + wallets
+  bootstrap --> localManifest : write
+  localApp --> localManifest : read
+}
+node "Live | compose.live.yaml" {
+  component "app\nVerified release + React" as liveApp
+  database "database\nPostgreSQL volume" as liveDb
+  artifact "Released manifest + mounted secrets" as release
+  liveApp --> liveDb
+  liveApp --> release : read
+}
+component "Host HTTPS proxy\nProvisioned separately" as https
+node "Existing Solana deployment" {
+  component "External HTTPS RPC\nReviewed deployed program" as liveRpc
+}
+https --> liveApp : loopback port 8080
+liveApp --> liveRpc
+@enduml
