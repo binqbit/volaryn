@@ -6,6 +6,7 @@ import { createSolanaRpc, lamports, type Instruction } from '@solana/kit';
 import {
   VOLARYN_PROGRAM_ADDRESS,
   getCreateAssetPolicyInstruction,
+  getUpdateAssetPolicyInstruction,
   getCreateOfferInstruction,
   getInitializeInstruction,
   fetchMaybeAgreement,
@@ -19,6 +20,7 @@ import { demoBalances, fixtureAssets, fixtureUnits } from './assets';
 import { fixtureTokens } from './tokens';
 import { withProgress } from './progress';
 import { checkLocalManifest } from './manifest';
+import { localPolicyTerms, needsFixturePolicyUpgrade } from './policy';
 import type { components } from '../../frontend/src/lib/api/schema';
 
 const { values } = parseArgs({
@@ -193,11 +195,21 @@ await Promise.all(
           config: addresses.config,
           policy: addresses.policy,
           mint: mint.address,
-          terms: { enabled: true, reviewedUntil: now + 86400n, maxExpiry: now + 86400n },
+          terms: localPolicyTerms,
         }),
       ]);
     else if (policy.data.mint !== mint.address || policy.data.decimals !== asset.decimals)
       throw new Error('Asset policy differs from the fixture');
+    else if (needsFixturePolicyUpgrade(policy.data))
+      await execute(`Removing the one-day admission cutoff for ${asset.symbol} local replica`, [
+        getUpdateAssetPolicyInstruction({
+          authority: keys.authority,
+          config: addresses.config,
+          policy: addresses.policy,
+          mint: mint.address,
+          terms: localPolicyTerms,
+        }),
+      ]);
   }),
 );
 
