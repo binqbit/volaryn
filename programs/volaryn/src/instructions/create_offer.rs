@@ -54,6 +54,10 @@ pub struct CreateOffer<'info> {
 }
 
 pub fn handle_create_offer(ctx: Context<CreateOffer>, terms: OfferTerms) -> Result<()> {
+    require!(
+        terms.designated_holder != Some(ctx.accounts.writer.key()),
+        VolarynError::WriterCannotBeHolder
+    );
     let now = Clock::get()?.unix_timestamp;
     require!(
         terms.quantity_raw > 0

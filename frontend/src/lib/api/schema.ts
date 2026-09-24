@@ -441,7 +441,7 @@ export interface operations {
                 quantity_raw?: string;
                 min_payout?: string;
                 max_premium?: string;
-                /** @description Include unrestricted offers and offers reserved for this holder. */
+                /** @description Include unrestricted offers and offers reserved for this holder, excluding their own offers. */
                 eligible_holder?: string;
             };
             header?: never;
@@ -555,7 +555,7 @@ export interface operations {
                 quantity_raw?: string;
                 min_payout?: string;
                 max_premium?: string;
-                /** @description Include unrestricted offers and offers reserved for this holder. */
+                /** @description Include unrestricted offers and offers reserved for this holder, excluding their own offers. */
                 eligible_holder?: string;
             };
             header?: never;

@@ -69,6 +69,14 @@ export function OfferForm({
       if (funding > BigInt(account.amountRaw))
         throw new Error('The selected USDC account cannot fund the full payout');
       if (designated.trim()) {
+        if (designated.trim() === wallet.owner) {
+          setError('The designated holder must be a different wallet from the writer.');
+          if (restriction.current) {
+            restriction.current.open = true;
+            restriction.current.querySelector('input')?.focus();
+          }
+          return;
+        }
         try {
           address(designated.trim());
         } catch {

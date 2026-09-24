@@ -58,7 +58,11 @@ export function usePortfolio(
         return { identity, agreements: [], next: null };
       if (!result.data)
         throw new Error('Agreement lookup is unavailable. This does not mean no offers exist.');
-      const agreements = Array.isArray(result.data) ? result.data : [result.data];
+      const observed = Array.isArray(result.data) ? result.data : [result.data];
+      const agreements =
+        mode === 'offers' && owner && !selected
+          ? observed.filter((agreement) => agreement.writer !== owner)
+          : observed;
       for (const value of agreements) {
         if (value.version !== 1) throw new Error('An agreement version is unsupported');
         for (const raw of [

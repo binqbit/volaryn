@@ -111,7 +111,7 @@ test('writer funds and cancels offers, holder matches and exercises, writer rece
   await signAction(page, 'Activate protection');
   await switchWallet(page, 'writer');
   await expect(page.getByRole('button', { name: 'Cancel offer', exact: true })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Reclaim expired reserve' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Reserve locked until expiry' })).toBeDisabled();
   // A stale or dishonest projection cannot substitute another mint's delivery account.
   await page.route('**/api/wallet?**', async (route) => {
     const response = await route.fetch();
@@ -190,7 +190,7 @@ test('expired protection disables delivery and returns the reserve only to its w
   await expect(page.getByText('Expired · awaiting reclaim', { exact: true })).toBeVisible({
     timeout: 110_000,
   });
-  await expect(page.getByRole('button', { name: 'Exercise protection' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Protection expired' })).toBeDisabled();
   await switchWallet(page, 'writer');
   const before = (await fetchToken(rpc, address(config.localnet!.writerUsdc))).data.amount;
   await signAction(page, 'Reclaim expired reserve');

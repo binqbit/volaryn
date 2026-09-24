@@ -54,6 +54,10 @@ pub struct Activate<'info> {
 pub fn handle_activate(ctx: Context<Activate>) -> Result<()> {
     let agreement = &mut ctx.accounts.agreement;
     check_state(agreement, AgreementStatus::Funded)?;
+    require!(
+        ctx.accounts.holder.key() != agreement.writer,
+        VolarynError::WriterCannotBeHolder
+    );
     let now = Clock::get()?.unix_timestamp;
     require!(
         now < agreement.accept_before,

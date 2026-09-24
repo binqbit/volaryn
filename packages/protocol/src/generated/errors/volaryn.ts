@@ -44,6 +44,8 @@ export const VOLARYN_ERROR__INVALID_SETTLEMENT_ACCOUNT = 0x177c; // 6012
 export const VOLARYN_ERROR__ARITHMETIC_OVERFLOW = 0x177d; // 6013
 /** InvalidSettlementCurrency: The settlement currency must use the configured six-decimal SPL mint */
 export const VOLARYN_ERROR__INVALID_SETTLEMENT_CURRENCY = 0x177e; // 6014
+/** WriterCannotBeHolder: The writer cannot be the protection holder */
+export const VOLARYN_ERROR__WRITER_CANNOT_BE_HOLDER = 0x177f; // 6015
 
 export type VolarynError =
   | typeof VOLARYN_ERROR__ACCEPTANCE_CLOSED
@@ -60,6 +62,7 @@ export type VolarynError =
   | typeof VOLARYN_ERROR__UNAUTHORIZED_INITIALIZER
   | typeof VOLARYN_ERROR__UNSUPPORTED_MINT
   | typeof VOLARYN_ERROR__UNSUPPORTED_VERSION
+  | typeof VOLARYN_ERROR__WRITER_CANNOT_BE_HOLDER
   | typeof VOLARYN_ERROR__WRONG_HOLDER;
 
 let volarynErrorMessages: Record<VolarynError, string> | undefined;
@@ -79,6 +82,7 @@ if (process.env["NODE_ENV"] !== "production") {
     [VOLARYN_ERROR__UNAUTHORIZED_INITIALIZER]: `Only the deployment upgrade authority can initialize the protocol`,
     [VOLARYN_ERROR__UNSUPPORTED_MINT]: `The mint has unsupported extensions or is paused`,
     [VOLARYN_ERROR__UNSUPPORTED_VERSION]: `The agreement version is unsupported`,
+    [VOLARYN_ERROR__WRITER_CANNOT_BE_HOLDER]: `The writer cannot be the protection holder`,
     [VOLARYN_ERROR__WRONG_HOLDER]: `The signer is not the authorized holder`,
   };
 }

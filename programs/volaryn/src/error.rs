@@ -32,4 +32,6 @@ pub enum VolarynError {
     ArithmeticOverflow,
     #[msg("The settlement currency must use the configured six-decimal SPL mint")]
     InvalidSettlementCurrency,
+    #[msg("The writer cannot be the protection holder")]
+    WriterCannotBeHolder,
 }

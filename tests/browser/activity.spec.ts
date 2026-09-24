@@ -197,7 +197,7 @@ test('an activity outage preserves ongoing confirmation and the saved signature'
   unavailable = true;
   await expect(page.getByRole('alert')).toContainText('Activity is unavailable');
   await expect(status).toContainText(receipt.signature);
-  await expect(page.getByRole('button', { name: /^Activate protection/ })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Activating protection…' })).toBeDisabled();
   const key = journalKey(d.genesisHash, d.programId, d.localnet!.holder);
   expect(await page.evaluate((key) => localStorage.getItem(key), key)).toContain(receipt.signature);
   unavailable = false;

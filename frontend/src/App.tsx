@@ -291,6 +291,7 @@ export function App({ deployment }: { deployment: Deployment }) {
                   walletStatus={wallet.status}
                   usable={usable}
                   revision={revision}
+                  activity={transaction.activity}
                   onReview={onReview}
                 />
               }

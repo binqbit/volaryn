@@ -7,6 +7,75 @@ use solana_signer::Signer;
 use volaryn::{error::VolarynError, AgreementStatus};
 
 #[test]
+fn writer_cannot_activate_own_offer_with_any_owned_usdc_account() {
+    for separate_account in [false, true] {
+        let mut fixture = Fixture::new(AssetFixture::Plain);
+        fixture.create();
+        let payment = if separate_account {
+            create_token(
+                &mut fixture.svm,
+                &fixture.authority,
+                31,
+                fixture.usdc,
+                signer_pubkey(&fixture.writer),
+                PREMIUM,
+                false,
+            )
+        } else {
+            fixture.writer_usdc
+        };
+        let writer_before = fixture.amount(fixture.writer_usdc);
+        let payment_before = fixture.amount(payment);
+        let mut ix = fixture.activate_instruction();
+        ix.accounts[0].pubkey = fixture.writer.pubkey();
+        ix.accounts[6].pubkey = address(payment);
+        let result = fixture.writer_send(ix);
+        if separate_account {
+            assert_error(result, VolarynError::WriterCannotBeHolder);
+        } else {
+            // Anchor rejects duplicate mutable payment accounts before entering the handler.
+            assert!(result.is_err());
+        }
+        assert_eq!(fixture.amount(fixture.writer_usdc), writer_before);
+        assert_eq!(fixture.amount(payment), payment_before);
+        assert_eq!(fixture.amount(fixture.reserve), PAYOUT);
+        assert_eq!(fixture.agreement().status, AgreementStatus::Funded);
+        assert_eq!(fixture.agreement().holder, None);
+        fixture.activate();
+        assert_eq!(
+            fixture.agreement().holder,
+            Some(signer_pubkey(&fixture.holder))
+        );
+    }
+}
+
+#[test]
+fn writer_cannot_designate_itself_as_holder() {
+    let mut fixture = Fixture::new(AssetFixture::Plain);
+    let before = fixture.amount(fixture.writer_usdc);
+    let mut terms = fixture.terms();
+    terms.designated_holder = Some(signer_pubkey(&fixture.writer));
+    assert_error(
+        fixture.writer_send(fixture.create_instruction(terms)),
+        VolarynError::WriterCannotBeHolder,
+    );
+    assert_eq!(fixture.amount(fixture.writer_usdc), before);
+    for account in [fixture.agreement, fixture.reserve, fixture.settlement] {
+        assert!(fixture.svm.get_account(&address(account)).is_none());
+    }
+    let mut terms = fixture.terms();
+    terms.designated_holder = Some(signer_pubkey(&fixture.holder));
+    fixture
+        .writer_send(fixture.create_instruction(terms))
+        .unwrap();
+    fixture.activate();
+    assert_eq!(
+        fixture.agreement().holder,
+        Some(signer_pubkey(&fixture.holder))
+    );
+}
+
+#[test]
 fn designated_holder_and_full_delivery_are_enforced() {
     let mut fixture = Fixture::new(AssetFixture::Plain);
     let mut terms = fixture.terms();

@@ -155,7 +155,7 @@
           {
             "name": "eligible_holder",
             "in": "query",
-            "description": "Include unrestricted offers and offers reserved for this holder.",
+            "description": "Include unrestricted offers and offers reserved for this holder, excluding their own offers.",
             "required": false,
             "schema": {
               "type": "string"
@@ -352,7 +352,7 @@
           {
             "name": "eligible_holder",
             "in": "query",
-            "description": "Include unrestricted offers and offers reserved for this holder.",
+            "description": "Include unrestricted offers and offers reserved for this holder, excluding their own offers.",
             "required": false,
             "schema": {
               "type": "string"

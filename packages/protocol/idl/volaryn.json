@@ -1123,6 +1123,11 @@
       "code": 6014,
       "name": "InvalidSettlementCurrency",
       "msg": "The settlement currency must use the configured six-decimal SPL mint"
+    },
+    {
+      "code": 6015,
+      "name": "WriterCannotBeHolder",
+      "msg": "The writer cannot be the protection holder"
     }
   ],
   "types": [

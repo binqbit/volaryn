@@ -21,7 +21,7 @@ pub struct AgreementQuery {
     pub quantity_raw: Option<String>,
     pub min_payout: Option<String>,
     pub max_premium: Option<String>,
-    /// Include unrestricted offers and offers reserved for this holder.
+    /// Include unrestricted offers and offers reserved for this holder, excluding their own offers.
     pub eligible_holder: Option<String>,
 }
 

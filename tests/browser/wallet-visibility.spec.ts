@@ -87,7 +87,9 @@ test('public agreement ownership and reserved offers never imply personal protec
 
   await page.getByRole('button', { name: 'Connect Test Wallet 1' }).click();
   await expect(
-    page.getByText('Only the holder can exercise this agreement.', { exact: false }),
+    page.getByText('Only the holder can exercise this agreement and receive its USDC payout.', {
+      exact: false,
+    }),
   ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Exercise protection' })).toHaveCount(0);
 

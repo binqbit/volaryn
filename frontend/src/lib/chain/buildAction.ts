@@ -65,6 +65,10 @@ export async function buildAction(
   request: ActionRequest,
   signer: TransactionSigner,
 ): Promise<ActionPlan> {
+  if (request.operation === 'create' && request.terms.designatedHolder === signer.address)
+    throw new Error('The designated holder must be a different wallet from the writer');
+  if (request.operation === 'activate' && request.agreement.writer === signer.address)
+    throw new Error('You cannot activate your own offer');
   const { rpc } = client;
   if ((await rpc.getGenesisHash().send()) !== deployment.genesisHash)
     throw new Error('Wrong network: the ledger identity changed');
@@ -250,6 +254,8 @@ export async function buildAction(
       throw new Error('The full payout is not available in reserve');
     const writerInput = { ...addresses, writer: signer, writerUsdc: usdcAddress, usdcMint };
     if (request.operation === 'activate') {
+      if (agreement.writer === signer.address)
+        throw new Error('You cannot activate your own offer');
       const { data: policy, programAddress: policyProgram } = await fetchAssetPolicy(
         rpc,
         addresses.policy,

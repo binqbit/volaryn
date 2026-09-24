@@ -13,6 +13,9 @@ import { AssetIdentity } from './AssetIdentity';
 import { TokenBalance } from './TokenBalance';
 import { Details } from './Details';
 import { agreementLifecycle } from './agreementLifecycle';
+import { agreementAction } from './agreementAction';
+import { agreementPerspective } from './agreementPerspective';
+import type { ActivityItem } from './activity/model';
 import styles from '../App.module.css';
 
 export function AgreementPanel({
@@ -23,6 +26,7 @@ export function AgreementPanel({
   walletStatus,
   usable,
   now,
+  activity,
   onReview,
 }: {
   agreement: Agreement;
@@ -32,6 +36,7 @@ export function AgreementPanel({
   walletStatus: string;
   usable: boolean;
   now: bigint | undefined;
+  activity: ActivityItem[];
   onReview: (request: ActionRequest) => Promise<void>;
 }) {
   const [usdcSelection, setUsdcSelection] = useState('');
@@ -53,9 +58,16 @@ export function AgreementPanel({
   const acceptanceEnded = now !== undefined && now >= BigInt(agreement.acceptBefore);
   const terminal = !active && !funded;
   const lifecycle = agreementLifecycle(agreement, now);
-  const holderAction = (funded && !reservedForAnother) || (active && isHolder);
+  const perspective = agreementPerspective(agreement, owner, now);
+  const action = agreementAction(agreement, owner, activity);
+  const holderOperation = active ? 'exercise' : 'activate';
+  const holderProgress = action?.operation === holderOperation ? action : undefined;
+  const holderAction = (funded && !isWriter && !reservedForAnother) || (active && isHolder);
+  const holderCanReview = holderAction && !(funded ? acceptanceEnded : expired);
   const writerAction = isWriter && (funded || (active && expired) || terminal);
-  const eligible = !!owner && now !== undefined && !!usdc && usable;
+  const eligible = !!owner && now !== undefined && !!usdc && usable && !action;
+  const actionLabel = (operation: Operation, fallback: string) =>
+    action?.operation === operation ? action.label : fallback;
   const deliverable =
     !!asset && BigInt(asset.amountRaw) >= BigInt(agreement.quantityRaw) && !asset.frozen;
   const review = (operation: Exclude<Operation, 'create'>) => {
@@ -85,19 +97,10 @@ export function AgreementPanel({
           {lifecycle.label}
         </span>
       </div>
-      <p className={styles.note}>
-        {funded
-          ? acceptanceEnded
-            ? 'This offer can no longer be accepted. The writer can cancel it to recover the reserved USDC.'
-            : 'A writer has reserved the payout. Protection begins only after activation and payment of the premium.'
-          : active && expired
-            ? 'The exercise window has ended. The writer can now reclaim the reserve.'
-            : active && isHolder
-              ? 'Your connected wallet is the holder of this agreement.'
-              : active
-                ? 'Only the holder can exercise this agreement. The writer cannot withdraw an active reserve before expiry.'
-                : 'This agreement is closed and remains a public record of its terms and outcome.'}
+      <p className={styles.smallTag} aria-label="Your agreement role">
+        {perspective.role}
       </p>
+      <p className={styles.note}>{perspective.description}</p>
       <AssetIdentity assets={assets} mint={agreement.underlyingMint} />
       <div className={styles.payout}>
         <span>Agreed payout</span>
@@ -111,22 +114,28 @@ export function AgreementPanel({
       </div>
       <dl className={styles.terms}>
         <div>
-          <dt>Writer</dt>
+          <dt>Writer · PreStocks recipient</dt>
           <dd title={agreement.writer}>
             {isWriter ? 'Your wallet · ' : ''}
             {shortAddress(agreement.writer)}
           </dd>
         </div>
         <div>
-          <dt>{funded ? 'Eligible holder' : 'Holder'}</dt>
-          <dd title={agreement.holder ?? agreement.designatedHolder ?? undefined}>
+          <dt>
+            {funded ? 'Eligible holder' : agreement.holder ? 'Holder · USDC recipient' : 'Holder'}
+          </dt>
+          <dd
+            title={
+              agreement.holder ?? (funded ? (agreement.designatedHolder ?? undefined) : undefined)
+            }
+          >
             {agreement.holder
               ? `${isHolder ? 'Your wallet · ' : ''}${shortAddress(agreement.holder)}`
-              : agreement.designatedHolder
-                ? shortAddress(agreement.designatedHolder)
-                : funded
-                  ? 'Any eligible wallet'
-                  : 'Not activated'}
+              : funded
+                ? agreement.designatedHolder
+                  ? shortAddress(agreement.designatedHolder)
+                  : 'Any eligible wallet'
+                : 'Not activated'}
           </dd>
         </div>
         <div>
@@ -154,7 +163,7 @@ export function AgreementPanel({
           </div>
         )}
       </dl>
-      {owner && holderAction && (
+      {owner && holderCanReview && !action?.complete && (
         <TokenBalance
           symbol={symbol}
           decimals={agreement.underlyingDecimals}
@@ -166,7 +175,7 @@ export function AgreementPanel({
             : `Exercise delivers ${formatUnits(agreement.quantityRaw, agreement.underlyingDecimals)} ${symbol} from one account and pays you ${formatUnits(agreement.payout)} USDC.`}
         </TokenBalance>
       )}
-      {(holderAction || writerAction) && owner && (
+      {(holderCanReview || writerAction) && owner && !action?.complete && (
         <div className={styles.formGrid}>
           <AccountSelect
             label="USDC account"
@@ -176,7 +185,7 @@ export function AgreementPanel({
             symbol="USDC"
             decimals={6}
             status={walletStatus}
-            required={funded && holderAction ? BigInt(agreement.premium) : undefined}
+            required={funded && holderAction && !isWriter ? BigInt(agreement.premium) : undefined}
             requiredLabel="Premium to activate"
           />
           {active && isHolder && !expired && (
@@ -194,19 +203,41 @@ export function AgreementPanel({
           )}
         </div>
       )}
+      {!action && (
+        <p
+          className={styles.actionOutcome}
+          data-complete={completed || (active && now !== undefined && !expired) || undefined}
+          role="status"
+          aria-label="Agreement outcome"
+        >
+          {perspective.title}
+        </p>
+      )}
       {holderAction && (
         <button
           className={styles.primaryButton}
+          data-complete={holderProgress?.complete || undefined}
           disabled={
             !eligible ||
             (active
               ? expired || !deliverable
               : acceptanceEnded || BigInt(usdc?.amountRaw ?? '0') < BigInt(agreement.premium))
           }
-          onClick={() => review(active ? 'exercise' : 'activate')}
+          onClick={() => review(holderOperation)}
         >
-          {active ? 'Exercise protection' : 'Activate protection'}
-          <span>↗</span>
+          {actionLabel(
+            holderOperation,
+            active
+              ? expired
+                ? 'Protection expired'
+                : 'Exercise protection'
+              : acceptanceEnded
+                ? 'Acceptance ended'
+                : 'Activate protection',
+          )}
+          <span aria-hidden="true">
+            {holderProgress?.complete ? '✓' : holderProgress ? '…' : eligible ? '↗' : ''}
+          </span>
         </button>
       )}
       {active && isHolder && !expired && !deliverable && (
@@ -221,19 +252,24 @@ export function AgreementPanel({
       {isWriter && funded && (
         <button
           className={styles.outlineButton}
+          data-complete={action?.operation === 'cancel' && action.complete ? true : undefined}
           disabled={!eligible}
           onClick={() => review('cancel')}
         >
-          Cancel offer
+          {actionLabel('cancel', 'Cancel offer')}
         </button>
       )}
       {isWriter && active && (
         <button
           className={styles.outlineButton}
+          data-complete={action?.operation === 'reclaim' && action.complete ? true : undefined}
           disabled={!eligible || !expired}
           onClick={() => review('reclaim')}
         >
-          Reclaim expired reserve
+          {actionLabel(
+            'reclaim',
+            expired ? 'Reclaim expired reserve' : 'Reserve locked until expiry',
+          )}
         </button>
       )}
       {isWriter && terminal && (
@@ -242,8 +278,11 @@ export function AgreementPanel({
           disabled={!eligible}
           onClick={() => review('cleanup')}
         >
-          Recover residual funds
+          {actionLabel('cleanup', 'Recover residual funds')}
         </button>
+      )}
+      {action?.complete && (
+        <p className={styles.note}>Updating agreement details after finalization…</p>
       )}
       {!owner && (funded || active) && (
         <p className={styles.connectHint}>
@@ -269,7 +308,10 @@ export function AgreementPanel({
         </p>
         <p>
           Holder{' '}
-          <code>{agreement.holder ?? agreement.designatedHolder ?? 'Any eligible wallet'}</code>
+          <code>
+            {agreement.holder ??
+              (funded ? (agreement.designatedHolder ?? 'Any eligible wallet') : 'Not activated')}
+          </code>
         </p>
         <p>Gross delivery: {agreement.quantityRaw} base units.</p>
         <p>

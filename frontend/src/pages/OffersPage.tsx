@@ -56,6 +56,12 @@ export function OffersPage({
         <h2>Available offers</h2>
         <span>Fully funded · Fixed terms</span>
       </div>
+      {owner && (
+        <p className={styles.note}>
+          Your own offers are in <Link to="/portfolio/written">My offers</Link>. You cannot activate
+          them yourself.
+        </p>
+      )}
       <AgreementList
         assets={deployment.assets}
         portfolio={portfolio}

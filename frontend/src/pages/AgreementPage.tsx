@@ -7,6 +7,7 @@ import type { ActionRequest } from '../lib/chain/actionTypes';
 import { usePortfolio } from '../features/usePortfolio';
 import { useChainTime } from '../features/useChainTime';
 import { AgreementPanel } from '../features/AgreementPanel';
+import type { useActivity } from '../features/activity/useActivity';
 import styles from '../App.module.css';
 
 export function AgreementPage({
@@ -16,6 +17,7 @@ export function AgreementPage({
   walletStatus,
   usable,
   revision,
+  activity,
   onReview,
 }: {
   deployment: Deployment;
@@ -24,6 +26,7 @@ export function AgreementPage({
   walletStatus: string;
   usable: boolean;
   revision: number;
+  activity: ReturnType<typeof useActivity>;
   onReview: (request: ActionRequest) => Promise<void>;
 }) {
   const { address } = useParams();
@@ -82,6 +85,7 @@ export function AgreementPage({
             walletStatus={walletStatus}
             usable={usable && portfolio.status !== 'error'}
             now={now}
+            activity={[...activity.items, ...activity.pending]}
             onReview={onReview}
           />
         </div>

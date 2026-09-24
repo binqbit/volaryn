@@ -165,6 +165,7 @@ pub async fn agreements(
         }
     }
     if let Some(holder) = &query.eligible_holder {
+        sql.push(" AND writer <> ").push_bind(holder);
         sql.push(" AND (projection ->> 'designatedHolder' IS NULL OR projection ->> 'designatedHolder' = ")
             .push_bind(holder).push(")");
     }

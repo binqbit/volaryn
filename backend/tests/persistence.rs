@@ -133,7 +133,7 @@ async fn offer_matching_uses_exact_amounts_and_designated_holder_eligibility() {
         .unwrap();
     let holder = Pubkey::new_unique().to_string();
     let other = Pubkey::new_unique().to_string();
-    let rows: Vec<_> = (0..6)
+    let rows: Vec<_> = (0..8)
         .map(|index| {
             let mut row = agreement::agreement(10, 100);
             row.address = Pubkey::new_unique().to_string();
@@ -153,6 +153,12 @@ async fn offer_matching_uses_exact_amounts_and_designated_holder_eligibility() {
             if index == 5 {
                 row.reserve_amount = "0".into();
             }
+            if index >= 6 {
+                row.writer = holder.clone();
+                if index == 7 {
+                    row.designated_holder = Some(holder.clone());
+                }
+            }
             row
         })
         .collect();
@@ -161,7 +167,7 @@ async fn offer_matching_uses_exact_amounts_and_designated_holder_eligibility() {
         quantity_raw: Some(u64::MAX.to_string()),
         min_payout: Some(u64::MAX.to_string()),
         max_premium: Some("1".into()),
-        eligible_holder: Some(holder),
+        eligible_holder: Some(holder.clone()),
         ..Default::default()
     };
     let page = store::agreements(&pool, &query, true).await.unwrap();
@@ -170,6 +176,43 @@ async fn offer_matching_uses_exact_amounts_and_designated_holder_eligibility() {
         .items
         .iter()
         .all(|row| [rows[0].address.clone(), rows[1].address.clone()].contains(&row.address)));
+    let mut paged_query = AgreementQuery {
+        limit: Some(1),
+        ..query
+    };
+    let mut found = Vec::new();
+    loop {
+        let page = store::agreements(&pool, &paged_query, true).await.unwrap();
+        found.extend(page.items.into_iter().map(|row| row.address));
+        paged_query.after = page.next;
+        if paged_query.after.is_none() {
+            break;
+        }
+    }
+    assert_eq!(
+        found.len(),
+        2,
+        "Own offers must be excluded before pagination"
+    );
+    let own = store::agreements(
+        &pool,
+        &AgreementQuery {
+            writer: Some(holder),
+            ..Default::default()
+        },
+        false,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        own.items.len(),
+        2,
+        "My offers retains the writer's own records"
+    );
+    assert!(store::agreement(&pool, &rows[6].address)
+        .await
+        .unwrap()
+        .is_some());
     for invalid in ["1.2", "01", "-1", "18446744073709551616", "1 OR TRUE"] {
         assert!(AgreementQuery {
             quantity_raw: Some(invalid.into()),
