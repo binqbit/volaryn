@@ -14,6 +14,7 @@ import {
 } from './environment';
 
 checkValidator();
+const browserArguments = process.argv.slice(2);
 
 // Every run owns its ledger, projection, ports and processes. Nothing is reset in place.
 await mkdir('artifacts/localnet', { recursive: true });
@@ -100,10 +101,15 @@ try {
   );
   await bootApp('app.log');
   await finish(
-    start('node_modules/.bin/playwright', ['test'], `${directory}/browser.log`, {
-      ...process.env,
-      VOLARYN_TEST_APP: appUrl,
-    }),
+    start(
+      'node_modules/.bin/playwright',
+      ['test', ...browserArguments],
+      `${directory}/browser.log`,
+      {
+        ...process.env,
+        VOLARYN_TEST_APP: appUrl,
+      },
+    ),
   );
   const before = await observations();
   const deployment = JSON.parse(await readFile(manifest, 'utf8')) as {
@@ -232,6 +238,7 @@ try {
       {
         passed: true,
         browser: true,
+        browserArguments,
         restart: true,
         databaseOutageRecovery: true,
         bootstrapIdempotency: true,
