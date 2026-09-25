@@ -1,4 +1,4 @@
-import { Link } from 'react-router';
+import { Link, useLocation } from 'react-router';
 import type { Deployment, Wallet } from '../lib/api/client';
 import type { ActionRequest } from '../lib/chain/actionTypes';
 import { OfferForm } from '../features/OfferForm';
@@ -20,6 +20,7 @@ export function CreateOfferPage({
   busy: boolean;
   onReview: (request: ActionRequest) => Promise<void>;
 }) {
+  const location = useLocation();
   return (
     <>
       <Link className={styles.backLink} to="/offers">
@@ -48,7 +49,9 @@ export function CreateOfferPage({
       ) : wallet ? (
         <div className={styles.surface}>
           <OfferForm
-            key={owner}
+            // Explicit navigation starts the route's requested draft, even at the same URL.
+            // Background observations and edits within the form preserve this identity.
+            key={`${owner}:${location.key}`}
             deployment={deployment}
             wallet={wallet}
             walletStatus={status}
