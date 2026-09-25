@@ -3,6 +3,8 @@ import { readFile } from 'node:fs/promises';
 
 const config = JSON.parse(await readFile(process.argv[2] ?? 'artifacts/compose.json', 'utf8'));
 assert(config.name.startsWith('volaryn-test-'), 'Expected an isolated test project');
+assert.equal(config.services.app.environment.VOLARYN_INDEX_POLL_INTERVAL_SECS, '1');
+assert.equal(config.services.app.environment.VOLARYN_INDEX_DISCOVERY_INTERVAL_SECS, '2');
 for (const service of Object.values(config.services)) {
   assert(!service.ports?.length, 'Test services must not publish host ports');
   assert(!service.env_file?.length, 'Test services must not inherit live configuration');

@@ -3,6 +3,67 @@ mod support;
 use volaryn_backend::config::validate_deployment;
 
 #[test]
+fn index_cadence_has_optional_defaults_and_bounded_overrides() {
+    use clap::{CommandFactory, Parser};
+    use volaryn_backend::config::{Config, IndexConfig};
+    let defaults = IndexConfig::default();
+    assert_eq!(defaults.index_poll_interval_secs, 1);
+    assert_eq!(defaults.index_discovery_interval_secs, 2);
+    for (name, variable, default) in [
+        (
+            "index_poll_interval_secs",
+            "VOLARYN_INDEX_POLL_INTERVAL_SECS",
+            "1",
+        ),
+        (
+            "index_discovery_interval_secs",
+            "VOLARYN_INDEX_DISCOVERY_INTERVAL_SECS",
+            "2",
+        ),
+    ] {
+        let command = Config::command();
+        let argument = command
+            .get_arguments()
+            .find(|arg| arg.get_id() == name)
+            .unwrap();
+        assert_eq!(argument.get_env().unwrap(), variable);
+        assert_eq!(argument.get_default_values(), &[default]);
+    }
+    for (poll, discovery) in [("1", "1"), ("10", "300")] {
+        let config = Config::try_parse_from([
+            "volaryn",
+            "--index-poll-interval-secs",
+            poll,
+            "--index-discovery-interval-secs",
+            discovery,
+        ])
+        .unwrap();
+        assert_eq!(config.index.index_poll_interval_secs.to_string(), poll);
+        assert_eq!(
+            config.index.index_discovery_interval_secs.to_string(),
+            discovery
+        );
+    }
+    for (poll, discovery) in [
+        ("0", "5"),
+        ("11", "5"),
+        ("2", "0"),
+        ("2", "301"),
+        ("2", "1.5"),
+        ("-1", "5"),
+    ] {
+        assert!(Config::try_parse_from([
+            "volaryn",
+            "--index-poll-interval-secs",
+            poll,
+            "--index-discovery-interval-secs",
+            discovery,
+        ])
+        .is_err());
+    }
+}
+
+#[test]
 fn fixture_manifests_require_the_explicit_localnet_build() {
     let deployment = support::deployment();
     assert_eq!(

@@ -42,6 +42,8 @@ Open `http://localhost:8080` and choose **Connect wallet**. Select **Test Wallet
 
 Follow the [two-wallet walkthrough](docs/demo.md) to create either offer type, inspect its escrow, activate protection, exercise without the writer, and verify both participants' outcomes.
 
+Optional index timing settings are listed in [.env.example](.env.example); startup uses built-in defaults without that file. See [refresh timing](docs/development.md#refresh-timing) for the difference between network finalization and application updates.
+
 Development uses one current contract and database baseline, without historical format conversion. After incompatible changes, [reset the disposable local environment](docs/development.md#local-development-reset) in the same Compose project and rebuild all services together.
 
 - **Home** (`/`) explains the PreStocks exit floor, premium, expiry, and both participant roles through a clearly labelled numerical example. It does not load an offer list. **View wallet** in the header opens the connected wallet panel.

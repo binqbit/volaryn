@@ -10,10 +10,11 @@ use crate::{
 use serde_json::json;
 use solana_rpc_client_api::request::RpcRequest;
 use sqlx::PgPool;
+use std::{collections::BTreeSet, sync::Arc};
 use volaryn::state::{Agreement, AgreementStatus};
 
 pub(super) async fn refresh(
-    chain: &Chain,
+    chain: &Arc<Chain>,
     pool: &PgPool,
     deployment: &Deployment,
 ) -> Result<(), AppError> {
@@ -41,9 +42,12 @@ pub(super) async fn refresh(
     if values.len() != entries.len() {
         return Err(AppError::Chain);
     }
+    let mut completed = Vec::new();
+    let mut minimum_slot = slot;
     for (entry, status) in entries.iter().zip(values) {
         let state = if status["confirmationStatus"] == "finalized" {
             if status.get("err").ok_or(AppError::Chain)?.is_null() {
+                minimum_slot = minimum_slot.max(status["slot"].as_u64().ok_or(AppError::Chain)?);
                 Status::Finalized
             } else {
                 Status::Failed
@@ -58,13 +62,45 @@ pub(super) async fn refresh(
                 .parse::<u64>()
                 .map_err(|_| AppError::Storage)?
         {
-            effect(chain, deployment, entry, slot)
-                .await
-                .unwrap_or(Status::Unresolved)
+            match effect(chain, deployment, entry, slot).await {
+                Ok((state, observed_slot)) => {
+                    minimum_slot = minimum_slot.max(observed_slot);
+                    state
+                }
+                Err(_) => Status::Unresolved,
+            }
         } else {
             Status::Pending
         };
-        store::update(pool, &entry.signature, state).await?;
+        if matches!(state, Status::Finalized | Status::Reconciled) {
+            completed.push((entry, state));
+        } else {
+            store::update(pool, &entry.signature, state).await?;
+        }
+    }
+    if !completed.is_empty() {
+        let addresses: Vec<_> = completed
+            .iter()
+            .map(|(entry, _)| entry.agreement.clone())
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect();
+        minimum_slot = minimum_slot.max(crate::adapters::store::last_slot(pool).await?);
+        // Keep receipts retryable until their finalized account pair is indexed. This
+        // survives worker failure/restart without losing the prompt discovery hint.
+        if let Err(error) =
+            crate::indexer::refresh_batches(chain, pool, deployment, &addresses, minimum_slot).await
+        {
+            // Rotate failed work too, so a lagging/missing pair cannot monopolize
+            // the oldest-first queue while later receipts are waiting.
+            for (entry, _) in completed {
+                store::update(pool, &entry.signature, entry.status.clone()).await?;
+            }
+            return Err(error);
+        }
+        for (entry, state) in completed {
+            store::update(pool, &entry.signature, state).await?;
+        }
     }
     Ok(())
 }
@@ -74,7 +110,7 @@ async fn effect(
     deployment: &Deployment,
     entry: &Activity,
     slot: u64,
-) -> Result<Status, AppError> {
+) -> Result<(Status, u64), AppError> {
     let response = chain
         .request(
             RpcRequest::GetAccountInfo,
@@ -82,22 +118,24 @@ async fn effect(
         {"encoding":"base64", "commitment":"finalized", "minContextSlot":slot}]),
         )
         .await?;
-    if response["context"]["slot"]
+    let observed_slot = response["context"]["slot"]
         .as_u64()
-        .ok_or(AppError::Chain)?
-        < slot
-    {
+        .ok_or(AppError::Chain)?;
+    if observed_slot < slot {
         return Err(AppError::Chain);
     }
     if response["value"].is_null() {
-        return Ok(if entry.operation == Operation::Create {
-            Status::Expired
-        } else {
-            Status::Unresolved
-        });
+        return Ok((
+            if entry.operation == Operation::Create {
+                Status::Expired
+            } else {
+                Status::Unresolved
+            },
+            observed_slot,
+        ));
     }
     let agreement = agreement_account(&response["value"], &entry.agreement, deployment)?;
-    Ok(effect_status(entry, &agreement))
+    Ok((effect_status(entry, &agreement), observed_slot))
 }
 
 /// Proofs require immutable creator/terms, fixed matched roles and irreversible settlement.

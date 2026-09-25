@@ -1,4 +1,5 @@
 import { Link, useSearchParams } from 'react-router';
+import { useEffect } from 'react';
 import { useClient } from '@solana/react';
 import { amount, type Asset, type Deployment } from '../lib/api/client';
 import type { AppClient } from '../lib/chain/client';
@@ -39,7 +40,15 @@ function readFilters(search: URLSearchParams, assets: Asset[]): PortfolioQuery {
   return filters;
 }
 
-export function OffersPage({ deployment, owner }: { deployment: Deployment; owner?: string }) {
+export function OffersPage({
+  deployment,
+  owner,
+  revision,
+}: {
+  deployment: Deployment;
+  owner?: string;
+  revision: number;
+}) {
   const [search, setSearch] = useSearchParams();
   let filters: PortfolioQuery = { mode: 'offers' };
   let error: string | undefined;
@@ -105,7 +114,7 @@ export function OffersPage({ deployment, owner }: { deployment: Deployment; owne
           {error} <Link to="/offers">Clear invalid filters</Link>
         </p>
       ) : (
-        <OfferResults deployment={deployment} owner={owner} filters={filters} />
+        <OfferResults deployment={deployment} owner={owner} filters={filters} revision={revision} />
       )}
     </>
   );
@@ -115,10 +124,12 @@ function OfferResults({
   deployment,
   owner,
   filters,
+  revision,
 }: {
   deployment: Deployment;
   owner?: string;
   filters: PortfolioQuery;
+  revision: number;
 }) {
   const [search] = useSearchParams();
   const client = useClient<AppClient>();
@@ -130,6 +141,10 @@ function OfferResults({
     search.get('after') ?? undefined,
     filters,
   );
+  const { refresh } = portfolio;
+  useEffect(() => {
+    if (revision) refresh();
+  }, [revision, refresh]);
   return (
     <>
       <div className={styles.listHeading}>

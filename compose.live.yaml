@@ -30,6 +30,9 @@ services:
     restart: unless-stopped
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
+    environment:
+      VOLARYN_INDEX_POLL_INTERVAL_SECS: ${VOLARYN_INDEX_POLL_INTERVAL_SECS:-1}
+      VOLARYN_INDEX_DISCOVERY_INTERVAL_SECS: ${VOLARYN_INDEX_DISCOVERY_INTERVAL_SECS:-2}
     depends_on:
       database:
         condition: service_healthy

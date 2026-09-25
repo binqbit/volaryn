@@ -259,6 +259,7 @@ async fn portfolio_http_validates_filters_and_observes_chain_deadlines() {
         Chain::new(endpoint.clone()).unwrap(),
         pool,
         Catalog::new(endpoint).unwrap(),
+        Default::default(),
     );
     app.reconcile().await.unwrap();
     let rows = store::agreements(&app.pool, &Default::default(), false, None)
@@ -368,6 +369,7 @@ async fn offer_discovery_uses_chain_time_across_host_skew_and_deadline_boundarie
         Chain::new(endpoint.clone()).unwrap(),
         pool,
         Catalog::new(endpoint).unwrap(),
+        Default::default(),
     );
     app.reconcile().await.unwrap();
     let service = router(

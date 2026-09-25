@@ -11,11 +11,13 @@ export function PortfolioPage({
   owner,
   view = 'all',
   activity,
+  revision,
 }: {
   deployment: Deployment;
   owner?: string;
   view?: PortfolioRole | 'activity';
   activity: ReturnType<typeof useActivity>;
+  revision: number;
 }) {
   const [search] = useSearchParams();
   const roleSearch = search.has('status')
@@ -94,6 +96,7 @@ export function PortfolioPage({
               owner={owner}
               role={view}
               activity={activity}
+              revision={revision}
             />
           )}
         </>

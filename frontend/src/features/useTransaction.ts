@@ -20,11 +20,19 @@ type Phase =
 interface Tracking {
   key: string;
   pending: Pending | null;
+  completedSignature: string | null;
   phase: Phase;
   error: string;
   unavailable: boolean;
 }
-const empty: Tracking = { key: '', pending: null, phase: 'idle', error: '', unavailable: false };
+const empty: Tracking = {
+  key: '',
+  pending: null,
+  completedSignature: null,
+  phase: 'idle',
+  error: '',
+  unavailable: false,
+};
 
 export function useTransaction(
   client: AppClient,
@@ -63,6 +71,7 @@ export function useTransaction(
           setTracking((previous) => ({
             key,
             pending: record,
+            completedSignature: previous.key === key ? previous.completedSignature : null,
             phase: record
               ? 'pending'
               : previous.key === key &&
@@ -139,6 +148,8 @@ export function useTransaction(
         setTracking({
           key,
           pending: complete ? null : pending,
+          completedSignature:
+            phase === 'finalized' || phase === 'reconciled' ? pending!.signature : null,
           phase,
           unavailable: false,
           error:
@@ -318,6 +329,7 @@ export function useTransaction(
     phase: current.phase,
     error: current.error,
     pending,
+    completedSignature: current.completedSignature,
     activity,
     busy:
       !owner ||

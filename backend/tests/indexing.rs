@@ -25,6 +25,11 @@ async fn discovery_batches_pairs_and_refreshes_only_live_agreements() {
         Chain::new(url.clone()).unwrap(),
         pool,
         volaryn_backend::catalog::Catalog::new(url).unwrap(),
+        // This test measures batching and intervening refresh, not elapsed discovery time.
+        volaryn_backend::config::IndexConfig {
+            index_discovery_interval_secs: 300,
+            ..Default::default()
+        },
     );
     app.reconcile().await.unwrap();
     assert_eq!(ledger.discoveries.load(Ordering::Relaxed), 1);
@@ -122,6 +127,45 @@ async fn account_pair_reads_reject_older_contexts_missing_accounts_and_wrong_own
         rpc.agreement_batch(&deployment, &[key], 0).await,
         Err(AppError::Identity)
     ));
+    server.abort();
+}
+
+#[tokio::test]
+async fn discovery_respects_configured_interval_without_delaying_live_refresh() {
+    let ledger = chain::Ledger::new(1);
+    let (url, server) = ledger.serve().await;
+    let database = database::Database::new().await;
+    let deployment = support::deployment();
+    let pool = store::open(database.options.clone(), &deployment)
+        .await
+        .unwrap();
+    let app = Application::new(
+        deployment,
+        Chain::new(url.clone()).unwrap(),
+        pool,
+        volaryn_backend::catalog::Catalog::new(url).unwrap(),
+        volaryn_backend::config::IndexConfig {
+            index_poll_interval_secs: 2,
+            index_discovery_interval_secs: 20,
+        },
+    );
+    app.reconcile().await.unwrap();
+    ledger.discovery_slot.store(11, Ordering::Relaxed);
+    // Advance only scheduling time; keep PostgreSQL and HTTP on an ordinary runtime.
+    tokio::time::pause();
+    tokio::time::advance(std::time::Duration::from_secs(19)).await;
+    tokio::time::resume();
+    app.reconcile().await.unwrap();
+    assert_eq!(ledger.discoveries.load(Ordering::Relaxed), 1);
+    assert_eq!(ledger.batches.load(Ordering::Relaxed), 2);
+    tokio::time::pause();
+    tokio::time::advance(std::time::Duration::from_secs(1)).await;
+    tokio::time::resume();
+    app.reconcile().await.unwrap();
+    assert_eq!(ledger.discoveries.load(Ordering::Relaxed), 2);
+    assert_eq!(ledger.batches.load(Ordering::Relaxed), 3);
+    app.pool.close().await;
+    database.close().await;
     server.abort();
 }
 

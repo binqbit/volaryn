@@ -92,6 +92,8 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://volaryn:volaryn-local@database:5432/volaryn
+      VOLARYN_INDEX_POLL_INTERVAL_SECS: ${VOLARYN_INDEX_POLL_INTERVAL_SECS:-1}
+      VOLARYN_INDEX_DISCOVERY_INTERVAL_SECS: ${VOLARYN_INDEX_DISCOVERY_INTERVAL_SECS:-2}
     build:
       context: .
       target: app

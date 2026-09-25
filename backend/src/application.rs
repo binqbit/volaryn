@@ -1,5 +1,6 @@
 use crate::{
     adapters::{chain::Chain, store},
+    config::IndexConfig,
     domain::{now, AppError},
     indexer::Indexer,
     observations::{AgreementView, Deployment},
@@ -29,6 +30,7 @@ impl Application {
         chain: Chain,
         pool: PgPool,
         catalog: crate::catalog::Catalog,
+        index: IndexConfig,
     ) -> Arc<Self> {
         Arc::new(Self {
             catalog,
@@ -36,7 +38,9 @@ impl Application {
             chain: Arc::new(chain),
             pool,
             last_success: AtomicI64::new(0),
-            indexer: Mutex::new(Indexer::default()),
+            indexer: Mutex::new(Indexer::new(Duration::from_secs(
+                index.index_discovery_interval_secs,
+            ))),
             identity_verified: Mutex::new(None),
         })
     }

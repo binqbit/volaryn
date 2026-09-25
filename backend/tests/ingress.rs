@@ -22,6 +22,7 @@ fn service() -> axum::Router {
         Chain::new(endpoint.into()).unwrap(),
         pool,
         Catalog::new(endpoint.into()).unwrap(),
+        Default::default(),
     );
     router(app, "missing-test-frontend".into())
 }

@@ -28,6 +28,8 @@ use volaryn_backend::{
 struct Network {
     pool: sqlx::PgPool,
     height: AtomicU64,
+    account_slot: AtomicU64,
+    discoveries: AtomicU64,
     sent: AtomicU64,
     reject_submissions: AtomicBool,
     simulated: AtomicU64,
@@ -51,7 +53,12 @@ async fn upstream(State(state): State<Arc<Network>>, Json(request): Json<Value>)
         }
         "getMultipleAccounts" => {
             let accounts = state.accounts.lock().unwrap();
-            json!({"context":{"slot":1000},"value":request["params"][0].as_array().unwrap().iter().map(|key| accounts.get(key.as_str().unwrap()).cloned().unwrap_or(Value::Null)).collect::<Vec<_>>()})
+            assert_eq!(request["params"][1]["commitment"], "finalized");
+            json!({"context":{"slot":state.account_slot.load(Ordering::Relaxed)},"value":request["params"][0].as_array().unwrap().iter().map(|key| accounts.get(key.as_str().unwrap()).cloned().unwrap_or(Value::Null)).collect::<Vec<_>>()})
+        }
+        "getProgramAccounts" => {
+            state.discoveries.fetch_add(1, Ordering::Relaxed);
+            json!({"context":{"slot":10},"value":[]})
         }
         "isBlockhashValid" => json!({"context":{"slot":10},"value":true}),
         "getLatestBlockhash" => json!({"value":{"lastValidBlockHeight":200}}),
@@ -123,6 +130,8 @@ async fn authenticated_receipts_survive_relay_duplicates_and_reconcile_without_a
     let network = Arc::new(Network {
         pool: pool.clone(),
         height: AtomicU64::new(10),
+        account_slot: AtomicU64::new(1000),
+        discoveries: AtomicU64::new(0),
         sent: AtomicU64::new(0),
         reject_submissions: AtomicBool::new(false),
         simulated: AtomicU64::new(0),
@@ -148,8 +157,11 @@ async fn authenticated_receipts_survive_relay_duplicates_and_reconcile_without_a
         deployment,
         Chain::new(url.clone()).unwrap(),
         pool.clone(),
-        volaryn_backend::catalog::Catalog::new(url).unwrap(),
+        volaryn_backend::catalog::Catalog::new(url.clone()).unwrap(),
+        Default::default(),
     );
+    app.reconcile().await.unwrap();
+    assert_eq!(network.discoveries.load(Ordering::Relaxed), 1);
     let directory = tempfile::tempdir().unwrap();
     let router = http::router(app.clone(), directory.path().to_owned());
     let action = SignedAction::create(1);
@@ -244,9 +256,75 @@ async fn authenticated_receipts_survive_relay_duplicates_and_reconcile_without_a
     );
     network.statuses.lock().unwrap().insert(
         action.signature(),
-        json!({"confirmationStatus":"finalized","err":null}),
+        json!({"confirmationStatus":"finalized","slot":1001,"err":null}),
     );
-    app.reconcile_activity().await.unwrap();
+    *network.accounts.lock().unwrap() = fixtures::accounts(&action.state(), 20);
+    assert!(store::agreement(&pool, &action.agreement.to_string())
+        .await
+        .unwrap()
+        .is_none());
+    // A pair observed behind the finalized signature cannot publish an older state,
+    // and a failed refresh must not discard the durable receipt's retry opportunity.
+    sqlx::query("UPDATE activity SET checked_at = 0 WHERE signature = $1")
+        .bind(action.signature())
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(app.reconcile_activity().await.is_err());
+    let checked_at: i64 =
+        sqlx::query_scalar("SELECT checked_at FROM activity WHERE signature = $1")
+            .bind(action.signature())
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+    assert!(
+        checked_at > 0,
+        "Failed targeted refreshes rotate through the retry queue"
+    );
+    assert_eq!(
+        receipts::find(&pool, &action.signature())
+            .await
+            .unwrap()
+            .unwrap()
+            .status,
+        Status::Provisional
+    );
+    network.account_slot.store(1001, Ordering::Relaxed);
+    sqlx::query("ALTER TABLE agreements ADD CONSTRAINT test_refresh_failure CHECK (false)")
+        .execute(&pool)
+        .await
+        .unwrap();
+    assert!(app.reconcile_activity().await.is_err());
+    assert_eq!(
+        receipts::find(&pool, &action.signature())
+            .await
+            .unwrap()
+            .unwrap()
+            .status,
+        Status::Provisional
+    );
+    sqlx::query("ALTER TABLE agreements DROP CONSTRAINT test_refresh_failure")
+        .execute(&pool)
+        .await
+        .unwrap();
+    let recovered = Application::new(
+        app.deployment.clone(),
+        Chain::new(url.clone()).unwrap(),
+        pool.clone(),
+        volaryn_backend::catalog::Catalog::new(url.clone()).unwrap(),
+        Default::default(),
+    );
+    recovered.reconcile_activity().await.unwrap();
+    let indexed = store::agreement(&pool, &action.agreement.to_string())
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(indexed.finalized_slot, "1001");
+    assert_eq!(
+        network.discoveries.load(Ordering::Relaxed),
+        1,
+        "Finalized receipts publish agreements without waiting for another discovery pass"
+    );
     let finalized = receipts::find(&pool, &action.signature())
         .await
         .unwrap()
@@ -346,6 +424,87 @@ async fn authenticated_receipts_survive_relay_duplicates_and_reconcile_without_a
 use std::future::IntoFuture;
 
 #[tokio::test]
+async fn effect_recovery_indexes_at_or_after_the_observed_evidence_slot() {
+    let database = database::Database::new().await;
+    let deployment = support::deployment();
+    let pool = store::open(database.options.clone(), &deployment)
+        .await
+        .unwrap();
+    let action = SignedAction::create(5001);
+    let network = Arc::new(Network {
+        pool: pool.clone(),
+        height: AtomicU64::new(10),
+        account_slot: AtomicU64::new(999),
+        discoveries: AtomicU64::new(0),
+        sent: AtomicU64::new(0),
+        reject_submissions: AtomicBool::new(false),
+        simulated: AtomicU64::new(0),
+        simulation: Mutex::new(Some(json!({"context":{"slot":10},"value":{"err":null}}))),
+        pause_simulation: AtomicBool::new(false),
+        simulation_started: tokio::sync::Notify::new(),
+        resume_simulation: tokio::sync::Notify::new(),
+        statuses: Mutex::default(),
+        accounts: Mutex::new(fixtures::accounts(&action.state(), 20)),
+    });
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let endpoint = format!("http://{}", listener.local_addr().unwrap());
+    let server = tokio::spawn(
+        axum::serve(
+            listener,
+            Router::new()
+                .route("/", post(upstream))
+                .with_state(network.clone()),
+        )
+        .into_future(),
+    );
+    let app = Application::new(
+        deployment,
+        Chain::new(endpoint.clone()).unwrap(),
+        pool.clone(),
+        volaryn_backend::catalog::Catalog::new(endpoint).unwrap(),
+        Default::default(),
+    );
+    app.record_submission(&action.params()).await.unwrap();
+    // History is absent beyond the lifetime. The root is 500, but the finalized
+    // agreement proving creation is observed at 1000; pair 999 cannot publish it.
+    network.height.store(201, Ordering::Relaxed);
+    assert!(app.reconcile_activity().await.is_err());
+    assert!(store::agreement(&pool, &action.agreement.to_string())
+        .await
+        .unwrap()
+        .is_none());
+    assert_eq!(
+        receipts::find(&pool, &action.signature())
+            .await
+            .unwrap()
+            .unwrap()
+            .status,
+        Status::Pending
+    );
+    network.account_slot.store(1000, Ordering::Relaxed);
+    app.reconcile_activity().await.unwrap();
+    assert_eq!(
+        receipts::find(&pool, &action.signature())
+            .await
+            .unwrap()
+            .unwrap()
+            .status,
+        Status::Reconciled
+    );
+    assert_eq!(
+        store::agreement(&pool, &action.agreement.to_string())
+            .await
+            .unwrap()
+            .unwrap()
+            .finalized_slot,
+        "1000"
+    );
+    app.pool.close().await;
+    database.close().await;
+    server.abort();
+}
+
+#[tokio::test]
 async fn both_origins_persist_verified_side_and_actor_role_for_every_operation() {
     use volaryn::state::{AgreementStatus, OfferSide as ChainSide};
     use volaryn_backend::{activity::Operation, observations::OfferSide};
@@ -357,6 +516,8 @@ async fn both_origins_persist_verified_side_and_actor_role_for_every_operation()
     let network = Arc::new(Network {
         pool: pool.clone(),
         height: AtomicU64::new(10),
+        account_slot: AtomicU64::new(1000),
+        discoveries: AtomicU64::new(0),
         sent: AtomicU64::new(0),
         reject_submissions: AtomicBool::new(false),
         simulated: AtomicU64::new(0),
@@ -383,6 +544,7 @@ async fn both_origins_persist_verified_side_and_actor_role_for_every_operation()
         Chain::new(endpoint.clone()).unwrap(),
         pool.clone(),
         volaryn_backend::catalog::Catalog::new(endpoint).unwrap(),
+        Default::default(),
     );
     for (side_index, side) in [ChainSide::Writer, ChainSide::Holder]
         .into_iter()
@@ -499,6 +661,8 @@ async fn server_preflight_blocks_invalid_receipts_and_preserves_relay_ambiguity(
     let network = Arc::new(Network {
         pool: pool.clone(),
         height: AtomicU64::new(10),
+        account_slot: AtomicU64::new(1000),
+        discoveries: AtomicU64::new(0),
         sent: AtomicU64::new(0),
         reject_submissions: AtomicBool::new(true),
         simulated: AtomicU64::new(0),
@@ -525,6 +689,7 @@ async fn server_preflight_blocks_invalid_receipts_and_preserves_relay_ambiguity(
         Chain::new(endpoint.clone()).unwrap(),
         pool.clone(),
         volaryn_backend::catalog::Catalog::new(endpoint).unwrap(),
+        Default::default(),
     );
     let mut action = SignedAction::create(901);
     action.transaction.message.instructions[0].data = volaryn::instruction::CancelOffer {}.data();

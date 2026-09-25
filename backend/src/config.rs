@@ -1,6 +1,6 @@
 use crate::{assets::MAINNET_GENESIS, domain::AppError, observations::Deployment};
 use anchor_lang::prelude::Pubkey;
-use clap::Parser;
+use clap::{Args, Parser};
 use std::{net::SocketAddr, path::PathBuf, str::FromStr};
 
 /// Circle's native Solana USDC; never substituted with a bridged or test mint.
@@ -9,6 +9,8 @@ pub const MAINNET_USDC: &str = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
 #[derive(Parser)]
 #[command(about = "Volaryn application server")]
 pub struct Config {
+    #[command(flatten)]
+    pub index: IndexConfig,
     #[arg(long, default_value = "target/localnet/deployment.json")]
     pub manifest: PathBuf,
     #[arg(
@@ -36,6 +38,27 @@ pub struct Config {
     /// Verify release, chain, protocol and asset policies without opening a database or sending.
     #[arg(long)]
     pub check_deployment: bool,
+}
+
+#[derive(Args, Clone, Copy, Debug)]
+pub struct IndexConfig {
+    /// Seconds between index passes; keep below the 30-second readiness budget.
+    #[arg(long, env = "VOLARYN_INDEX_POLL_INTERVAL_SECS", default_value_t = 1,
+        value_parser = clap::value_parser!(u64).range(1..=10))]
+    pub index_poll_interval_secs: u64,
+    /// Seconds before the next index pass discovers externally created agreements.
+    #[arg(long, env = "VOLARYN_INDEX_DISCOVERY_INTERVAL_SECS", default_value_t = 2,
+        value_parser = clap::value_parser!(u64).range(1..=300))]
+    pub index_discovery_interval_secs: u64,
+}
+
+impl Default for IndexConfig {
+    fn default() -> Self {
+        Self {
+            index_poll_interval_secs: 1,
+            index_discovery_interval_secs: 2,
+        }
+    }
 }
 
 fn secret(value: &Option<String>, file: &Option<PathBuf>) -> Result<Option<String>, &'static str> {

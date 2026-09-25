@@ -1,4 +1,5 @@
 import { Link, useSearchParams } from 'react-router';
+import { useEffect } from 'react';
 import { useClient } from '@solana/react';
 import { formatUnits, type Deployment } from '../lib/api/client';
 import type { AppClient } from '../lib/chain/client';
@@ -25,11 +26,13 @@ export function PortfolioAgreements({
   owner,
   role,
   activity,
+  revision,
 }: {
   deployment: Deployment;
   owner: string;
   role: PortfolioRole;
   activity: ReturnType<typeof useActivity>;
+  revision: number;
 }) {
   const [search, setSearch] = useSearchParams();
   const status = search.get('status') ?? '';
@@ -74,6 +77,7 @@ export function PortfolioAgreements({
           owner={owner}
           role={role}
           activity={activity}
+          revision={revision}
           lifecycle={status ? (status as PortfolioQuery['lifecycle']) : undefined}
         />
       ) : (
@@ -91,12 +95,14 @@ function PortfolioResults({
   role,
   activity,
   lifecycle,
+  revision,
 }: {
   deployment: Deployment;
   owner: string;
   role: PortfolioRole;
   activity: ReturnType<typeof useActivity>;
   lifecycle?: PortfolioQuery['lifecycle'];
+  revision: number;
 }) {
   const [search] = useSearchParams();
   const client = useClient<AppClient>();
@@ -105,6 +111,10 @@ function PortfolioResults({
     mode: role,
     lifecycle,
   });
+  const { refresh } = portfolio;
+  useEffect(() => {
+    if (revision) refresh();
+  }, [revision, refresh]);
   const operations = [
     ...new Map(
       [...activity.pending, ...activity.items]

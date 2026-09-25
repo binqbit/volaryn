@@ -158,10 +158,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 "Invalid catalog transport configuration",
             )
         })?;
-    let app = Application::new(deployment, chain, pool, catalog);
+    let app = Application::new(deployment, chain, pool, catalog, config.index);
     let worker_app = Arc::clone(&app);
     let worker = tokio::spawn(async move {
-        let mut interval = tokio::time::interval(std::time::Duration::from_secs(2));
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(
+            config.index.index_poll_interval_secs,
+        ));
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         loop {
             interval.tick().await;
@@ -175,7 +177,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map_err(|error| startup("binding the HTTP listener", error))?;
     let activity_app = Arc::clone(&app);
     let activity_worker = tokio::spawn(async move {
-        let mut interval = tokio::time::interval(std::time::Duration::from_secs(2));
+        let mut interval = tokio::time::interval(std::time::Duration::from_secs(
+            config.index.index_poll_interval_secs,
+        ));
         interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
         loop {
             interval.tick().await;

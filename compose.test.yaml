@@ -12,6 +12,10 @@ services:
         condition: service_healthy
   app:
     ports: !reset []
+    environment:
+      # Test timing is independent of optional operator overrides.
+      VOLARYN_INDEX_POLL_INTERVAL_SECS: "1"
+      VOLARYN_INDEX_DISCOVERY_INTERVAL_SECS: "2"
   browser-tests:
     build:
       context: .

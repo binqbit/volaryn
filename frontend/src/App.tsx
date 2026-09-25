@@ -39,6 +39,17 @@ export function App({ deployment }: { deployment: Deployment }) {
       : undefined,
   );
   const wallet = useWallet(owner);
+  const refreshedCompletion = useRef<string | undefined>(undefined);
+  const completion = transaction.completedSignature;
+  const refreshWallet = wallet.refresh;
+  const refreshActivity = transaction.activity.refresh;
+  useEffect(() => {
+    if (!completion || refreshedCompletion.current === completion) return;
+    refreshedCompletion.current = completion;
+    setRevision((value) => value + 1);
+    refreshWallet();
+    refreshActivity();
+  }, [completion, refreshWallet, refreshActivity]);
   const [review, setReview] = useState<{ request: ActionRequest; value: Review }>();
   const [reviewError, setReviewError] = useState('');
   const [preparing, setPreparing] = useState(false);
@@ -92,8 +103,6 @@ export function App({ deployment }: { deployment: Deployment }) {
       const agreement = await transaction.execute(visibleReview.request, visibleReview.value);
       setReview(undefined);
       if (agreement) await navigate(`/agreements/${agreement}`);
-      setRevision((value) => value + 1);
-      wallet.refresh();
     } finally {
       previewLock.current = false;
     }
@@ -203,7 +212,10 @@ export function App({ deployment }: { deployment: Deployment }) {
               </div>
             }
           >
-            <Route path="/offers" element={<OffersPage deployment={deployment} owner={owner} />} />
+            <Route
+              path="/offers"
+              element={<OffersPage deployment={deployment} owner={owner} revision={revision} />}
+            />
             <Route
               path="/offers/new"
               element={
@@ -224,6 +236,7 @@ export function App({ deployment }: { deployment: Deployment }) {
                   deployment={deployment}
                   owner={owner}
                   activity={transaction.activity}
+                  revision={revision}
                 />
               }
             />
@@ -234,6 +247,7 @@ export function App({ deployment }: { deployment: Deployment }) {
                   deployment={deployment}
                   owner={owner}
                   activity={transaction.activity}
+                  revision={revision}
                   view="holder"
                 />
               }
@@ -245,6 +259,7 @@ export function App({ deployment }: { deployment: Deployment }) {
                   deployment={deployment}
                   owner={owner}
                   activity={transaction.activity}
+                  revision={revision}
                   view="writer"
                 />
               }
@@ -256,6 +271,7 @@ export function App({ deployment }: { deployment: Deployment }) {
                   deployment={deployment}
                   owner={owner}
                   activity={transaction.activity}
+                  revision={revision}
                   view="activity"
                 />
               }

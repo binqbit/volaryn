@@ -6,18 +6,22 @@ use crate::{
     observations::Deployment,
 };
 use sqlx::PgPool;
-use std::{
-    sync::Arc,
-    time::{Duration, Instant},
-};
-use tokio::task::JoinSet;
+use std::{sync::Arc, time::Duration};
+use tokio::{task::JoinSet, time::Instant};
 
-#[derive(Default)]
 pub struct Indexer {
     discovered_at: Option<Instant>,
+    discovery_interval: Duration,
 }
 
 impl Indexer {
+    pub fn new(discovery_interval: Duration) -> Self {
+        Self {
+            discovered_at: None,
+            discovery_interval,
+        }
+    }
+
     pub async fn refresh(
         &mut self,
         chain: &Arc<Chain>,
@@ -27,7 +31,7 @@ impl Indexer {
         let started = Instant::now();
         let full_scan = self
             .discovered_at
-            .is_none_or(|time| time.elapsed() >= Duration::from_secs(30));
+            .is_none_or(|time| time.elapsed() >= self.discovery_interval);
         let minimum_slot = store::last_slot(pool).await?;
         let mut count = 0;
         if full_scan {
@@ -61,7 +65,7 @@ impl Indexer {
     }
 }
 
-async fn refresh_batches(
+pub(crate) async fn refresh_batches(
     chain: &Arc<Chain>,
     pool: &PgPool,
     deployment: &Deployment,

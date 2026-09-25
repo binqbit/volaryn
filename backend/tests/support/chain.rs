@@ -7,7 +7,7 @@ use serde_json::{json, Value};
 use std::{
     collections::BTreeMap,
     sync::{
-        atomic::{AtomicI64, AtomicUsize, Ordering},
+        atomic::{AtomicI64, AtomicU64, AtomicUsize, Ordering},
         Arc,
     },
 };
@@ -17,6 +17,7 @@ pub struct Ledger {
     pub accounts: BTreeMap<String, Value>,
     pub addresses: Vec<String>,
     pub discoveries: AtomicUsize,
+    pub discovery_slot: AtomicU64,
     pub batches: AtomicUsize,
     pub time: AtomicI64,
 }
@@ -89,6 +90,7 @@ impl Ledger {
             accounts,
             addresses,
             discoveries: AtomicUsize::new(0),
+            discovery_slot: AtomicU64::new(10),
             batches: AtomicUsize::new(0),
             time: AtomicI64::new(1800000000),
         })
@@ -136,7 +138,7 @@ async fn respond(State(ledger): State<Arc<Ledger>>, Json(request): Json<Value>) 
             assert_eq!(request["params"][1]["dataSlice"]["length"], 0);
             assert_eq!(request["params"][1]["filters"][0]["memcmp"]["offset"], 0);
             let values: Vec<_> = ledger.addresses.iter().map(|key| json!({"pubkey":key,"account":{"owner":volaryn::ID.to_string(),"data":["","base64"]}})).collect();
-            json!({"context":{"slot":10},"value":values})
+            json!({"context":{"slot":ledger.discovery_slot.load(Ordering::Relaxed)},"value":values})
         }
         "getMultipleAccounts" => {
             ledger.batches.fetch_add(1, Ordering::Relaxed);

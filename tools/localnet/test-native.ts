@@ -44,7 +44,13 @@ async function bootApp(log: string, databaseUrl?: string) {
     'target/debug/volaryn',
     ['--manifest', manifest, '--rpc-url', rpc, '--bind', `127.0.0.1:${appPort}`],
     `${directory}/${log}`,
-    { ...applicationEnvironment(), ...(databaseUrl ? { DATABASE_URL: databaseUrl } : {}) },
+    {
+      ...applicationEnvironment(),
+      // Test timing is independent of optional operator overrides.
+      VOLARYN_INDEX_POLL_INTERVAL_SECS: '1',
+      VOLARYN_INDEX_DISCOVERY_INTERVAL_SECS: '2',
+      ...(databaseUrl ? { DATABASE_URL: databaseUrl } : {}),
+    },
   );
   await waitFor(`${appUrl}/health/index`, app);
 }

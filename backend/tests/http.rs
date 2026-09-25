@@ -58,6 +58,7 @@ async fn readiness_proxy_and_static_routes_keep_their_boundaries() {
         Chain::new(endpoint.clone()).unwrap(),
         pool,
         volaryn_backend::catalog::Catalog::new(endpoint).unwrap(),
+        Default::default(),
     );
     let service = router(app.clone(), directory.path().to_owned());
     let response = service
