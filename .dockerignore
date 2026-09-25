@@ -3,6 +3,7 @@ target
 **/target
 artifacts
 debug-tools
+demo-videos
 .anchor
 .env
 node_modules
