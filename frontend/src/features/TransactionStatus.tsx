@@ -37,9 +37,9 @@ export function TransactionStatus({
         aria-label="Transaction status"
         aria-live="polite"
       >
-        {text[transaction.phase]}
-        {transaction.pending && <code>{transaction.pending.signature}</code>}
+        <span>{text[transaction.phase]}</span>
         <Link to="/portfolio/activity">View activity →</Link>
+        {transaction.pending && <code>{transaction.pending.signature}</code>}
       </div>
     </>
   );
