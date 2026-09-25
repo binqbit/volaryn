@@ -537,14 +537,60 @@ async fn server_preflight_blocks_invalid_receipts_and_preserves_relay_ambiguity(
         .extend(fixtures::accounts(&action.state(), 20));
     let router = http::router(app.clone(), "missing-test-frontend".into());
     let request = || {
+        let mut params = action.params();
+        params[1] = json!({"encoding":"base64", "skipPreflight":false,
+            "preflightCommitment":"confirmed", "maxRetries":0, "minContextSlot":10});
         Request::post("/rpc")
             .header("content-type", "application/json")
             .body(Body::from(
-                json!({"jsonrpc":"2.0", "id":1, "method":"sendTransaction", "params":action.params()})
+                json!({"jsonrpc":"2.0", "id":1, "method":"sendTransaction", "params":params})
                     .to_string(),
             ))
             .unwrap()
     };
+    *network.simulation.lock().unwrap() = Some(json!({"context":{"slot":10},"value":{"err":null}}));
+    for config in [
+        json!({"encoding":"base64", "skipPreflight":"invalid"}),
+        json!({"encoding":"base64", "maxRetries":-1}),
+        json!({"encoding":"base64", "minContextSlot":"10"}),
+        json!({"encoding":"base64", "preflightCommitment":"invalid"}),
+        Value::Null,
+    ] {
+        let mut params = action.params();
+        if config.is_null() {
+            params
+                .as_array_mut()
+                .unwrap()
+                .push(json!("unexpected third argument"));
+        } else {
+            params[1] = config;
+        }
+        let response = router
+            .clone()
+            .oneshot(
+                Request::post("/rpc")
+                    .header("content-type", "application/json")
+                    .body(Body::from(
+                        json!({"jsonrpc":"2.0", "id":1,
+                    "method":"sendTransaction", "params":params})
+                        .to_string(),
+                    ))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            response.status(),
+            400,
+            "Malformed send options must be rejected before recording or relaying"
+        );
+        assert!(receipts::find(&pool, &action.signature())
+            .await
+            .unwrap()
+            .is_none());
+        assert_eq!(network.sent.load(Ordering::Relaxed), 0);
+        assert_eq!(network.simulated.load(Ordering::Relaxed), 0);
+    }
     for (simulation, status) in [
         (
             Some(json!({"context":{"slot":10},"value":{"err":"AccountNotFound"}})),

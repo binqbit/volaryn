@@ -4,6 +4,7 @@ use anchor_lang::{prelude::Pubkey, AnchorDeserialize, Discriminator};
 use base64::{engine::general_purpose::STANDARD, Engine};
 use bincode::Options;
 use serde_json::Value;
+use solana_rpc_client_api::config::{RpcSendTransactionConfig, UiTransactionEncoding};
 use solana_transaction::Transaction;
 
 pub(super) struct Intent {
@@ -17,8 +18,15 @@ pub(super) struct Intent {
 }
 
 pub(super) fn decode(params: &Value) -> Result<Option<Intent>, AppError> {
+    if params.as_array().is_none_or(|values| values.len() != 2) {
+        return Err(AppError::Invalid);
+    }
+    // Simulation uses its own options, but the relay forwards the original request.
+    // Reject options the upstream cannot deserialize before admitting durable work.
+    let config: RpcSendTransactionConfig =
+        serde_json::from_value(params[1].clone()).map_err(|_| AppError::Invalid)?;
     let encoded = params[0].as_str().ok_or(AppError::Invalid)?;
-    if params[1]["encoding"] != "base64" || encoded.len() > 1644 {
+    if config.encoding != Some(UiTransactionEncoding::Base64) || encoded.len() > 1644 {
         return Err(AppError::Invalid);
     }
     let bytes = STANDARD.decode(encoded).map_err(|_| AppError::Invalid)?;
