@@ -1,4 +1,9 @@
 import type { components } from '../lib/api/schema';
+import { formatUnits } from '../lib/api/client';
+
+export function formatFeeRate(basisPoints: number): string {
+  return `${formatUnits(String(basisPoints), 2)}% (${basisPoints} bps)`;
+}
 
 /** Only group observed rules shared by the full catalog, independently of the search filter. */
 export function sharedTransferRestrictions(

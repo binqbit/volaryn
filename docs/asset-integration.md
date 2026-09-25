@@ -2,6 +2,8 @@
 
 The **Official assets** page (`/issuer-assets`) reads PreStocks context and verifies mint accounts on Solana mainnet. It is independent of the local demo's assets, balances, ledger, and signing flow. A compatible observation is evidence for admission review, not an executable offer or permission to transact. Live use requires a released deployment with a matching on-chain `AssetPolicy`.
 
+Each card's **Verified token behavior** tooltip shows current and scheduled issuer fees as percentages and basis points, for example **1% (100 bps)**, with their separate maximum fees in exact unscaled tokens and raw units and the scheduled activation epoch. These mainnet observations can differ from local demo fees; Volaryn charges no trading fee. A failed chain refresh labels retained rates **Last observed**; a market-price failure alone does not make a fresh chain fee stale. Missing chain evidence does not expose verified token details. Verified absence of the extension shows **No transfer-fee extension**, while a configured zero rate shows **0% (0 bps)**.
+
 ## Local PreStocks experience
 
 The local demo uses disposable replicas of the reviewed ANDURIL, ANTHROPIC, FIGUREAI, KALSHI, NEURALINK, OPENAI, POLYMARKET, and SPACEX identities. `tools/localnet/assets.ts` maps stable local fixture seeds to `config/assets.json`; bootstrap derives the public metadata from that registry. Deployment schema 3 carries the local mint, reference mainnet mint, name, ticker, precision, and issuer page. The backend rejects unknown references, duplicate identities, altered metadata, and mainnet mints passed as local replicas.

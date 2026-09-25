@@ -25,6 +25,7 @@ export function OfficialAssets() {
   const request = useRequest(source, { getAbortSignal: () => AbortSignal.timeout(12000) });
   const { refresh } = request;
   const status = observationStatus(request);
+  const chainStale = status === 'error' || request.data?.chainSource.status !== 'fresh';
   useEffect(() => {
     if (request.status === 'fetching') return;
     const timer = setTimeout(refresh, 30000);
@@ -84,7 +85,8 @@ export function OfficialAssets() {
             </section>
           )}
           <p className={info.note}>
-            Individual fees, token settings and additional restrictions are in each asset's details.
+            Fee limits, scheduled changes, token settings and additional restrictions are in each
+            asset's Verified token behavior.
           </p>
         </InfoPopover>
       </aside>
@@ -180,6 +182,7 @@ export function OfficialAssets() {
                 key={asset.mint}
                 asset={asset}
                 unavailable={status === 'error'}
+                chainStale={chainStale}
                 sharedRestrictions={sharedRestrictions}
               />
             ))}

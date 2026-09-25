@@ -1,8 +1,9 @@
-import { shortAddress } from '../lib/api/client';
+import { formatUnits, shortAddress } from '../lib/api/client';
 import type { components } from '../lib/api/schema';
 import { InfoPopover } from './InfoPopover';
 import {
   formatBuffer,
+  formatFeeRate,
   formatPolicyDate,
   formatSourcePrice,
   protectionDeadline,
@@ -22,10 +23,12 @@ const eligibilityLabels: Record<components['schemas']['Eligibility'], string> = 
 export function OfficialAssetCard({
   asset,
   unavailable,
+  chainStale,
   sharedRestrictions,
 }: {
   asset: components['schemas']['OfficialAsset'];
   unavailable: boolean;
+  chainStale: boolean;
   sharedRestrictions: readonly string[];
 }) {
   const eligibility =
@@ -150,7 +153,7 @@ export function OfficialAssetCard({
         </InfoPopover>
         {asset.chain && (
           <InfoPopover title="Verified token behavior" context={asset.name}>
-            {unavailable && (
+            {chainStale && (
               <p className={info.note} data-tone="warning" role="status">
                 Last known observations · refresh unavailable.
               </p>
@@ -160,15 +163,15 @@ export function OfficialAssetCard({
               {asset.chain.currentFee ? (
                 <dl className={info.facts}>
                   <div>
-                    <dt>Current issuer fee</dt>
-                    <dd>
-                      {asset.chain.currentFee.basisPoints} <small>basis points</small>
-                    </dd>
+                    <dt>{chainStale ? 'Last observed issuer fee' : 'Current issuer fee'}</dt>
+                    <dd>{formatFeeRate(asset.chain.currentFee.basisPoints)}</dd>
                   </div>
                   <div>
                     <dt>Maximum fee</dt>
                     <dd>
-                      {asset.chain.currentFee.maximumRaw} <small>raw units</small>
+                      {formatUnits(asset.chain.currentFee.maximumRaw, asset.chain.decimals)}
+                      <small>unscaled tokens per transfer</small>
+                      <small>{asset.chain.currentFee.maximumRaw} raw units</small>
                     </dd>
                   </div>
                 </dl>
@@ -180,8 +183,16 @@ export function OfficialAssetCard({
                   <div>
                     <dt>Scheduled fee</dt>
                     <dd>
-                      {asset.chain.nextFee.basisPoints} basis points
+                      {formatFeeRate(asset.chain.nextFee.basisPoints)}
                       <small>from epoch {asset.chain.nextFee.epoch}</small>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Scheduled maximum fee</dt>
+                    <dd>
+                      {formatUnits(asset.chain.nextFee.maximumRaw, asset.chain.decimals)}
+                      <small>unscaled tokens per transfer</small>
+                      <small>{asset.chain.nextFee.maximumRaw} raw units</small>
                     </dd>
                   </div>
                 </dl>

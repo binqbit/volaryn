@@ -33,6 +33,7 @@ export function officialCatalog(): components['schemas']['OfficialCatalog'] {
         extensions: registry.extensions,
         authorities: { mint: registry.issuerAuthority },
         currentFee: { basisPoints: 100, maximumRaw: '1000000', epoch: '42' },
+        nextFee: { basisPoints: 75, maximumRaw: '2000000', epoch: '44' },
         displayMultiplier: '1.5',
         transparentTransferSupported: true,
         restrictions: [
