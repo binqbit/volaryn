@@ -245,5 +245,68 @@ test('an unavailable chain clock does not claim protection is still exercisable'
     'Protection activated · checking expiry',
   );
   await expect(page.getByRole('button', { name: 'Exercise protection' })).toBeDisabled();
+  state.wallets[d.localnet!.writer]!.accounts = [
+    account(d.usdcMint, d.localnet!.writerUsdc, '100000000'),
+  ];
+  // Even a deadline far in the browser's past must not enable reclaim without chain time.
+  state.agreement = { ...state.agreement, expiresAt: '1' };
+  await page.reload();
+  await switchWallet(page, 'writer');
+  await expect(page.getByRole('button', { name: 'Reserve locked until expiry' })).toBeDisabled();
   expect(state.unexpected).toEqual([]);
 });
+
+for (const side of ['holder', 'writer'] as const) {
+  test(`${side} origin cancellation and terminal cleanup remain available without chain time`, async ({
+    page,
+  }) => {
+    const { state, account } = await balanceFixture(page);
+    const d = state.deployment;
+    const creator = d.localnet![side];
+    state.agreement = {
+      ...state.agreement,
+      side,
+      creator,
+      holder: side === 'holder' ? creator : null,
+      writer: side === 'writer' ? creator : null,
+    };
+    for (const role of ['holder', 'writer'] as const) {
+      state.wallets[d.localnet![role]]!.accounts = [
+        account(d.usdcMint, d.localnet![`${role}Usdc`], '100000000'),
+      ];
+    }
+    await page.route('**/rpc', async (route) => {
+      const { method, id } = route.request().postDataJSON();
+      if (method === 'getBlockTime')
+        return route.fulfill({ json: { jsonrpc: '2.0', id, result: null } });
+      await route.fallback();
+    });
+    await page.goto(`/agreements/${state.agreement.address}`);
+    await switchWallet(page, side);
+    await expect(
+      page.getByRole('button', {
+        name: side === 'holder' ? 'Cancel request' : 'Cancel offer',
+        exact: true,
+      }),
+    ).toBeEnabled();
+    await expect(
+      page.getByText('Deadline-dependent actions are paused', { exact: false }),
+    ).toHaveCount(0);
+
+    await switchWallet(page, side === 'holder' ? 'writer' : 'holder');
+    await expect(
+      page.getByRole('button', {
+        name: side === 'holder' ? 'Fund protection' : 'Activate protection',
+        exact: true,
+      }),
+    ).toBeDisabled();
+    await expect(page.getByRole('button', { name: /Cancel request|Cancel offer/ })).toHaveCount(0);
+
+    state.agreement = { ...state.agreement, status: 'cancelled' };
+    await page.reload();
+    await expect(page.getByRole('button', { name: 'Recover residual funds' })).toHaveCount(0);
+    await switchWallet(page, side);
+    await expect(page.getByRole('button', { name: 'Recover residual funds' })).toBeEnabled();
+    expect(state.unexpected).toEqual([]);
+  });
+}

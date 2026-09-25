@@ -74,7 +74,7 @@ export function AgreementPanel({
   const managementAction = (isCreator && open) || (isWriter && active && expired) || canCleanup;
   const requiredUsdc =
     open && primaryAction ? BigInt(request ? agreement.payout : agreement.premium) : undefined;
-  const eligible = !!owner && now !== undefined && !!usdc && usable && !action;
+  const eligible = !!owner && !!usdc && usable && !action;
   const actionLabel = (operation: Operation, fallback: string) =>
     action?.operation === operation ? action.label : fallback;
   const deliverable =
@@ -239,6 +239,7 @@ export function AgreementPanel({
           data-complete={primaryProgress?.complete || undefined}
           disabled={
             !eligible ||
+            now === undefined ||
             (active
               ? expired || !deliverable
               : acceptanceEnded || BigInt(usdc?.amountRaw ?? '0') < (requiredUsdc ?? 0n))
@@ -312,9 +313,10 @@ export function AgreementPanel({
           to check eligibility. Nothing is activated automatically.
         </p>
       )}
-      {now === undefined && !terminal && (
+      {now === undefined && (primaryAction || (isWriter && active)) && (
         <p className={styles.note}>
-          Waiting for the network clock. Actions are paused until deadlines can be checked.
+          Waiting for the network clock. Deadline-dependent actions are paused until deadlines can
+          be checked.
         </p>
       )}
       <p className={styles.note}>

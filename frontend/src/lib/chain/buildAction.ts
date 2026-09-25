@@ -74,7 +74,6 @@ export async function buildAction(
   const { rpc } = client;
   if ((await rpc.getGenesisHash().send()) !== deployment.genesisHash)
     throw new Error('Wrong network: the ledger identity changed');
-  const now = await chainTime(client);
   const mintAddress = address(
     request.operation === 'create'
       ? request.terms.underlyingMint
@@ -137,6 +136,7 @@ export async function buildAction(
   let reserveAmount: string | null = null;
   let underlyingAccount: string | null = null;
   if (creating) {
+    const now = await chainTime(client);
     if (
       !quantity ||
       !payout ||
@@ -274,6 +274,7 @@ export async function buildAction(
       );
     const refundInput = { ...addresses, actor: signer, actorUsdc: usdcAddress, usdcMint };
     if (request.operation === 'activate') {
+      const now = await chainTime(client);
       if (agreement.creator === signer.address) throw new Error('You cannot accept your own offer');
       const { data: policy, programAddress: policyProgram } = await fetchAssetPolicy(
         rpc,
@@ -322,6 +323,7 @@ export async function buildAction(
         });
       }
     } else if (request.operation === 'exercise') {
+      const now = await chainTime(client);
       if (
         agreement.status !== AgreementStatus.Active ||
         unwrapOption(agreement.holder) !== signer.address ||
@@ -364,6 +366,7 @@ export async function buildAction(
           throw new Error('Only an unaccepted offer can be cancelled');
         instruction = getCancelOfferInstruction(refundInput);
       } else if (request.operation === 'reclaim') {
+        const now = await chainTime(client);
         if (agreement.status !== AgreementStatus.Active || now < expiresAt)
           throw new Error('An active reserve cannot be withdrawn before expiry');
         instruction = getReclaimExpiredInstruction(refundInput);
