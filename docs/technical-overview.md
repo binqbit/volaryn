@@ -82,7 +82,7 @@ The diagram shows **stored contract states**. Time passing alone submits no tran
 
 Cancellation refunds the original deposit to the creator: premium for a sell request, payout for a buy offer. Expiry reclaim returns the payout to the writer, who already received the premium at activation. A holder cannot cancel an active agreement to recover the premium.
 
-`cleanup_terminal` is a separate recovery instruction, not another financial lifecycle stage. It sweeps residual reserve USDC to the entitled beneficiary and handles settlement authority where applicable. It leaves the Agreement record and reserve account intact, changes no terminal status, and cannot reopen an exercised right. Account closure and rent recovery are not implicit.
+`cleanup_terminal` is a separate recovery instruction, not another financial lifecycle stage. It sweeps residual reserve USDC to the entitled beneficiary and handles settlement authority where applicable. A frozen underlying account defers its authority handoff until the issuer thaws it; this does not block the USDC sweep. It leaves the Agreement record and reserve account intact, changes no terminal status, and cannot reopen an exercised right. Account closure and rent recovery are not implicit.
 
 **Code:** [refund and reclaim](../programs/volaryn/src/instructions/refund.rs), [terminal cleanup](../programs/volaryn/src/instructions/cleanup_terminal.rs), [frontend lifecycle interpretation](../frontend/src/features/agreementLifecycle.ts). The [lifecycle reference](offer-lifecycle.md) describes participant-specific labels and available actions.
 

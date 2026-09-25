@@ -99,7 +99,7 @@ The scenarios verify both offer origins, side-specific deposits, atomic payout f
 
 Every scenario transaction is checked against the legacy transaction size limit. The full exercise scenarios also enforce a 200,000 compute-unit budget; normal SBF execution enforces stack, heap, and nested-call limits. Financial checks keep signature and blockhash verification enabled. No fixture bypasses agreement authorization or edits financial state directly.
 
-Terminal agreements remain allocated to prevent address reuse. Cleanup sweeps reserve surplus and hands over any remaining PDA-controlled underlying account. It does not automatically close token accounts or withdraw issuer-owned withheld fees; the terminal beneficiary can use ordinary token instructions after handoff: the creator after cancellation, or the writer after exercise/expired reclaim. Freezing or dust in the underlying account cannot become a prerequisite for a reserve refund.
+Terminal agreements remain allocated to prevent address reuse. Cleanup sweeps reserve surplus and hands over any remaining PDA-controlled underlying account when it is not frozen. A frozen underlying account remains under the agreement PDA; surplus USDC still returns to the beneficiary, who can retry handoff after the issuer thaws it. After handoff, a later change of token-account owner neither changes the USDC beneficiary nor blocks further surplus recovery. It does not automatically close token accounts or withdraw issuer-owned withheld fees; the terminal beneficiary can use ordinary token instructions after handoff: the creator after cancellation, or the writer after exercise/expired reclaim. Freezing or dust in the underlying account cannot become a prerequisite for a reserve refund.
 
 ## Run the local application
 

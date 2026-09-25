@@ -84,16 +84,18 @@ pub fn handle_cleanup_terminal(ctx: Context<CleanupTerminal>) -> Result<()> {
             &[seeds],
         )?;
     }
-    // After handoff the beneficiary may close the account. Late reserve donations remain recoverable.
+    // After handoff the beneficiary may close or transfer the account. Late reserve donations
+    // remain recoverable by the original terminal beneficiary.
     let closed = ctx.accounts.settlement.data_is_empty()
         && ctx.accounts.settlement.owner == &anchor_lang::system_program::ID;
     if agreement.status != AgreementStatus::Exercised && !closed {
         use anchor_spl::token_2022::spl_token_2022::{
             extension::StateWithExtensions, state::Account as TokenState,
         };
-        let authority = {
+        let (authority, frozen) = {
             let data = ctx.accounts.settlement.try_borrow_data()?;
-            StateWithExtensions::<TokenState>::unpack(&data)?.base.owner
+            let state = StateWithExtensions::<TokenState>::unpack(&data)?;
+            (state.base.owner, state.base.is_frozen())
         };
         if authority == agreement.key() {
             token::validate_settlement(
@@ -101,19 +103,17 @@ pub fn handle_cleanup_terminal(ctx: Context<CleanupTerminal>) -> Result<()> {
                 &agreement.key(),
                 &agreement.underlying_mint,
             )?;
-            token::handoff(
-                &ctx.accounts.underlying_program.to_account_info(),
-                &ctx.accounts.settlement.to_account_info(),
-                &agreement.to_account_info(),
-                &beneficiary,
-                &[seeds],
-            )?;
-        } else {
-            require_keys_eq!(
-                authority,
-                beneficiary,
-                VolarynError::InvalidSettlementAccount
-            );
+            // An issuer freeze blocks SetAuthority, but must not block the USDC sweep.
+            // Keep PDA control so cleanup can retry the handoff after the issuer thaws it.
+            if !frozen {
+                token::handoff(
+                    &ctx.accounts.underlying_program.to_account_info(),
+                    &ctx.accounts.settlement.to_account_info(),
+                    &agreement.to_account_info(),
+                    &beneficiary,
+                    &[seeds],
+                )?;
+            }
         }
     }
     Ok(())
