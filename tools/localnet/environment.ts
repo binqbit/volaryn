@@ -26,6 +26,9 @@ export async function validatorArguments(directory: string, rpcPort: number) {
   return [
     '--ledger',
     `${directory}/ledger`,
+    // Agave's 10,000-shred default can prune past the latest snapshot.
+    '--limit-ledger-size',
+    '1000000',
     '--rpc-port',
     String(rpcPort),
     '--faucet-port',

@@ -28,6 +28,9 @@ services:
     command: [
       --ledger,
       /ledger,
+      # Retain the replay history after the latest snapshot across restarts.
+      --limit-ledger-size,
+      "1000000",
       --bind-address,
       validator,
       --rpc-port,

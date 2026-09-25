@@ -198,6 +198,8 @@ npm run dev:localnet
 
 Open `http://localhost:8080`. The launcher owns a loopback-only PostgreSQL cluster and Solana validator, supplies the database connection, initializes fixtures, and waits for application readiness. It fails if port 8080 or the persistent runner is already in use. Ctrl+C stops its processes and retains the ledger, manifest, database, and logs under `target/localnet/`. Run the same command to resume. Build changed Rust/frontend sources before restarting; this command does not run a watcher. Only this complete localnet environment needs a running validator; contract tests continue to use LiteSVM.
 
+Both native and Compose validators retain 1,000,000 shreds with `--limit-ledger-size`. Agave 4.0.3's 10,000-shred default can remove blocks newer than the latest snapshot before shutdown, leaving a replay gap that prevents finalization after restart. Keep this retention setting when changing the launcher. Recovery checks require the finalized chain and index to resume while preserving balances and agreements; an RPC process responding alone is insufficient.
+
 ## Local development reset
 
 Development maintains one current contract, manifest, generated client and database schema. Change them together; do not add historical decoders, conversion jobs or incremental migrations solely to retain disposable development data. Version identifiers and program fingerprints remain validation boundaries, not promises to support older formats.
