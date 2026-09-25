@@ -5,7 +5,8 @@ CREATE TABLE deployment (
 );
 
 CREATE TABLE agreements (
-    address TEXT PRIMARY KEY,
+    -- Base58 cursor comparisons and indexes use byte order, independent of database locale.
+    address TEXT COLLATE "C" PRIMARY KEY,
     projection JSONB NOT NULL,
     finalized_slot NUMERIC(20, 0) NOT NULL CHECK (
         finalized_slot BETWEEN 0 AND 18446744073709551615

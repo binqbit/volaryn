@@ -36,8 +36,11 @@ impl Database {
             std::process::id(),
             NEXT.fetch_add(1, Ordering::Relaxed)
         );
+        // Exercise linguistic ordering even when the native cluster uses --no-locale.
+        // ICU avoids depending on an OS-specific locale name or installed locale files.
         sqlx::query(sqlx::AssertSqlSafe(format!(
-            "CREATE DATABASE {name} OWNER volaryn"
+            "CREATE DATABASE {name} OWNER volaryn
+             TEMPLATE template0 ENCODING 'UTF8' LOCALE_PROVIDER icu ICU_LOCALE 'en'"
         )))
         .execute(&admin)
         .await

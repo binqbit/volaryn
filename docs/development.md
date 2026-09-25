@@ -215,7 +215,7 @@ For native development, stop `npm run dev:localnet`, remove only the disposable 
 
 ## Database changes and recovery
 
-Local launchers provision the database and restricted application role; the backend applies the schema before serving requests. No database connection is needed to compile code or export OpenAPI. Native tests allocate their own cluster and per-scenario databases, while container tests use an isolated Compose database service. `VOLARYN_TEST_DATABASE_URL` is an internal runner setting used only to create and remove owned test databases; it is not application configuration.
+Local launchers provision the database and restricted application role; the backend applies the schema before serving requests. No database connection is needed to compile code or export OpenAPI. Native tests allocate their own cluster and per-scenario databases, while container tests use an isolated Compose database service. Both create test databases with English ICU collation, so locale-dependent ordering cannot be hidden by the native cluster's `--no-locale` default. Pagination tests verify bytewise address order across mixed-case cursors and more than a thousand agreements, including reconciliation reads. `VOLARYN_TEST_DATABASE_URL` is an internal runner setting used only to create and remove owned test databases; it is not application configuration.
 
 `backend/migrations/0001_initial_schema.sql` defines deployment identity, chain projections, reconciliation and durable activity receipts together. Edit this baseline for development schema changes and recreate the disposable environment using [local development reset](#local-development-reset). SQLx still validates applied checksums and serializes concurrent initialization; startup never erases a database or ignores a schema conflict. Tests cover fresh installation, repeated and concurrent startup, retained data and rejection of changed migration history.
 
@@ -223,7 +223,7 @@ Rebuilding observations cannot recover discarded off-chain history. For retained
 
 ## Application checks
 
-Use Node **24.15.0**, its bundled npm **11.x**, and PostgreSQL **17.11** for native application checks. Install PostgreSQL through the host package manager with `postgres`, `initdb`, `pg_ctl`, and `psql` on `PATH`; a system database service is unnecessary. Run as an ordinary user because `initdb` refuses root. `.npmrc` enforces engine and peer compatibility; `npm ci` uses the committed lockfile. For native backend/frontend checks without a validator:
+Use Node **24.15.0**, its bundled npm **11.x**, and PostgreSQL **17.11** with ICU support for native application checks. The pinned PostgreSQL Docker image already includes ICU. Install PostgreSQL through the host package manager with `postgres`, `initdb`, `pg_ctl`, and `psql` on `PATH`; a system database service is unnecessary. Run as an ordinary user because `initdb` refuses root. `.npmrc` enforces engine and peer compatibility; `npm ci` uses the committed lockfile. For native backend/frontend checks without a validator:
 
 ```sh
 ./tools/test app

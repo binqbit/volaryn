@@ -79,7 +79,7 @@ pub async fn upsert(
         "INSERT INTO agreements (address, projection, finalized_slot, observed_at)
          SELECT item ->> 'address', item - 'finalizedSlot' - 'observedAt',
                 (item ->> 'finalizedSlot')::NUMERIC, (item ->> 'observedAt')::BIGINT
-         FROM jsonb_array_elements($1) AS item ORDER BY item ->> 'address'
+         FROM jsonb_array_elements($1) AS item ORDER BY (item ->> 'address') COLLATE \"C\"
          ON CONFLICT (address) DO UPDATE SET
              projection = EXCLUDED.projection,
              finalized_slot = EXCLUDED.finalized_slot,

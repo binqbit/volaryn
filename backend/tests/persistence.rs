@@ -48,6 +48,25 @@ async fn pages_filters_and_targeted_updates_work_beyond_one_thousand_agreements(
         found, expected,
         "Every address appears exactly once in key order"
     );
+    let mut active = Vec::new();
+    let mut after = String::new();
+    loop {
+        let page = store::active_addresses(&pool, &after).await.unwrap();
+        assert!(page.len() <= 200);
+        let Some(last) = page.last() else {
+            break;
+        };
+        after = last.clone();
+        active.extend(page);
+        assert!(
+            active.len() <= expected.len(),
+            "Worker cursors must advance"
+        );
+    }
+    assert_eq!(
+        active, expected,
+        "Reconciliation uses the same address order"
+    );
     let mut changed = rows[1200].clone();
     changed.status = "exercised".into();
     changed.finalized_slot = "11".into();
@@ -124,6 +143,67 @@ async fn pages_filters_and_targeted_updates_work_beyond_one_thousand_agreements(
     )
     .await
     .is_err());
+    pool.close().await;
+    database.close().await;
+}
+
+#[tokio::test]
+async fn address_cursors_use_bytewise_order_under_a_linguistic_collation() {
+    let database = database::Database::new().await;
+    let pool = store::open(database.options.clone(), &support::deployment())
+        .await
+        .unwrap();
+    let linguistic_order: bool = sqlx::query_scalar("SELECT 'a'::TEXT < 'Z'::TEXT")
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    assert!(
+        linguistic_order,
+        "The fixture must expose locale-sensitive ordering"
+    );
+
+    let rows: Vec<_> = ['a', 'Z', 'z', 'A']
+        .into_iter()
+        .map(|prefix| {
+            let mut row = agreement::agreement(10, 100);
+            row.address = format!("{prefix}{}", "1".repeat(42));
+            row.address.parse::<Pubkey>().unwrap();
+            row
+        })
+        .collect();
+    store::upsert(&pool, &rows, 10, 100).await.unwrap();
+    let expected: Vec<_> = ['A', 'Z', 'a', 'z']
+        .into_iter()
+        .map(|prefix| format!("{prefix}{}", "1".repeat(42)))
+        .collect();
+
+    // Both portfolio and offer cursors must use the same order as their indexes.
+    for offers_only in [false, true] {
+        let mut query = AgreementQuery {
+            limit: Some(1),
+            owner: rows[0].writer.clone(),
+            ..Default::default()
+        };
+        for (index, address) in expected.iter().enumerate() {
+            let page = store::agreements(&pool, &query, offers_only, Some(100))
+                .await
+                .unwrap();
+            assert_eq!(page.items.len(), 1);
+            assert_eq!(&page.items[0].address, address);
+            assert_eq!(page.next, (index < 3).then(|| address.clone()));
+            query.after = Some(address.clone());
+        }
+        assert!(store::agreements(&pool, &query, offers_only, Some(100))
+            .await
+            .unwrap()
+            .items
+            .is_empty());
+    }
+    assert_eq!(
+        store::active_addresses(&pool, &expected[1]).await.unwrap(),
+        expected[2..],
+        "Worker cursors cross the uppercase/lowercase boundary without skipping addresses"
+    );
     pool.close().await;
     database.close().await;
 }
